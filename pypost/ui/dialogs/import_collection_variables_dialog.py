@@ -1,22 +1,10 @@
 """Dialog allowing users to inspect collection variables, select presets, and import."""
 from __future__ import annotations
 
-from dataclasses import dataclass
 import logging
 from typing import Any, Iterable
 
-from PySide6.QtCore import (
-    QAbstractItemModel,
-    QAbstractTableModel,
-    QModelIndex,
-    QObject,
-    QPersistentModelIndex,
-    Qt,
-    QThread,
-    Signal,
-)
 from PySide6.QtWidgets import (
-    QAbstractItemDelegate,
     QComboBox,
     QDialog,
     QDialogButtonBox,
@@ -24,9 +12,6 @@ from PySide6.QtWidgets import (
     QHeaderView,
     QLabel,
     QPushButton,
-    QStyledItemDelegate,
-    QStyleOptionViewItem,
-    QTableView,
     QVBoxLayout,
     QWidget,
 )
@@ -34,713 +19,65 @@ from PySide6.QtWidgets import (
 from pypost.core.collection_variable_import import (
     ConflictStrategy,
     ImportSummary,
-    format_variable_value,
     import_collection_variables_to_environment,
 )
-from pypost.core.constants import HIDDEN_MASK
 from pypost.models.models import Collection, Environment
+from pypost.ui.delegates.conflict_strategy_delegate import ConflictStrategyDelegate
+from pypost.ui.models.collection_variables_table_model import (
+    COL_CANDIDATE_VALUE,
+    COL_CURRENT_VALUE,
+    COL_DESC,
+    COL_NAME,
+    COL_SECRET,
+    COL_SELECT,
+    COL_STATUS,
+    COL_STRATEGY,
+    COL_TYPE,
+    HEADERS,
+    CollectionVariableRowRecord,
+    CollectionVariablesTableModel,
+)
+from pypost.ui.views.collection_variables_table_view import (
+    CollectionVariablesTableView,
+    HeaderItemProxy,
+    TableItemProxy,
+)
 from pypost.ui.widget_ids import (
     IMPORT_COLLECTION_BULK_KEEP_CURRENT_BUTTON,
     IMPORT_COLLECTION_BULK_OVERWRITE_BUTTON,
     IMPORT_COLLECTION_DESELECT_ALL_BUTTON,
     IMPORT_COLLECTION_PRESET_COMBO,
-    IMPORT_COLLECTION_ROW_STRATEGY_COMBO_PREFIX,
     IMPORT_COLLECTION_SELECT_ALL_BUTTON,
     IMPORT_COLLECTION_SOURCE_COMBO,
     IMPORT_COLLECTION_VARIABLES_DIALOG,
     IMPORT_COLLECTION_VARS_TABLE,
     set_widget_id,
 )
+from pypost.ui.workers.collection_fetch_worker import CollectionFetchWorker
 
 logger = logging.getLogger(__name__)
 
-COL_SELECT = 0
-COL_NAME = 1
-COL_CURRENT_VALUE = 2
-COL_CANDIDATE_VALUE = 3
-COL_STRATEGY = 4
-COL_TYPE = 5
-COL_SECRET = 6
-COL_STATUS = 7
-COL_DESC = 8
-
-HEADERS = [
-    "",
-    "Name",
-    "Current Value",
-    "Candidate Value",
-    "Conflict Strategy",
-    "Type",
-    "Secret",
-    "Status",
-    "Description",
+# Backward-compatible re-exports for existing tests and callers.
+__all__ = [
+    "COL_CANDIDATE_VALUE",
+    "COL_CURRENT_VALUE",
+    "COL_DESC",
+    "COL_NAME",
+    "COL_SECRET",
+    "COL_SELECT",
+    "COL_STATUS",
+    "COL_STRATEGY",
+    "COL_TYPE",
+    "HEADERS",
+    "CollectionFetchWorker",
+    "CollectionVariableRowRecord",
+    "CollectionVariablesTableModel",
+    "CollectionVariablesTableView",
+    "ConflictStrategyDelegate",
+    "HeaderItemProxy",
+    "ImportCollectionVariablesDialog",
+    "TableItemProxy",
 ]
-
-
-@dataclass
-class CollectionVariableRowRecord:
-    """Internal model record holding variable diff and strategy metadata."""
-
-    name: str
-    current_display: str
-    candidate_display: str
-    raw_current: Any
-    raw_candidate: Any
-    var_default: Any
-    strategy: ConflictStrategy
-    var_type: str
-    is_collection_secret: bool
-    is_env_secret: bool
-    is_effective_secret: bool
-    is_collision: bool
-    status: str
-    description: str
-    is_selected: bool = True
-
-
-class HeaderItemProxy:
-    """Backward-compatibility proxy for horizontalHeaderItem(col)."""
-
-    def __init__(self, text: str) -> None:
-        self._text = text
-
-    def text(self) -> str:
-        return self._text
-
-
-class TableItemProxy:
-    """Backward-compatibility proxy mimicking QTableWidgetItem."""
-
-    def __init__(
-        self,
-        model: CollectionVariablesTableModel,
-        row: int,
-        col: int,
-    ) -> None:
-        self._model = model
-        self._row = row
-        self._col = col
-
-    def text(self) -> str:
-        idx = self._model.index(self._row, self._col)
-        val = self._model.data(idx, Qt.ItemDataRole.DisplayRole)
-        return str(val) if val is not None else ""
-
-    def setText(self, text: str) -> None:
-        idx = self._model.index(self._row, self._col)
-        self._model.setData(idx, text, Qt.ItemDataRole.DisplayRole)
-
-    def checkState(self) -> Qt.CheckState:
-        idx = self._model.index(self._row, self._col)
-        val = self._model.data(idx, Qt.ItemDataRole.CheckStateRole)
-        if isinstance(val, Qt.CheckState):
-            return val
-        return Qt.CheckState.Checked if val else Qt.CheckState.Unchecked
-
-    def setCheckState(self, state: Qt.CheckState) -> None:
-        idx = self._model.index(self._row, self._col)
-        self._model.setData(idx, state, Qt.ItemDataRole.CheckStateRole)
-
-    def flags(self) -> Qt.ItemFlag:
-        idx = self._model.index(self._row, self._col)
-        return self._model.flags(idx)
-
-
-class CollectionVariablesTableModel(QAbstractTableModel):
-    """Virtualized table model representing collection variables and conflict diffs."""
-
-    selection_changed = Signal()
-    strategy_changed = Signal(int, object)
-
-    def __init__(
-        self,
-        target_environment: Environment,
-        parent: QObject | None = None,
-    ) -> None:
-        super().__init__(parent)
-        self._target_environment = target_environment
-        self._collection: Collection | None = None
-        self._records: list[CollectionVariableRowRecord] = []
-
-    def rowCount(
-        self,
-        parent: QModelIndex | QPersistentModelIndex = QModelIndex(),
-    ) -> int:
-        if parent.isValid():
-            return 0
-        return len(self._records)
-
-    def columnCount(
-        self,
-        parent: QModelIndex | QPersistentModelIndex = QModelIndex(),
-    ) -> int:
-        return len(HEADERS)
-
-    def headerData(
-        self,
-        section: int,
-        orientation: Qt.Orientation,
-        role: int = Qt.ItemDataRole.DisplayRole,
-    ) -> Any:
-        if orientation == Qt.Orientation.Horizontal and role == Qt.ItemDataRole.DisplayRole:
-            if 0 <= section < len(HEADERS):
-                return HEADERS[section]
-        return None
-
-    def data(
-        self,
-        index: QModelIndex | QPersistentModelIndex,
-        role: int = Qt.ItemDataRole.DisplayRole,
-    ) -> Any:
-        if not index.isValid():
-            return None
-        row = index.row()
-        col = index.column()
-        if row < 0 or row >= len(self._records):
-            return None
-        rec = self._records[row]
-
-        if role == Qt.ItemDataRole.CheckStateRole:
-            if col == COL_SELECT:
-                return Qt.CheckState.Checked if rec.is_selected else Qt.CheckState.Unchecked
-            return None
-
-        if role in (Qt.ItemDataRole.DisplayRole, Qt.ItemDataRole.EditRole):
-            if col == COL_SELECT:
-                return ""
-            if col == COL_NAME:
-                return rec.name
-            if col == COL_CURRENT_VALUE:
-                return rec.current_display
-            if col == COL_CANDIDATE_VALUE:
-                return rec.candidate_display
-            if col == COL_STRATEGY:
-                if rec.is_collision:
-                    return (
-                        "Overwrite"
-                        if rec.strategy == ConflictStrategy.OVERWRITE
-                        else "Keep Current"
-                    )
-                return "—"
-            if col == COL_TYPE:
-                return rec.var_type
-            if col == COL_SECRET:
-                return "Yes" if rec.is_collection_secret else "No"
-            if col == COL_STATUS:
-                return rec.status
-            if col == COL_DESC:
-                return rec.description
-
-        if role == Qt.ItemDataRole.ToolTipRole:
-            if col == COL_DESC:
-                return rec.description
-            if col in (COL_CURRENT_VALUE, COL_CANDIDATE_VALUE):
-                if not rec.is_effective_secret:
-                    return (
-                        rec.candidate_display
-                        if col == COL_CANDIDATE_VALUE
-                        else rec.current_display
-                    )
-
-        return None
-
-    def flags(self, index: QModelIndex | QPersistentModelIndex) -> Qt.ItemFlag:
-        if not index.isValid():
-            return Qt.ItemFlag.NoItemFlags
-        flags = Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable
-        if index.column() == COL_SELECT:
-            flags |= Qt.ItemFlag.ItemIsUserCheckable
-        elif index.column() == COL_STRATEGY:
-            if 0 <= index.row() < len(self._records) and self._records[index.row()].is_collision:
-                flags |= Qt.ItemFlag.ItemIsEditable
-        return flags
-
-    def setData(
-        self,
-        index: QModelIndex | QPersistentModelIndex,
-        value: Any,
-        role: int = Qt.ItemDataRole.EditRole,
-    ) -> bool:
-        if not index.isValid():
-            return False
-        row = index.row()
-        col = index.column()
-        if row < 0 or row >= len(self._records):
-            return False
-        rec = self._records[row]
-
-        if col == COL_SELECT and role == Qt.ItemDataRole.CheckStateRole:
-            checked = (
-                value == Qt.CheckState.Checked
-                or value == Qt.CheckState.Checked.value
-                or value is True
-            )
-            if rec.is_selected != checked:
-                rec.is_selected = checked
-                self.dataChanged.emit(index, index, [Qt.ItemDataRole.CheckStateRole])
-                self.selection_changed.emit()
-            return True
-
-        if col == COL_STRATEGY and role in (
-            Qt.ItemDataRole.EditRole,
-            Qt.ItemDataRole.DisplayRole,
-        ):
-            if not rec.is_collision:
-                return False
-            if isinstance(value, ConflictStrategy):
-                strat = value
-            elif value == "Overwrite":
-                strat = ConflictStrategy.OVERWRITE
-            else:
-                strat = ConflictStrategy.SKIP
-            if rec.strategy != strat:
-                rec.strategy = strat
-                logger.debug(
-                    "collection_variables_table_model_strategy_changed row=%d var_name=%s "
-                    "strategy=%s",
-                    row,
-                    rec.name,
-                    strat.value,
-                )
-                self.dataChanged.emit(
-                    index,
-                    index,
-                    [Qt.ItemDataRole.DisplayRole, Qt.ItemDataRole.EditRole],
-                )
-                self.strategy_changed.emit(row, strat)
-            return True
-
-        if col == COL_CANDIDATE_VALUE and role in (
-            Qt.ItemDataRole.EditRole,
-            Qt.ItemDataRole.DisplayRole,
-        ):
-            rec.candidate_display = str(value)
-            self.dataChanged.emit(index, index, [Qt.ItemDataRole.DisplayRole])
-            return True
-
-        return False
-
-    def get_record(self, row: int) -> CollectionVariableRowRecord | None:
-        if 0 <= row < len(self._records):
-            return self._records[row]
-        return None
-
-    def get_strategy(self, row: int) -> ConflictStrategy | None:
-        if 0 <= row < len(self._records) and self._records[row].is_collision:
-            return self._records[row].strategy
-        return None
-
-    def set_row_strategy(self, row: int, strategy: ConflictStrategy) -> None:
-        if 0 <= row < len(self._records) and self._records[row].is_collision:
-            self.setData(
-                self.index(row, COL_STRATEGY),
-                strategy,
-                Qt.ItemDataRole.EditRole,
-            )
-
-    def set_row_selected(self, row: int, selected: bool) -> None:
-        if 0 <= row < len(self._records):
-            self.setData(
-                self.index(row, COL_SELECT),
-                Qt.CheckState.Checked if selected else Qt.CheckState.Unchecked,
-                Qt.ItemDataRole.CheckStateRole,
-            )
-
-    def set_all_selected(self, selected: bool) -> None:
-        if not self._records:
-            return
-        changed = False
-        for rec in self._records:
-            if rec.is_selected != selected:
-                rec.is_selected = selected
-                changed = True
-        if changed:
-            top_left = self.index(0, COL_SELECT)
-            bottom_right = self.index(len(self._records) - 1, COL_SELECT)
-            self.dataChanged.emit(
-                top_left,
-                bottom_right,
-                [Qt.ItemDataRole.CheckStateRole],
-            )
-            self.selection_changed.emit()
-
-    def set_all_collision_strategy(self, strategy: ConflictStrategy) -> int:
-        if not self._records:
-            return 0
-        colliding_count = 0
-        changed = False
-        for rec in self._records:
-            if rec.is_collision:
-                colliding_count += 1
-                if rec.strategy != strategy:
-                    rec.strategy = strategy
-                    changed = True
-        if changed:
-            top_left = self.index(0, COL_STRATEGY)
-            bottom_right = self.index(len(self._records) - 1, COL_STRATEGY)
-            self.dataChanged.emit(
-                top_left,
-                bottom_right,
-                [Qt.ItemDataRole.DisplayRole, Qt.ItemDataRole.EditRole],
-            )
-        logger.debug(
-            "collection_variables_table_model_bulk_strategy_set strategy=%s "
-            "affected_rows=%d total_rows=%d",
-            strategy.value,
-            colliding_count,
-            len(self._records),
-        )
-        return colliding_count
-
-    def get_summary_counts(self) -> tuple[int, int, int]:
-        will_add = 0
-        will_overwrite = 0
-        will_keep = 0
-        for rec in self._records:
-            if not rec.is_selected:
-                continue
-            if rec.is_collision:
-                if rec.strategy == ConflictStrategy.OVERWRITE:
-                    will_overwrite += 1
-                else:
-                    will_keep += 1
-            else:
-                will_add += 1
-        return will_add, will_overwrite, will_keep
-
-    def get_selected_keys(self) -> set[str]:
-        return {rec.name for rec in self._records if rec.is_selected}
-
-    def get_conflict_strategies(self) -> dict[str, ConflictStrategy]:
-        return {rec.name: rec.strategy for rec in self._records if rec.is_collision}
-
-    def load_collection(
-        self,
-        collection: Collection | None,
-        preset_name: str | None = None,
-    ) -> None:
-        self.beginResetModel()
-        self._collection = collection
-        self._records.clear()
-        if collection and collection.variables:
-            preset_values = (
-                collection.presets.get(preset_name, {})
-                if (preset_name and collection.presets)
-                else {}
-            )
-            for var in collection.variables:
-                name = var.name
-                is_env_secret = name in self._target_environment.hidden_keys
-                is_col_secret = bool(var.secret)
-                is_effective_secret = is_env_secret or is_col_secret
-                is_collision = name in self._target_environment.variables
-
-                if is_collision:
-                    raw_curr = self._target_environment.variables[name]
-                    curr_str = format_variable_value(raw_curr)
-                    curr_display = HIDDEN_MASK if is_effective_secret else curr_str
-                else:
-                    raw_curr = None
-                    curr_display = "—"
-
-                raw_cand = preset_values.get(name, var.default)
-                cand_str = format_variable_value(raw_cand)
-                cand_display = HIDDEN_MASK if is_effective_secret else cand_str
-
-                status_str = "Exists (Collision)" if is_collision else "New"
-                desc_str = var.description or ""
-
-                rec = CollectionVariableRowRecord(
-                    name=name,
-                    current_display=curr_display,
-                    candidate_display=cand_display,
-                    raw_current=raw_curr,
-                    raw_candidate=raw_cand,
-                    var_default=var.default,
-                    strategy=ConflictStrategy.SKIP,
-                    var_type=var.type,
-                    is_collection_secret=is_col_secret,
-                    is_env_secret=is_env_secret,
-                    is_effective_secret=is_effective_secret,
-                    is_collision=is_collision,
-                    status=status_str,
-                    description=desc_str,
-                    is_selected=True,
-                )
-                self._records.append(rec)
-        self.endResetModel()
-        logger.debug(
-            "collection_variables_table_model_loaded collection_name=%s row_count=%d "
-            "collisions=%d preset=%s",
-            self._collection.name if self._collection else "None",
-            len(self._records),
-            sum(1 for r in self._records if r.is_collision),
-            preset_name,
-        )
-
-    def update_preset(self, preset_name: str | None) -> None:
-        if not self._collection or not self._records:
-            return
-        preset_values = (
-            self._collection.presets.get(preset_name, {})
-            if (preset_name and self._collection.presets)
-            else {}
-        )
-        for rec in self._records:
-            raw_cand = preset_values.get(rec.name, rec.var_default)
-            cand_str = format_variable_value(raw_cand)
-            rec.candidate_display = HIDDEN_MASK if rec.is_effective_secret else cand_str
-            rec.raw_candidate = raw_cand
-        top_left = self.index(0, COL_CANDIDATE_VALUE)
-        bottom_right = self.index(len(self._records) - 1, COL_CANDIDATE_VALUE)
-        self.dataChanged.emit(top_left, bottom_right, [Qt.ItemDataRole.DisplayRole])
-
-
-class ConflictStrategyDelegate(QStyledItemDelegate):
-    """Delegate providing on-demand QComboBox editing for colliding strategy cells."""
-
-    def __init__(self, parent: QObject | None = None) -> None:
-        super().__init__(parent)
-
-    def createEditor(
-        self,
-        parent: QWidget | None,
-        option: QStyleOptionViewItem,
-        index: QModelIndex | QPersistentModelIndex,
-    ) -> QWidget:
-        if index.column() != COL_STRATEGY:
-            return super().createEditor(parent, option, index)
-        model = index.model()
-        if not isinstance(model, CollectionVariablesTableModel):
-            return super().createEditor(parent, option, index)
-        rec = model.get_record(index.row())
-        if rec is None or not rec.is_collision:
-            return super().createEditor(parent, option, index)
-
-        combo = QComboBox(parent)
-        set_widget_id(combo, f"{IMPORT_COLLECTION_ROW_STRATEGY_COMBO_PREFIX}{rec.name}")
-        combo.addItem("Keep Current", userData=ConflictStrategy.SKIP)
-        combo.addItem("Overwrite", userData=ConflictStrategy.OVERWRITE)
-        combo.currentIndexChanged.connect(lambda: self.commitAndCloseEditor(combo))
-        return combo
-
-    def commitAndCloseEditor(self, editor: QWidget) -> None:
-        self.commitData.emit(editor)
-        self.closeEditor.emit(editor, QAbstractItemDelegate.EndEditHint.NoHint)
-
-    def setEditorData(
-        self,
-        editor: QWidget,
-        index: QModelIndex | QPersistentModelIndex,
-    ) -> None:
-        if isinstance(editor, QComboBox):
-            val = index.data(Qt.ItemDataRole.DisplayRole)
-            idx = editor.findText(val)
-            if idx >= 0:
-                editor.setCurrentIndex(idx)
-
-    def setModelData(
-        self,
-        editor: QWidget,
-        model: QAbstractItemModel,
-        index: QModelIndex | QPersistentModelIndex,
-    ) -> None:
-        if isinstance(editor, QComboBox):
-            text = editor.currentText()
-            strat = ConflictStrategy.OVERWRITE if text == "Overwrite" else ConflictStrategy.SKIP
-            logger.debug(
-                "conflict_strategy_delegate_committed row=%d strategy=%s",
-                index.row(),
-                strat.value,
-            )
-            model.setData(index, strat, Qt.ItemDataRole.EditRole)
-
-    def updateEditorGeometry(
-        self,
-        editor: QWidget,
-        option: QStyleOptionViewItem,
-        index: QModelIndex | QPersistentModelIndex,
-    ) -> None:
-        editor.setGeometry(option.rect)
-
-
-class CollectionVariablesTableView(QTableView):
-    """Virtualized table view with backward-compatibility proxies for legacy tests."""
-
-    itemChanged = Signal(object)
-
-    def __init__(self, parent: QWidget | None = None) -> None:
-        super().__init__(parent)
-        self._proxies: dict[tuple[int, int], TableItemProxy] = {}
-        self._strategy_combos: dict[int, QComboBox] = {}
-
-    def setModel(self, model: QAbstractItemModel | None) -> None:
-        old_model = self.model()
-        if old_model is not None:
-            try:
-                old_model.dataChanged.disconnect(self._on_model_data_changed)
-            except Exception:
-                pass
-        super().setModel(model)
-        self._proxies.clear()
-        self._strategy_combos.clear()
-        if model is not None:
-            model.dataChanged.connect(self._on_model_data_changed)
-
-    def _on_model_data_changed(
-        self,
-        top_left: QModelIndex,
-        bottom_right: QModelIndex,
-        roles: list[int] | None = None,
-    ) -> None:
-        for r in range(top_left.row(), bottom_right.row() + 1):
-            if r in self._strategy_combos:
-                combo = self._strategy_combos[r]
-                m = self.model()
-                if isinstance(m, CollectionVariablesTableModel):
-                    strat = m.get_strategy(r)
-                    target_text = (
-                        "Overwrite" if strat == ConflictStrategy.OVERWRITE else "Keep Current"
-                    )
-                    idx = combo.findText(target_text)
-                    if idx >= 0 and combo.currentIndex() != idx:
-                        combo.blockSignals(True)
-                        combo.setCurrentIndex(idx)
-                        combo.blockSignals(False)
-            if top_left.row() == bottom_right.row():
-                for c in range(top_left.column(), bottom_right.column() + 1):
-                    proxy = self.item(r, c)
-                    if proxy is not None:
-                        self.itemChanged.emit(proxy)
-
-    def columnCount(self) -> int:
-        m = self.model()
-        return m.columnCount() if m is not None else 0
-
-    def rowCount(self) -> int:
-        m = self.model()
-        return m.rowCount() if m is not None else 0
-
-    def horizontalHeaderItem(self, col: int) -> HeaderItemProxy | None:
-        m = self.model()
-        if m is None or col < 0 or col >= m.columnCount():
-            return None
-        text = str(
-            m.headerData(col, Qt.Orientation.Horizontal, Qt.ItemDataRole.DisplayRole) or ""
-        )
-        return HeaderItemProxy(text)
-
-    def item(self, row: int, col: int) -> TableItemProxy | None:
-        m = self.model()
-        if not isinstance(m, CollectionVariablesTableModel):
-            return None
-        if row < 0 or row >= m.rowCount() or col < 0 or col >= m.columnCount():
-            return None
-        key = (row, col)
-        if key not in self._proxies:
-            self._proxies[key] = TableItemProxy(m, row, col)
-        return self._proxies[key]
-
-    def cellWidget(self, row: int, col: int) -> QWidget | None:
-        m = self.model()
-        if not isinstance(m, CollectionVariablesTableModel):
-            return None
-        if col != COL_STRATEGY:
-            return None
-        rec = m.get_record(row)
-        if rec is None or not rec.is_collision:
-            return None
-        if row not in self._strategy_combos:
-            combo = QComboBox(parent=None)
-            set_widget_id(combo, f"{IMPORT_COLLECTION_ROW_STRATEGY_COMBO_PREFIX}{rec.name}")
-            combo.addItem("Keep Current", userData=ConflictStrategy.SKIP)
-            combo.addItem("Overwrite", userData=ConflictStrategy.OVERWRITE)
-            if rec.strategy == ConflictStrategy.OVERWRITE:
-                combo.setCurrentIndex(1)
-            else:
-                combo.setCurrentIndex(0)
-
-            def _on_combo_index_changed(idx: int, target_row: int = row) -> None:
-                strat = ConflictStrategy.OVERWRITE if idx == 1 else ConflictStrategy.SKIP
-                m.setData(
-                    m.index(target_row, COL_STRATEGY),
-                    strat,
-                    Qt.ItemDataRole.EditRole,
-                )
-
-            combo.currentIndexChanged.connect(_on_combo_index_changed)
-            self._strategy_combos[row] = combo
-        return self._strategy_combos[row]
-
-
-class CollectionFetchWorker(QThread):
-    """Background worker for non-blocking remote collection retrieval."""
-
-    fetch_completed = Signal(object, int)
-    fetch_failed = Signal(Exception, int)
-
-    def __init__(
-        self,
-        library_service: Any,
-        connection_id: str,
-        collection_path: str,
-        generation_id: int,
-        parent: QObject | None = None,
-    ) -> None:
-        super().__init__(parent)
-        self.library_service = library_service
-        self.connection_id = connection_id
-        self.collection_path = collection_path
-        self.generation_id = generation_id
-        self._cancelled = False
-
-    def cancel(self) -> None:
-        self._cancelled = True
-        self.requestInterruption()
-        logger.debug(
-            "collection_variable_fetch_worker_cancelled generation_id=%d connection_id=%s",
-            self.generation_id,
-            self.connection_id,
-        )
-
-    def run(self) -> None:
-        logger.debug(
-            "collection_variable_fetch_worker_started generation_id=%d connection_id=%s path=%s",
-            self.generation_id,
-            self.connection_id,
-            self.collection_path,
-        )
-        try:
-            col = self.library_service.read_collection(
-                self.connection_id,
-                self.collection_path,
-            )
-            if not self._cancelled and not self.isInterruptionRequested():
-                logger.debug(
-                    "collection_variable_fetch_worker_completed generation_id=%d",
-                    self.generation_id,
-                )
-                self.fetch_completed.emit(col, self.generation_id)
-            else:
-                logger.debug(
-                    "collection_variable_fetch_worker_interrupted generation_id=%d",
-                    self.generation_id,
-                )
-        except Exception as exc:
-            if not self._cancelled and not self.isInterruptionRequested():
-                logger.warning(
-                    "collection_variable_fetch_worker_failed generation_id=%d error=%s",
-                    self.generation_id,
-                    exc,
-                )
-                self.fetch_failed.emit(exc, self.generation_id)
-            else:
-                logger.debug(
-                    "collection_variable_fetch_worker_interrupted_on_error generation_id=%d "
-                    "error=%s",
-                    self.generation_id,
-                    exc,
-                )
 
 
 class ImportCollectionVariablesDialog(QDialog):

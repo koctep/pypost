@@ -27,12 +27,17 @@ The import workflow is structured into three distinct layers:
    Pure Python business logic, completely decoupled from Qt widgets. Handles preset value resolution,
    data type serialization, identifier validation, collision detection, per-variable and batch conflict
    strategies, and secret masking assignment.
-2. **Interactive UI (`pypost.ui.dialogs.import_collection_variables_dialog`)**:
-   `ImportCollectionVariablesDialog` provides a 9-column side-by-side diff table layout
-   (Select, Name, Current Value, Candidate Value, Conflict Strategy, Type, Secret, Status, Description).
-   Users can compare existing environment values against incoming candidate values, select per-row
-   conflict strategies (`Keep Current` vs `Overwrite`) for colliding keys, trigger bulk collision
-   actions, and preview import mutations in real time with dual-source secret masking.
+2. **Interactive UI (dialog + extracted virtualization modules, PYPOST-1423)**:
+   `ImportCollectionVariablesDialog`
+   (`pypost.ui.dialogs.import_collection_variables_dialog`) orchestrates source/preset
+   selection, loading/error chrome, and import acceptance. Virtualization pieces live in
+   dedicated modules: `CollectionVariablesTableModel` (`pypost.ui.models`),
+   `CollectionVariablesTableView` (`pypost.ui.views`), `ConflictStrategyDelegate`
+   (`pypost.ui.delegates`), and `CollectionFetchWorker` (`pypost.ui.workers`). The dialog
+   re-exports these symbols for backward-compatible imports. The UI still provides a
+   9-column side-by-side diff table (Select, Name, Current Value, Candidate Value,
+   Conflict Strategy, Type, Secret, Status, Description) with per-row and bulk conflict
+   strategies and dual-source secret masking.
 3. **Widget & Presenter Integration (`pypost.ui.widgets.environments`)**:
    `EnvironmentVariablesWidget` embeds the "Import from Collection…" button
    (`COLLECTION_VARIABLE_IMPORT_BUTTON`), orchestrates dialog invocation, handles user cancellation,
@@ -273,6 +278,10 @@ Located in `pypost/ui/dialogs/import_collection_variables_dialog.py`:
 
 ### `CollectionVariablesTableModel(QAbstractTableModel)`
 
+Located in `pypost/ui/models/collection_variables_table_model.py` (extracted in
+[PYPOST-1423](https://pypost.atlassian.net/browse/PYPOST-1423); still re-exported from the
+dialog module).
+
 Prior to [PYPOST-1415](https://pypost.atlassian.net/browse/PYPOST-1415), the import table allocated persistent `QTableWidgetItem` instances and individual `QComboBox` widgets across thousands of rows. This caused severe UI thread blocking (several seconds), high memory consumption, and sluggish scrolling.
 
 `CollectionVariablesTableModel` is a pure virtualized Qt table model that stores raw variable metadata in a lightweight list of dataclass records and evaluates cell representations on demand:
@@ -317,6 +326,8 @@ class CollectionVariableRowRecord:
 
 ### `ConflictStrategyDelegate(QStyledItemDelegate)`
 
+Located in `pypost/ui/delegates/conflict_strategy_delegate.py` (PYPOST-1423).
+
 `ConflictStrategyDelegate` manages on-demand strategy editing for column 4 (`COL_STRATEGY`):
 
 - **On-Demand Instantiation (`createEditor`)**:
@@ -332,6 +343,8 @@ class CollectionVariableRowRecord:
 ---
 
 ### `CollectionVariablesTableView` (Backward-Compatibility Facade)
+
+Located in `pypost/ui/views/collection_variables_table_view.py` (PYPOST-1423).
 
 To ensure backward compatibility with existing tests and integration code expecting `QTableWidget` APIs, `CollectionVariablesTableView` subclasses `QTableView` and exposes a facade layer:
 
@@ -354,6 +367,8 @@ To ensure backward compatibility with existing tests and integration code expect
 ---
 
 ### `CollectionFetchWorker(QThread)` & Background Remote Fetching
+
+Located in `pypost/ui/workers/collection_fetch_worker.py` (PYPOST-1423).
 
 Querying collection manifests from remote connected libraries can incur variable network latency. Running fetch operations on the Qt GUI thread risks freezing the application.
 
@@ -407,6 +422,11 @@ Previous dialog workflows relied on modal error message boxes (`QMessageBox.crit
 ---
 
 ## Structured Observability
+
+Logger channel names follow each module's `__name__` after PYPOST-1423 (for example
+`pypost.ui.models.collection_variables_table_model` for model events and
+`pypost.ui.workers.collection_fetch_worker` for worker events). Event *message* names
+below are unchanged.
 
 The subsystem emits structured log events conforming to the repository logging policy:
 
