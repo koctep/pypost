@@ -388,12 +388,13 @@ class ManifestDiscoveryWorker(QThread):
 ```
 
 1. When `library_service` is provided, `__init__` calls `_start_manifest_discovery()`.
-2. The worker lists connections and per-connection manifest collections off-thread.
+2. The worker lists connections and per-connection manifest collections off-thread,
+   passing a `CancellationToken` so cancel can abort listing I/O (PYPOST-1425).
 3. On success, the dialog appends combo entries while preserving the prior selection
    index (so Qt’s empty-combo auto-select does not swallow a later `setCurrentIndex(0)`).
 4. Failures show the inline error banner; Retry restarts discovery when no library
    collection is selected. Cancel / close / accept invalidate `_discovery_generation`
-   and cancel the worker.
+   and cancel the worker (token abort + interruption).
 
 ### `CollectionFetchWorker(QThread)` & Background Remote Fetching
 
@@ -413,8 +414,11 @@ class CollectionFetchWorker(QThread):
 #### Off-Thread Retrieval Workflow
 
 1. When a library collection is selected, `_start_fetch_remote_collection(conn_id, path)` starts a new `CollectionFetchWorker`.
-2. The worker calls `library_service.read_collection(conn_id, path)` off-thread.
+2. The worker calls `library_service.read_collection(conn_id, path, cancellation_token=...)`
+   off-thread (token omitted only for legacy services that reject the keyword).
 3. Upon completion or failure, the worker emits `fetch_completed` or `fetch_failed` alongside its `generation_id`.
+   `OperationCancelledError` from transport abort is treated as a quiet interrupt (no
+   `fetch_failed` signal).
 
 #### Race Protection via Monotonic Generation Counter (`_fetch_generation`)
 
@@ -425,13 +429,20 @@ If a user rapidly changes the collection dropdown or triggers multiple requests,
 - When `_on_fetch_completed` or `_on_fetch_failed` fires, the incoming `gen` is checked against `self._fetch_generation`.
 - If `gen != self._fetch_generation`, the response is recognized as stale, safely discarded, and logged with `collection_variable_remote_fetch_stale_discarded`.
 
-#### Worker Cancellation
+#### Worker Cancellation & Transport Abort (PYPOST-1425)
 
 - When a new collection is selected or the user clicks "Cancel", `self._active_fetch_worker.cancel()` is called.
-- `cancel()` sets `_cancelled = True` and calls `self.requestInterruption()`.
+- `cancel()` sets `_cancelled = True`, calls `self.requestInterruption()`, and cancels the
+  worker's `CancellationTokenSource` so registered transport abort callbacks run
+  immediately (e.g. socket/session close).
+- `LibraryManagerService.read_collection` / `list_connections` /
+  `list_manifest_collections` accept an optional `cancellation_token` and raise
+  `OperationCancelledError` at cooperative checkpoints.
 - The worker checks interruption status before emitting signals; cancelled workers do not emit completion or failure events.
+- Generation discard remains a secondary safety net; transport abort is the primary stop.
 - Discovery cancel uses the same loading Cancel control when `_active_discovery_worker`
-  is active; otherwise Cancel targets the active collection fetch.
+  is active; `ManifestDiscoveryWorker` owns the same token/abort pattern for
+  `list_connections` / `list_manifest_collections`.
 
 ---
 
@@ -485,6 +496,8 @@ The subsystem emits structured log events conforming to the repository logging p
 | `collection_variable_fetch_worker_failed` | WARNING | `generation_id`, `error` | Worker encountered fetch error |
 | `collection_variable_fetch_worker_cancelled` | DEBUG | `generation_id`, `connection_id` | Worker cancel method invoked |
 | `collection_variable_fetch_worker_interrupted` | DEBUG | `generation_id` | Worker aborted due to interruption |
+| `collection_variable_fetch_worker_transport_aborted` | DEBUG | `generation_id`, `error` | Transport abort raised `OperationCancelledError` |
+| `collection_variable_manifest_discovery_worker_transport_aborted` | DEBUG | `generation_id`, `error` | Discovery transport abort raised `OperationCancelledError` |
 | `collection_variable_remote_fetch_started` | INFO | `connection_id`, `path`, `gen` | UI initiated background fetch |
 | `collection_variable_remote_fetch_completed` | INFO | `gen`, `collection_name`, `vars_count` | Remote fetch finished and loaded |
 | `collection_variable_remote_fetch_failed` | ERROR | `gen`, `error` | Remote fetch failed |
@@ -529,6 +542,10 @@ Automated test coverage is maintained in:
   - **Non-Blocking Dialog Init**: Asserts `__init__` returns before a slow
     `list_connections` completes, tracks `_active_discovery_worker`, keeps workspace
     items immediately, and appends remote entries after bounded event-loop wait.
+- `tests/test_collection_fetch_transport_abort_repro.py`:
+  - **Transport Abort on Cancel**: Asserts `CollectionFetchWorker` /
+    `ManifestDiscoveryWorker.cancel()` fires `CancellationToken` abort callbacks and
+    unblocks in-flight library I/O promptly (does not wait out the full remote budget).
 - `tests/test_variable_import_virtualization_repro.py`:
   - **Zero-Widget Scaling**: Asserts zero persistent cell widgets across 1,000+ variables, verifying virtualized memory and rendering scaling.
   - **Background Collection Fetching**: Verifies `CollectionFetchWorker` executes off-thread without freezing the UI, showing the loading container and cancel button (waits for async discovery first).

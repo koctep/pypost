@@ -10,11 +10,15 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass
 from enum import Enum
+import inspect
 import logging
 import threading
 import time
+from typing import Any, TypeVar
 
 logger = logging.getLogger(__name__)
+
+_R = TypeVar("_R")
 
 
 class CancellationState(str, Enum):
@@ -248,6 +252,42 @@ def adaptive_thread_join(
     return False
 
 
+def call_with_cancellation_token(
+    fn: Callable[..., _R],
+    *args: Any,
+    cancellation_token: CancellationToken | None = None,
+    **kwargs: Any,
+) -> _R:
+    """Invoke ``fn``, passing ``cancellation_token`` only when accepted.
+
+    Falls back to calling without the token when the callable rejects the
+    keyword (legacy duck-typed library services / test doubles).
+    """
+    if cancellation_token is None:
+        return fn(*args, **kwargs)
+
+    try:
+        signature = inspect.signature(fn)
+    except (TypeError, ValueError):
+        signature = None
+
+    if signature is not None:
+        params = signature.parameters
+        accepts_var_kw = any(
+            param.kind == inspect.Parameter.VAR_KEYWORD for param in params.values()
+        )
+        if not accepts_var_kw and "cancellation_token" not in params:
+            return fn(*args, **kwargs)
+
+    try:
+        return fn(*args, cancellation_token=cancellation_token, **kwargs)
+    except TypeError as exc:
+        # MagicMock (*args, **kwargs) forwards kwargs into a strict side_effect.
+        if "cancellation_token" not in str(exc):
+            raise
+        return fn(*args, **kwargs)
+
+
 __all__ = [
     "AdaptiveJoinPolicy",
     "CancellationState",
@@ -255,4 +295,5 @@ __all__ = [
     "CancellationTokenSource",
     "OperationCancelledError",
     "adaptive_thread_join",
+    "call_with_cancellation_token",
 ]
