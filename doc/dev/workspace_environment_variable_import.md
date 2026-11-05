@@ -56,7 +56,7 @@ flowchart TB
         EVW["EnvironmentVariablesWidget<br/>('Import from Collection…' button)"]
         ICD["ImportCollectionVariablesDialog<br/>(Preset selection, loading, & error UI)"]
         CVTV["CollectionVariablesTableView<br/>(Virtualized view with compat facade)"]
-        CVTM["CollectionVariablesTableModel<br/>(O(1) virtualized data model)"]
+        CVTM["CollectionVariablesTableModel<br/>(paged LRU + O(1) cell lookup)"]
         CSD["ConflictStrategyDelegate<br/>(On-demand QComboBox cell editor)"]
         CFW["CollectionFetchWorker<br/>(QThread remote collection reader)"]
         MDW["ManifestDiscoveryWorker<br/>(QThread connection/manifest discovery)"]
@@ -292,9 +292,16 @@ dialog module).
 
 Prior to [PYPOST-1415](https://pypost.atlassian.net/browse/PYPOST-1415), the import table allocated persistent `QTableWidgetItem` instances and individual `QComboBox` widgets across thousands of rows. This caused severe UI thread blocking (several seconds), high memory consumption, and sluggish scrolling.
 
-`CollectionVariablesTableModel` is a pure virtualized Qt table model that stores raw variable metadata in a lightweight list of dataclass records and evaluates cell representations on demand:
+`CollectionVariablesTableModel` is a pure virtualized Qt table model. As of
+[PYPOST-1427](https://pypost.atlassian.net/browse/PYPOST-1427) it binds the
+collection variable catalog by reference and materializes
+`CollectionVariableRowRecord` instances in LRU chunks instead of eagerly
+allocating one record per variable:
 
 ```python
+CHUNK_SIZE = 256
+MAX_CACHED_CHUNKS = 8  # ≤ 2048 materialized records
+
 @dataclass
 class CollectionVariableRowRecord:
     name: str
@@ -314,21 +321,34 @@ class CollectionVariableRowRecord:
     is_selected: bool = True
 ```
 
+Selection and conflict-strategy mutations live in sparse overlays (defaults +
+per-row overrides) so chunk eviction never loses import decisions.
+`cached_record_count` reports the current materialized window size.
+
 #### Key Architecture & Characteristics
 
 1. **Zero Persistent Widget Allocation**:
    Renders 10,000+ variables with zero persistent `QComboBox` or cell widget overhead.
-2. **$O(1)$ Cell Evaluation (`data()`)**:
-   Cell formatting, string coercion, and secret masking are computed once during model loading (`load_collection()`). Subsequent `data()` calls perform direct array index lookups in $O(1)$ time.
-3. **Dual-Source Secret Masking**:
+2. **Paged / Cursor Materialization (PYPOST-1427)**:
+   `load_collection()` resets overlays and clears the chunk cache without building
+   `N` records (instant initial load). `data()` / `get_record()` ensure the owning
+   chunk (`CHUNK_SIZE` rows) is present; least-recent chunks evict when the cache
+   exceeds `MAX_CACHED_CHUNKS`. Model record overhead stays bounded (sub-10MB target
+   for the cache window) for 50k–100k catalogs.
+3. **$O(1)$ Cell Evaluation after materialization**:
+   Within a cached chunk, cell formatting and secret masking are stored on the
+   record; subsequent `data()` calls are direct index lookups.
+4. **Dual-Source Secret Masking**:
    During record generation, both collection declaration (`var.secret`) and target environment (`var.name in env.hidden_keys`) are checked. If either is true, `current_display` and `candidate_display` are masked with `HIDDEN_MASK` (`"********"`). Tooltips for sensitive cells are suppressed to prevent accidental disclosure via mouse hover.
-4. **Native Check State Handling**:
+5. **Native Check State Handling**:
    Column 0 (`COL_SELECT`) responds to `Qt.ItemDataRole.CheckStateRole`, returning `Qt.CheckState.Checked` or `Qt.CheckState.Unchecked` based on `rec.is_selected`. Toggling emits `selection_changed` without re-rendering unrelated cells.
-5. **High-Performance Bulk Operations**:
-   - `set_all_selected(selected: bool)`: Updates selection states in-memory and emits a single bounding `dataChanged(top_left, bottom_right, [CheckStateRole])` signal.
-   - `set_all_collision_strategy(strategy: ConflictStrategy)`: Updates strategy states in-memory and emits a single `dataChanged` across column 4. Completes across 1,000+ rows in <20ms.
-6. **In-Place Preset Switching**:
-   `update_preset(preset_name)` updates candidate values in place and emits a columnar `dataChanged` across `COL_CANDIDATE_VALUE` without clearing or recreating the model.
+6. **High-Performance Bulk Operations**:
+   - `set_all_selected(selected: bool)`: Sets the selection default, clears overrides, patches cached records, and emits a single bounding `dataChanged(..., [CheckStateRole])`.
+   - `set_all_collision_strategy(strategy: ConflictStrategy)`: Sets the strategy default, clears overrides, patches cached collision records, and emits columnar `dataChanged` on strategy cells.
+7. **Preset Switching**:
+   `update_preset(preset_name)` updates preset value maps, invalidates the chunk
+   cache (candidates rematerialize on next access), and emits a columnar
+   `dataChanged` across `COL_CANDIDATE_VALUE` without resetting the model.
 
 ---
 
@@ -564,6 +584,11 @@ Automated test coverage is maintained in:
     asserts recoverable UX and worker `fetch_failed` emission.
   - **Cancel mid-stream**: Combines PYPOST-1425 transport abort with a blocked mid-stream
     read; cancel must abort promptly without a false fetch-failure banner.
+- `tests/test_collection_variables_paged_model_repro.py` (PYPOST-1427):
+  - **Instant extreme load**: 50,000-variable `load_collection` under wall-clock budget with empty cache before first row access.
+  - **Bounded chunk cache**: Sparse scroll across many chunks keeps `cached_record_count ≤ CHUNK_SIZE * MAX_CACHED_CHUNKS`.
+  - **Eviction-safe decisions**: Selection / strategy overlays and summary counts survive LRU eviction.
+  - **Small-catalog parity**: Existing row / bulk strategy behavior for tiny collections.
 - `tests/test_variable_import_virtualization_repro.py`:
   - **Zero-Widget Scaling**: Asserts zero persistent cell widgets across 1,000+ variables, verifying virtualized memory and rendering scaling.
   - **Background Collection Fetching**: Verifies `CollectionFetchWorker` executes off-thread without freezing the UI, showing the loading container and cancel button (waits for async discovery first).
