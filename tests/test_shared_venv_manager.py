@@ -2,6 +2,7 @@
 
 Architecture: ai-tasks/PYPOST-1419/20-architecture.md
 Failing repro (in-process materialization): ai-tasks/PYPOST-1420/20-architecture.md
+Failing repro (deep .pth readiness): ai-tasks/PYPOST-1421/20-architecture.md
 """
 
 from __future__ import annotations
@@ -107,16 +108,39 @@ def test_ensure_ready_recovers_incomplete_base_via_injected_runner(
     assert not (result / "stale-incomplete").exists()
 
 
+def _seed_ready_skeleton(
+    skeleton: Path,
+    *,
+    python_version: str,
+    pth_target: Path,
+) -> None:
+    """Seed marker + interpreter + valid `_prewarmed_base.pth` for a `.skeleton`."""
+    _seed_interpreter(skeleton)
+    (skeleton / helpers.MARKER_NAME).touch()
+    site_packages = skeleton / "lib" / f"python{python_version}" / "site-packages"
+    site_packages.mkdir(parents=True, exist_ok=True)
+    pth_target.mkdir(parents=True, exist_ok=True)
+    (site_packages / "_prewarmed_base.pth").write_text(
+        f"{pth_target}\n", encoding="utf-8",
+    )
+
+
 def test_materialize_timeout_cleans_partial_target_and_identifies_stage(
     tmp_path: Path,
 ) -> None:
     """FR5: materialization failure yields stage-aware error and cleans partials."""
+    python_version = (
+        f"{sys.version_info.major}.{sys.version_info.minor}"
+    )
     base = tmp_path / ".venv"
     _seed_interpreter(base)
     (base / helpers.MARKER_NAME).touch()
+    base_site = base / "lib" / f"python{python_version}" / "site-packages"
+    base_site.mkdir(parents=True, exist_ok=True)
     skeleton = tmp_path / ".skeleton"
-    _seed_interpreter(skeleton)
-    (skeleton / helpers.MARKER_NAME).touch()
+    _seed_ready_skeleton(
+        skeleton, python_version=python_version, pth_target=base_site,
+    )
 
     workspace = tmp_path / "workspace"
     workspace.mkdir()
@@ -146,14 +170,20 @@ def test_materialize_populates_without_preparation_runner_or_cp(
     tmp_path: Path,
 ) -> None:
     """FR1/FR2: materialize yields a ready isolated .venv without preparation_runner/cp."""
+    python_version = (
+        f"{sys.version_info.major}.{sys.version_info.minor}"
+    )
     base = tmp_path / ".venv"
     _seed_interpreter(base)
     (base / helpers.MARKER_NAME).touch()
     (base / "probe.txt").write_text("base-probe", encoding="utf-8")
+    base_site = base / "lib" / f"python{python_version}" / "site-packages"
+    base_site.mkdir(parents=True, exist_ok=True)
 
     skeleton = tmp_path / ".skeleton"
-    _seed_interpreter(skeleton)
-    (skeleton / helpers.MARKER_NAME).touch()
+    _seed_ready_skeleton(
+        skeleton, python_version=python_version, pth_target=base_site,
+    )
     (skeleton / "probe.txt").write_text("skeleton-probe", encoding="utf-8")
 
     workspace = tmp_path / "workspace"
@@ -192,3 +222,65 @@ def test_materialize_populates_without_preparation_runner_or_cp(
     (target / "probe.txt").write_text("mutated-workspace", encoding="utf-8")
     assert (skeleton / "probe.txt").read_text(encoding="utf-8") == "skeleton-probe"
     assert (base / "probe.txt").read_text(encoding="utf-8") == "base-probe"
+
+
+def test_is_ready_rejects_skeleton_without_prewarmed_base_pth(tmp_path: Path) -> None:
+    """PYPOST-1421: skeleton missing _prewarmed_base.pth must not be ready."""
+    python_version = (
+        f"{sys.version_info.major}.{sys.version_info.minor}"
+    )
+    skeleton = tmp_path / ".skeleton"
+    _seed_interpreter(skeleton)
+    (skeleton / helpers.MARKER_NAME).touch()
+    (
+        skeleton / "lib" / f"python{python_version}" / "site-packages"
+    ).mkdir(parents=True, exist_ok=True)
+
+    manager = SharedVenvManager(base_root=tmp_path, python_version=python_version)
+
+    assert not manager.is_ready(skeleton)
+    assert not helpers._venv_ready(skeleton)
+
+
+def test_is_ready_rejects_skeleton_with_invalid_prewarmed_base_pth_target(
+    tmp_path: Path,
+) -> None:
+    """PYPOST-1421: .pth pointing at a non-directory must fail readiness."""
+    python_version = (
+        f"{sys.version_info.major}.{sys.version_info.minor}"
+    )
+    skeleton = tmp_path / ".skeleton"
+    _seed_interpreter(skeleton)
+    (skeleton / helpers.MARKER_NAME).touch()
+    site_packages = (
+        skeleton / "lib" / f"python{python_version}" / "site-packages"
+    )
+    site_packages.mkdir(parents=True, exist_ok=True)
+    missing_target = tmp_path / "does-not-exist-site-packages"
+    (site_packages / "_prewarmed_base.pth").write_text(
+        f"{missing_target}\n", encoding="utf-8",
+    )
+
+    manager = SharedVenvManager(base_root=tmp_path, python_version=python_version)
+
+    assert not manager.is_ready(skeleton)
+    assert not helpers._venv_ready(skeleton)
+
+
+def test_is_ready_accepts_skeleton_with_valid_prewarmed_base_pth(
+    tmp_path: Path,
+) -> None:
+    """PYPOST-1421: marker + interpreter + readable .pth target => ready."""
+    python_version = (
+        f"{sys.version_info.major}.{sys.version_info.minor}"
+    )
+    base_site = tmp_path / "base-site-packages"
+    skeleton = tmp_path / ".skeleton"
+    _seed_ready_skeleton(
+        skeleton, python_version=python_version, pth_target=base_site,
+    )
+
+    manager = SharedVenvManager(base_root=tmp_path, python_version=python_version)
+
+    assert manager.is_ready(skeleton)
+    assert helpers._venv_ready(skeleton)

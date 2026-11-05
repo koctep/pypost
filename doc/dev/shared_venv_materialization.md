@@ -1,4 +1,4 @@
-# Shared Virtual Environment Materialization and Skeleton Template (PYPOST-1413, PYPOST-1419, PYPOST-1420)
+# Shared Virtual Environment Materialization and Skeleton Template (PYPOST-1413, PYPOST-1419, PYPOST-1420, PYPOST-1421)
 
 ## Overview
 
@@ -14,7 +14,8 @@ the Make fixture helpers prepare one shared base virtualenv and materialize per-
 
 - **`SharedVenvManager`** (`tests/helpers/shared_venv_manager.py`): owns bootstrap, flock +
   preparation-budget locking, skeleton publication, readiness state, and workspace
-  materialization (PYPOST-1419 ownership; PYPOST-1420 in-process population).
+  materialization (PYPOST-1419 ownership; PYPOST-1420 in-process population;
+  PYPOST-1421 deep `.pth` readiness).
 - **Stable facades** in `tests/makefile_test_helpers.py`:
   `_get_shared_base_venv`, `_materialize_prewarmed_venv`, `_venv_ready`, and `_build_skeleton`
   delegate to a lazy process-default manager so fixtures and
@@ -24,17 +25,22 @@ the Make fixture helpers prepare one shared base virtualenv and materialize per-
 - **In-process population** (PYPOST-1420): `materialize` copies `.skeleton` (fallback: base)
   via injected `tree_copier` (default `shutil.copytree(..., symlinks=True)`). Bootstrap stages
   still use `preparation_runner`; workspace population does not.
+- **Deep template readiness** (PYPOST-1421): `is_ready` / `_venv_ready` require
+  `_prewarmed_base.pth` on `.skeleton` and validate that any present `.pth` points at a
+  readable directory, so damaged templates are rebuilt or skipped instead of copied.
 
 This document describes the architecture, NFS filesystem performance challenges, skeleton
 template pattern, concurrency locking, failure recovery, isolation guarantees, and the
 manager / facade API.
 
-## Architecture (PYPOST-1419 / PYPOST-1420)
+## Architecture (PYPOST-1419 / PYPOST-1420 / PYPOST-1421)
 
 Lifecycle ownership no longer lives in scattered free functions plus a module-level mutable
 path cache (`_SHARED_BASE_VENV`). A single cohesive manager owns readiness as an instance
 attribute; helpers expose thin facades for continuity. PYPOST-1420 keeps that ownership model
-and replaces residual per-workspace `cp -a` fork/exec with in-process tree copy.
+and replaces residual per-workspace `cp -a` fork/exec with in-process tree copy. PYPOST-1421
+deepens `is_ready` so a skeleton is reusable only when its `_prewarmed_base.pth` target is a
+readable directory (full bases without a redirect file still pass on marker + interpreter).
 
 ```text
 Consumers (unchanged outward contracts)
@@ -301,7 +307,7 @@ materialization.
 | `__init__(*, python_version, base_root, marker_name, python_executable, preparation_runner, clock, flock, tempdir_fn, tree_copier)` | Construct with optional collaborator overrides for tests. |
 | `resolved_base` | Owned readiness path, or `None` if not yet validated/published. |
 | `clear_readiness()` | Drop owned readiness so the next `ensure_ready` re-validates on disk. |
-| `is_ready(venv)` | True when marker and `bin/python` exist. |
+| `is_ready(venv)` | True when marker and `bin/python` exist; `.skeleton` also requires a readable `_prewarmed_base.pth` target (PYPOST-1421). Any present `.pth` is validated the same way. |
 | `build_skeleton(venv_dir, skeleton_dir)` | Publish lightweight `.skeleton` template. |
 | `ensure_ready(*, preparation_budget=20)` | Serialize bootstrap under flock; return ready shared base `.venv` path. |
 | `materialize(workspace, *, copy_timeout=20)` | In-process populate `workspace/.venv` from skeleton (fallback: base) via `tree_copier`. |
@@ -383,6 +389,12 @@ ls -la /tmp/pypost_shared_base_venv_3.12/.skeleton
 cat /tmp/pypost_shared_base_venv_3.12/.skeleton/lib/python3.12/site-packages/_prewarmed_base.pth
 ```
 The file should contain the absolute path to `/tmp/pypost_shared_base_venv_3.12/.venv/lib/python3.12/site-packages`.
+
+If that path is missing, empty, unreadable, or not a directory, `is_ready(.skeleton)` /
+`_venv_ready` returns false (PYPOST-1421). `ensure_ready` then rebuilds the skeleton;
+`materialize` falls back to the full shared base until a healthy template is published
+again. Delete the damaged `.skeleton` (or the whole shared base root) and re-run
+`ensure_ready` if a manual reset is needed.
 
 ### Focused regressions
 ```bash

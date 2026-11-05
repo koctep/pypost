@@ -3,15 +3,18 @@
 Owns bootstrap, lock coordination, skeleton publication, readiness state,
 and workspace materialization for pre-warmed Make fixtures.
 
-Jira: PYPOST-1419 (lifecycle ownership); PYPOST-1420 (in-process materialize)
+Jira: PYPOST-1419 (lifecycle ownership); PYPOST-1420 (in-process materialize);
+  PYPOST-1421 (deep _prewarmed_base.pth readiness)
 Architecture: ai-tasks/PYPOST-1419/20-architecture.md
   Materialization: ai-tasks/PYPOST-1420/20-architecture.md
+  Deep readiness: ai-tasks/PYPOST-1421/20-architecture.md
 """
 
 from __future__ import annotations
 
 import errno
 import fcntl
+import os
 import shutil
 import subprocess
 import sys
@@ -92,11 +95,44 @@ class SharedVenvManager:
         self._resolved_base = None
 
     def is_ready(self, venv: Path) -> bool:
-        """True when the initialization marker and ``bin/python`` both exist."""
-        return (
+        """True when marker, interpreter, and template ``.pth`` (when required) are valid.
+
+        Skeleton templates must publish ``_prewarmed_base.pth`` pointing at a readable
+        directory. Any present ``.pth`` is validated the same way; full bases without
+        the redirect file remain ready on marker + ``bin/python`` alone.
+        """
+        if not (
             (venv / self._marker_name).is_file()
             and (venv / "bin" / "python").is_file()
+        ):
+            return False
+        pth = (
+            venv / "lib" / f"python{self._python_version}" / "site-packages"
+            / "_prewarmed_base.pth"
         )
+        if not pth.is_file():
+            return venv.name != ".skeleton"
+        return self._prewarmed_base_pth_target_ok(pth)
+
+    def _prewarmed_base_pth_target_ok(self, pth: Path) -> bool:
+        """Return True when ``pth`` names a readable directory on its first path line."""
+        try:
+            text = pth.read_text(encoding="utf-8")
+        except OSError:
+            return False
+        target: Path | None = None
+        for line in text.splitlines():
+            entry = line.strip()
+            if not entry or entry.startswith("#") or entry.startswith("import "):
+                continue
+            target = Path(entry)
+            break
+        if target is None:
+            return False
+        try:
+            return target.is_dir() and os.access(target, os.R_OK)
+        except OSError:
+            return False
 
     def build_skeleton(self, venv_dir: Path, skeleton_dir: Path) -> None:
         """Publish a lightweight ``.skeleton`` template from a ready base venv."""
