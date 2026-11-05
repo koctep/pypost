@@ -33,11 +33,13 @@ The import workflow is structured into three distinct layers:
    selection, loading/error chrome, and import acceptance. Virtualization pieces live in
    dedicated modules: `CollectionVariablesTableModel` (`pypost.ui.models`),
    `CollectionVariablesTableView` (`pypost.ui.views`), `ConflictStrategyDelegate`
-   (`pypost.ui.delegates`), and `CollectionFetchWorker` (`pypost.ui.workers`). The dialog
-   re-exports these symbols for backward-compatible imports. The UI still provides a
-   9-column side-by-side diff table (Select, Name, Current Value, Candidate Value,
-   Conflict Strategy, Type, Secret, Status, Description) with per-row and bulk conflict
-   strategies and dual-source secret masking.
+   (`pypost.ui.delegates`), `CollectionFetchWorker`, and `ManifestDiscoveryWorker`
+   (`pypost.ui.workers`). The dialog re-exports these symbols for backward-compatible
+   imports. Startup library catalog discovery is asynchronous (PYPOST-1424) so dialog
+   open stays instant on slow remotes. The UI still provides a 9-column side-by-side
+   diff table (Select, Name, Current Value, Candidate Value, Conflict Strategy, Type,
+   Secret, Status, Description) with per-row and bulk conflict strategies and dual-source
+   secret masking.
 3. **Widget & Presenter Integration (`pypost.ui.widgets.environments`)**:
    `EnvironmentVariablesWidget` embeds the "Import from Collection…" button
    (`COLLECTION_VARIABLE_IMPORT_BUTTON`), orchestrates dialog invocation, handles user cancellation,
@@ -56,17 +58,20 @@ flowchart TB
         CVTV["CollectionVariablesTableView<br/>(Virtualized view with compat facade)"]
         CVTM["CollectionVariablesTableModel<br/>(O(1) virtualized data model)"]
         CSD["ConflictStrategyDelegate<br/>(On-demand QComboBox cell editor)"]
-        CFW["CollectionFetchWorker<br/>(QThread remote catalog fetcher)"]
+        CFW["CollectionFetchWorker<br/>(QThread remote collection reader)"]
+        MDW["ManifestDiscoveryWorker<br/>(QThread connection/manifest discovery)"]
         
         EP --> ED
         ED --> EVW
         EVW -->|Opens on click| ICD
         ICD -->|Manages| CVTV
         ICD -->|Manages| CVTM
-        ICD -->|Spawns off-thread| CFW
+        ICD -->|Spawns on open| MDW
+        ICD -->|Spawns on remote select| CFW
         CVTV -->|Renders via| CVTM
         CVTV -->|Delegates Col 4| CSD
         CSD -->|Commits strategy to| CVTM
+        MDW -->|Signals entries to| ICD
         CFW -->|Signals result to| ICD
     end
 
@@ -252,9 +257,12 @@ Located in `pypost/ui/widgets/environments/environment_variables_widget.py`:
 Located in `pypost/ui/dialogs/import_collection_variables_dialog.py`:
 
 - **Source Discovery**:
-  - Populates workspace collections from `workspace_collections`.
-  - Populates catalog collections from connected libraries via `library_service.list_connections()`
-    and `library_service.list_manifest_collections()`.
+  - Populates workspace collections from `workspace_collections` synchronously during
+    `__init__` so the dialog paints immediately.
+  - Discovers catalog collections asynchronously via `ManifestDiscoveryWorker`, which
+    calls `library_service.list_connections()` and
+    `library_service.list_manifest_collections()` off the UI thread and appends combo
+    entries when complete (PYPOST-1424).
 - **9-Column Side-by-Side Diff Table Layout (`IMPORT_COLLECTION_VARS_TABLE`)**:
   Columns: `[Select, Name, Current Value, Candidate Value, Conflict Strategy, Type, Secret, Status, Description]`
   - *Select* (col 0): Interactive row checkboxes allowing users to cherry-pick which variables to import.
@@ -366,11 +374,33 @@ To ensure backward compatibility with existing tests and integration code expect
 
 ---
 
+### `ManifestDiscoveryWorker(QThread)` & Async Catalog Discovery
+
+Located in `pypost/ui/workers/manifest_discovery_worker.py` (PYPOST-1424).
+
+Enumerating library connections and remote manifests during dialog `__init__` used to
+block the UI thread. `ManifestDiscoveryWorker` moves that work off-thread:
+
+```python
+class ManifestDiscoveryWorker(QThread):
+    discovery_completed = Signal(object, int)  # (list[(label, userData)], generation_id)
+    discovery_failed = Signal(Exception, int)
+```
+
+1. When `library_service` is provided, `__init__` calls `_start_manifest_discovery()`.
+2. The worker lists connections and per-connection manifest collections off-thread.
+3. On success, the dialog appends combo entries while preserving the prior selection
+   index (so Qt’s empty-combo auto-select does not swallow a later `setCurrentIndex(0)`).
+4. Failures show the inline error banner; Retry restarts discovery when no library
+   collection is selected. Cancel / close / accept invalidate `_discovery_generation`
+   and cancel the worker.
+
 ### `CollectionFetchWorker(QThread)` & Background Remote Fetching
 
 Located in `pypost/ui/workers/collection_fetch_worker.py` (PYPOST-1423).
 
-Querying collection manifests from remote connected libraries can incur variable network latency. Running fetch operations on the Qt GUI thread risks freezing the application.
+Reading a selected remote collection can incur network latency. Running that on the Qt
+GUI thread risks freezing the application.
 
 `CollectionFetchWorker` moves remote library collection retrieval to a background `QThread`:
 
@@ -400,6 +430,8 @@ If a user rapidly changes the collection dropdown or triggers multiple requests,
 - When a new collection is selected or the user clicks "Cancel", `self._active_fetch_worker.cancel()` is called.
 - `cancel()` sets `_cancelled = True` and calls `self.requestInterruption()`.
 - The worker checks interruption status before emitting signals; cancelled workers do not emit completion or failure events.
+- Discovery cancel uses the same loading Cancel control when `_active_discovery_worker`
+  is active; otherwise Cancel targets the active collection fetch.
 
 ---
 
@@ -408,15 +440,19 @@ If a user rapidly changes the collection dropdown or triggers multiple requests,
 Previous dialog workflows relied on modal error message boxes (`QMessageBox.critical`) that blocked execution and disrupted user focus. PYPOST-1415 introduces non-modal inline status containers:
 
 1. **Inline Loading UI (`loading_container`)**:
-   - Contains `loading_label` ("Loading collection from library...") and `cancel_loading_btn`.
-   - Shown during active background fetches.
-   - Disables the `Import` button, preset dropdown, and variable table to prevent invalid interactions while keeping the Cancel button active.
+   - Contains `loading_label` and `cancel_loading_btn`.
+   - Shown during catalog discovery ("Discovering library collections...") and during
+     active collection fetches ("Loading collection from library...").
+   - During collection fetch, disables the `Import` button, preset dropdown, and
+     variable table while keeping Cancel active. Discovery does not disable the table
+     when workspace sources are already loaded.
 2. **Inline Error UI (`error_container`)**:
    - Contains `error_label` (styled in red with error message) and `retry_fetch_btn`.
-   - Displayed non-modally when remote collection fetching fails (network timeout, invalid manifest, connection error).
+   - Displayed non-modally when remote collection fetching or catalog discovery fails.
    - Keeps the dialog open and interactive. The user can switch to another collection or click "Retry".
 3. **Retry Mechanism (`_on_retry_fetch`)**:
-   - Clicking `retry_fetch_btn` immediately invokes `_start_fetch_remote_collection()` for the currently selected library collection under a new generation ID.
+   - Clicking `retry_fetch_btn` invokes `_start_fetch_remote_collection()` when a library
+     collection is selected; otherwise restarts `_start_manifest_discovery()`.
    - If the user changes the dropdown selection or cancels, the error container is automatically hidden and reset.
 
 ---
@@ -489,9 +525,13 @@ The subsystem emits structured log events conforming to the repository logging p
 
 Automated test coverage is maintained in:
 
+- `tests/test_async_manifest_discovery_repro.py`:
+  - **Non-Blocking Dialog Init**: Asserts `__init__` returns before a slow
+    `list_connections` completes, tracks `_active_discovery_worker`, keeps workspace
+    items immediately, and appends remote entries after bounded event-loop wait.
 - `tests/test_variable_import_virtualization_repro.py`:
   - **Zero-Widget Scaling**: Asserts zero persistent cell widgets across 1,000+ variables, verifying virtualized memory and rendering scaling.
-  - **Background Collection Fetching**: Verifies `CollectionFetchWorker` executes off-thread without freezing the UI, showing the loading container and cancel button.
+  - **Background Collection Fetching**: Verifies `CollectionFetchWorker` executes off-thread without freezing the UI, showing the loading container and cancel button (waits for async discovery first).
   - **Monotonic Generation Counter Race Protection**: Validates that slow or out-of-order responses from superseded fetch operations are safely discarded without overwriting active view state.
   - **Non-Modal Error Handling & Retry**: Validates inline error container display on library fetch failure and verifies retry button triggers a new background worker.
   - **Bulk Conflict Performance**: Benchmarks bulk strategy updates (`Keep All Collisions`, `Overwrite All Collisions`) completing across 1,000+ variables in sub-20ms.
