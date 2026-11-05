@@ -133,8 +133,13 @@ a closed UI surface.
 Use `teardown_tab()` when removing one request tab; it stops only that tab's request worker and
 leaves the workspace alive. Use `TabsPresenter.teardown()` when the tabs owner is closing; it
 handles every open `RequestTab`, requests cancellation, suppresses completion/error/chunk delivery,
-and drains the accepted environment-update ledger through the configured consumer. Non-request tab
-presenters keep their existing teardown seams.
+and drains the accepted environment-update ledger through the configured consumer. After that
+fencing, a WebSocket export phase snapshots strip plus deferred `WebSocketTab` pages and runs
+`dispose_websocket_tab_page(..., mode="app_exit")` under the remaining monotonic budget
+([PYPOST-1301](https://pypost.atlassian.net/browse/PYPOST-1301); see
+[websocket_message_stream.md](websocket_message_stream.md)). Non-request tab presenters keep their
+existing session teardown seams; export disposal is owned by the shared helper, not by those
+presenters.
 
 ### History panel and persistence
 

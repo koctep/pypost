@@ -48,6 +48,10 @@ def close_workspace_tab(
     ):
         return
     from pypost.ui.presenters.tabs_presenter import RequestTab
+    from pypost.ui.presenters.tabs_presenter_ws_export_teardown import (
+        dispose_websocket_tab_page,
+    )
+    from pypost.ui.widgets.websocket.websocket_tab import WebSocketTab
 
     if isinstance(tab, RequestTab):
         result = presenter.teardown_tab(tab)
@@ -57,7 +61,10 @@ def close_workspace_tab(
     teardown = getattr(tab_presenter, "teardown", None)
     if callable(teardown):
         teardown()
-    presenter._tabs.removeTab(index)
+    if isinstance(tab, WebSocketTab):
+        dispose_websocket_tab_page(presenter, tab, mode="tab_close")
+    else:
+        presenter._tabs.removeTab(index)
     if presenter._request_tab_count() == 0:
         presenter.handle_new_tab("last_tab")
     else:

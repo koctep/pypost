@@ -91,6 +91,8 @@ logger = logging.getLogger(__name__)
 _WORKER_FINISH_WAIT_MS = 100
 # Retry interval while QThread.finished has fired but the native join is not ready yet
 _FINALIZE_RETRY_MS = 10
+# Process-lifetime holders for workers abandoned at app exit (PYPOST-1301).
+_ORPHANED_EXPORT_WORKERS: set[WebSocketStreamExportWorker] = set()
 
 __all__ = [
     "StreamFilterProxyModel",
@@ -98,6 +100,32 @@ __all__ = [
     "StreamDetailPane",
     "WebSocketStreamView",
 ]
+
+
+def _finalize_orphaned_export_worker(
+    worker: WebSocketStreamExportWorker,
+    deferrals: int = 0,
+) -> None:
+    """Join and deleteLater an abandoned export worker held off the stream view."""
+    if worker not in _ORPHANED_EXPORT_WORKERS:
+        return
+    if not worker.wait(0):
+        if deferrals == 0:
+            logger.debug(
+                "websocket_stream_export_orphan_finalize_deferred retry_ms=%d",
+                _FINALIZE_RETRY_MS,
+            )
+        QTimer.singleShot(
+            _FINALIZE_RETRY_MS,
+            lambda: _finalize_orphaned_export_worker(worker, deferrals + 1),
+        )
+        return
+    _ORPHANED_EXPORT_WORKERS.discard(worker)
+    worker.deleteLater()
+    logger.debug(
+        "websocket_stream_export_orphan_finalized deferrals=%d",
+        deferrals,
+    )
 
 
 class StreamFilterProxyModel(QSortFilterProxyModel):
@@ -1078,6 +1106,48 @@ class WebSocketStreamView(QWidget):
     def cleanup(self) -> bool:
         """Return whether export teardown completed within the close wait budget."""
         return self.wait_for_export(_WORKER_FINISH_WAIT_MS)
+
+    def abandon_export_for_shutdown(self, *, wait_ms: int = 0) -> None:
+        """Release export ownership for process exit after the wait budget.
+
+        Transfers any running worker to a process-lifetime orphan holder so the
+        view can be destroyed without a hard QThread abort. Idempotent when idle.
+
+        Args:
+            wait_ms: Export wait budget already spent before abandon (for logs).
+        """
+        worker = self._export_worker
+        if worker is None:
+            return
+        try:
+            worker.export_completed.disconnect(self._on_export_completed)
+        except (RuntimeError, TypeError):
+            pass
+        try:
+            worker.export_failed.disconnect(self._on_export_failed)
+        except (RuntimeError, TypeError):
+            pass
+        try:
+            worker.finished.disconnect(self._on_export_worker_finished)
+        except (RuntimeError, TypeError):
+            pass
+        self._export_worker = None
+        self._set_export_busy(False)
+        _ORPHANED_EXPORT_WORKERS.add(worker)
+        if worker.isFinished() or not worker.isRunning():
+            _finalize_orphaned_export_worker(worker)
+        else:
+            held = worker
+
+            def _on_orphan_finished() -> None:
+                _finalize_orphaned_export_worker(held)
+
+            worker.finished.connect(_on_orphan_finished)
+        logger.warning(
+            "websocket_stream_export_worker_finish_wait_timeout "
+            "wait_ms=%d action=export_abandoned",
+            wait_ms,
+        )
 
     def closeEvent(self, event: QCloseEvent) -> None:
         """Refuse to close while an export worker is still owned after the wait budget."""

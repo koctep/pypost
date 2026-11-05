@@ -148,6 +148,28 @@ def teardown(presenter: TabsPresenter, timeout_ms: int | None = None) -> Teardow
             for record in pending:
                 presenter._env_update_ledger.mark(record.sequence, "incomplete")
             settled = False
+
+        from pypost.ui.presenters.tabs_presenter_ws_export_teardown import (
+            dispose_websocket_tab_page,
+            snapshot_websocket_pages_for_exit,
+        )
+
+        ws_pages = snapshot_websocket_pages_for_exit(presenter)
+        for page in ws_pages:
+            remaining_ms = max(0, int((deadline - time.monotonic()) * 1000))
+            tab_presenter = getattr(page, "presenter", None)
+            session_teardown = getattr(tab_presenter, "teardown", None)
+            if callable(session_teardown):
+                session_teardown()
+            outcome = dispose_websocket_tab_page(
+                presenter,
+                page,
+                mode="app_exit",
+                timeout_ms=remaining_ms,
+            )
+            if outcome == "abandoned":
+                settled = False
+
         result = TeardownResult(
             owner="tabs_presenter",
             outcome="success" if settled else "incomplete",

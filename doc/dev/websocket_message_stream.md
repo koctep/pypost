@@ -340,6 +340,7 @@ The view therefore owns the worker until all of these steps have finished.
 | `is_export_busy() -> bool` | `True` until the owned worker is finalized |
 | `wait_for_export(timeout_ms=5000) -> bool` | Bounded local `QEventLoop` until `export_finished` |
 | `cleanup() -> bool` | `wait_for_export(_WORKER_FINISH_WAIT_MS)` (100 ms); `True` if released |
+| `abandon_export_for_shutdown(*, wait_ms=0)` | Exit-only: transfer a still-owned worker to a process-lifetime orphan holder, clear view ownership, log abandon |
 | `closeEvent(event)` | Calls `cleanup()`; ignores the close event while export is still owned |
 
 `wait_for_export` returns `True` right away when idle. A timeout of zero or less only checks
@@ -349,26 +350,74 @@ disconnects the signal. A `False` result is the contract; the caller decides the
 
 `closeEvent` refuses the close (`event.ignore()`) when `cleanup()` returns `False`, and logs
 `websocket_stream_export_worker_finish_wait_timeout wait_ms=100 action=close_refused`
-(WARNING). The user gets no other feedback, and no deferred close is scheduled.
+(WARNING). The user gets no other feedback, and no deferred close is scheduled. Direct
+`close()` of the stream view is rare in production; tab strip removal uses the helper below.
 
-**Known limitation (PYPOST-1301):** `WebSocketStreamView` is a child widget inside the
-WebSocket tab. Removing the tab (`QTabWidget.removeTab`) does not call `close()` on the view,
-and no production code calls `cleanup()` yet. The close guard is therefore only exercised by
-an explicit `close()` or by tests. Exiting the app during an export can still destroy a running
-parentless `QThread`.
+#### Tab close and app exit disposal (PYPOST-1301)
+
+`QTabWidget.removeTab` does not call `close()` on the page and does not delete it. Production
+tab close and app exit therefore own export-safe disposal through
+[`tabs_presenter_ws_export_teardown`](file:///home/src/pypost/ui/presenters/tabs_presenter_ws_export_teardown.py).
+That helper never calls WebSocket session teardown; callers run duck-typed
+`presenter.teardown()` first, then invoke the helper.
+
+```mermaid
+flowchart TD
+  CLOSE["close_workspace_tab / close_tabs_for_websocket_ids"]
+  EXIT["TabsPresenter.teardown WS phase"]
+  SESS["session presenter.teardown()"]
+  HELP["dispose_websocket_tab_page"]
+  WAIT{"ownership ended within budget?"}
+  DISP["removeTab + page.deleteLater → disposed"]
+  DEFER["removeTab; keep page; deleteLater on export_finished → deferred"]
+  ABAN["abandon_export_for_shutdown; removeTab + deleteLater → abandoned"]
+
+  CLOSE --> SESS --> HELP
+  EXIT --> SESS --> HELP
+  HELP --> WAIT
+  WAIT -->|yes| DISP
+  WAIT -->|no, mode=tab_close| DEFER
+  WAIT -->|no, mode=app_exit| ABAN
+```
+
+| Entry point | Mode | Wait budget | After budget miss |
+| --- | --- | --- | --- |
+| `tabs_presenter_close.close_workspace_tab` | `tab_close` | `stream_view.cleanup()` (100 ms) | Strip removes the tab; page stays alive until `export_finished`, then `deleteLater` |
+| `tabs_presenter_ws_close.close_tabs_for_websocket_ids` | `tab_close` | same | same deferred path |
+| `tabs_presenter_lifecycle.teardown` (after request/MCP fencing) | `app_exit` | remaining monotonic share via `wait_for_export(remaining_ms)` | `abandon_export_for_shutdown`, then dispose the page; exit does not hang |
+
+Exit snapshots strip `WebSocketTab` pages **plus** any deferred pages
+(`snapshot_websocket_pages_for_exit`) before mutating the strip, so index shifts and
+already-removed busy pages are covered. Deferred pages live on the presenter-private set
+`_ws_export_deferred_pages`.
+
+`abandon_export_for_shutdown` is idempotent when idle. When busy it disconnects view slots,
+clears `_export_worker`, clears busy UI, holds the worker in a module-level orphan set until
+`finished`, then `deleteLater`s the worker. That prevents a hard
+`QThread: Destroyed while thread is still running` abort when the view is destroyed. An
+abandoned in-flight transcript is not required to be complete.
+
+| Helper API | Behavior |
+| --- | --- |
+| `ensure_deferred_set(presenter)` | Presenter-private set of pages awaiting deferred `deleteLater` |
+| `snapshot_websocket_pages_for_exit(presenter)` | Strip WS pages ∪ deferred set; no strip mutation |
+| `dispose_websocket_tab_page(presenter, tab, *, mode, timeout_ms=None)` | Bounded wait, `removeTab` via `indexOf`, then dispose / defer / abandon |
+
+Outcomes: `disposed`, `deferred` (`tab_close` only), `abandoned` (`app_exit` only).
 
 **Log events:**
 
 | Event | Level | When |
 | --- | --- | --- |
-| `websocket_stream_export_worker_finish_wait_timeout` | WARNING | `closeEvent` refused |
+| `websocket_stream_export_worker_finish_wait_timeout` | WARNING | `closeEvent` refused (`action=close_refused`); tab-close defer (`action=dispose_deferred`); exit abandon (`action=export_abandoned`) |
+| `websocket_stream_export_deferred_dispose_completed` | INFO | Deferred page `deleteLater` after `export_finished` (`action=dispose_deferred`) |
 | `websocket_stream_export_worker_finalize_deferred` | DEBUG | First failed `wait(0)` |
 | `websocket_stream_export_worker_finalized` | DEBUG | Worker released |
 | `websocket_stream_export_worker_finished_ignored` | DEBUG | Non-owned sender (`reason`) |
 
-Fields: the WARNING carries `wait_ms` and `action=close_refused`; `finalize_deferred`
-carries `retry_ms` and is logged once per worker; `finalized` carries `deferrals`, the
-number of join retries, so DEBUG traces show how long the native join took.
+Fields: timeout WARNINGs carry `wait_ms` and `action`; `finalize_deferred` carries
+`retry_ms` and is logged once per worker; `finalized` carries `deferrals`, the number of
+join retries, so DEBUG traces show how long the native join took.
 
 **Testing rules:**
 
@@ -377,8 +426,10 @@ number of join retries, so DEBUG traces show how long the native join took.
   exists before ownership is released, so a test that checks `is_export_busy()` or starts the
   next export too early becomes flaky under parallel load.
 - Keep waits bounded and give the test module a timeout marker (see [testing.md](testing.md)).
-- Regression and log-contract coverage: `tests/test_pypost_1286_failing_repro.py`,
+- View-level regression and log-contract coverage: `tests/test_pypost_1286_failing_repro.py`,
   `tests/test_pypost_1286_observability.py`, `tests/test_websocket_stream_view_repro.py`.
+- Production close/exit paths: `tests/test_pypost_1301_failing_repro.py`,
+  `tests/test_pypost_1301_observability.py`.
 
 ---
 
@@ -650,16 +701,22 @@ print(f"Batch flushed: inserted={inserted}, evicted={evicted}")
 | Transcript export fails with `WebSocketExportError` | Target export path is unwritable, disk is full, or parent directory creation failed. | Check file permissions and directory paths. `export_stream_to_json_file` and `export_stream_to_text_file` wrap underlying `OSError` into `WebSocketExportError`. |
 | `QAbstractItemModelTester` or Qt list view asserts invalid row indices during streaming | Direct modifications made to `MessageStream` bypassing `StreamListModel.append_batch`. | Ensure all stream additions on the UI thread route through `StreamListModel.append_batch(entries)` to emit matching `beginInsertRows`/`endInsertRows` and `beginRemoveRows`/`endRemoveRows` signals. |
 
-### Export Lifecycle Issues (PYPOST-1286)
+### Export Lifecycle Issues (PYPOST-1286 / PYPOST-1301)
 
 - **Export test flaky under parallel load; the file exists but `is_export_busy()` is `True`.**
   The test waited only for the output file. Ownership lasts until queued completion and the
   native join finish. Wait with `view.wait_for_export()` and assert `True`, or wait on
   `export_finished`.
-- **Stream view refuses to close; WARNING `websocket_stream_export_worker_finish_wait_timeout`
-  with `action=close_refused`.** The export is still owned after the 100 ms `cleanup()`
-  budget. This is the intended guard; close again after `export_finished`. Tab removal does
-  not reach this guard yet (PYPOST-1301).
+- **Stream view refuses to close; WARNING `… action=close_refused`.** Direct `close()` of the
+  stream view still uses the PYPOST-1286 guard after the 100 ms `cleanup()` budget. Close again
+  after `export_finished`. Tab strip removal does **not** refuse; it uses
+  `dispose_websocket_tab_page` instead.
+- **Tab closes but WARNING `… action=dispose_deferred`.** Export was still owned after the
+  close budget. The tab left the strip; the hidden page stays until `export_finished`, then
+  INFO `websocket_stream_export_deferred_dispose_completed` confirms `deleteLater`.
+- **App exit logs WARNING `… action=export_abandoned`.** The remaining exit budget was spent
+  (or was already zero after request/MCP fencing). Ownership was orphaned so the process can
+  finish without a hard QThread abort; the in-flight transcript may be incomplete.
 - **Repeated 10 ms finalize retries; `finalized deferrals=N` with a large N.** `wait(0)` keeps
   failing after `QThread.finished`, and the retry has no cap. Look for a worker that never
   leaves its native thread (TD-8 in `ai-tasks/PYPOST-1286/60-tech-debt.md`).

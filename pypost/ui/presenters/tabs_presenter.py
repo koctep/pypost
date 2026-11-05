@@ -192,6 +192,8 @@ class TabsPresenter(QObject, TabsPresenterWorkerHandlers):
         self._env_update_ledger = EnvironmentUpdateLedger()
         self._env_update_consumer: Callable[[dict[str, str], int], None] | None = None
         self._env_update_cutoff: int | None = None
+        # Pages removed from the strip while export ownership remains (PYPOST-1301).
+        self._ws_export_deferred_pages: set[WebSocketTab] = set()
 
         self._tabs = QTabWidget()
         set_widget_id(self._tabs, REQUEST_TABS)
