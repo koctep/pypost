@@ -1532,7 +1532,7 @@ further decomposed into 7 focused files (all with `pytestmark = pytest.mark.time
 - `tests/test_makefile_target_filtering.py`: marker filtering, PYTEST_ARGS narrowing, lint.
 - `tests/test_makefile_slow_smoke.py`: slow editable install smoke with real `pyproject.toml`.
 
-### Shared Make fixture preparation (PYPOST-1262 / PYPOST-1298 / PYPOST-1413 / PYPOST-1419)
+### Shared Make fixture preparation (PYPOST-1262 / PYPOST-1298 / PYPOST-1413 / PYPOST-1419 / PYPOST-1420)
 
 `SharedVenvManager` in `tests/helpers/shared_venv_manager.py` owns shared-base bootstrap, flock +
 budget locking, skeleton publication, readiness state, and workspace materialization.
@@ -1542,9 +1542,11 @@ delegate to a lazy process-default manager so existing imports stay stable (PYPO
 
 The helpers prepare one shared base virtualenv containing `pytest` and `flake8`, construct a
 lightweight `.skeleton` directory template with `.pth` linkage, and then materialize separate
-class-scoped `make_workspace` fixtures by cloning `.skeleton` via `cp -a` (with fallback to
-base). This replaces the legacy full-environment hardlink copy (`cp -al`) to eliminate NFS
-network filesystem latency and parallel materialization timeouts under load.
+class-scoped `make_workspace` fixtures by copying `.skeleton` in-process via
+`shutil.copytree(..., symlinks=True)` (injectable `tree_copier`; fallback to base)
+(PYPOST-1420). This replaces the legacy full-environment hardlink copy (`cp -al`) and the
+residual per-workspace `cp -a` fork/exec to eliminate NFS latency, spawn overhead, and parallel
+materialization timeouts under load.
 See [Shared Virtual Environment Materialization](shared_venv_materialization.md) for full design,
 manager API, and architectural benchmarks. Treat the published shared base as immutable.
 
@@ -1578,14 +1580,16 @@ copying and after a failed copy, allowing a later attempt to start cleanly.
 | --- | --- | --- |
 | Runner cold preparation | 90 seconds across lock, creation, install, validation | 5 seconds |
 | Ordinary helper call | 20 seconds across lock and bootstrap | 5 seconds |
-| Workspace skeleton copy | 20 seconds for the copy command | 1 second |
+| Workspace skeleton copy | 20 seconds soft post-copy deadline (`copy_timeout`) | N/A (in-process; no process group) |
 
-The runner watchdog is 95 seconds. Helper and runner failures terminate prerequisite process
-groups, including descendants, before returning failure. These preparation budgets are fixed
-implementation settings; they do not change `pytest.mark.timeout`, worker concurrency, or the
-Make `WORKER_TIMEOUT` default of 120 seconds. Cold preparation precedes worker execution;
-workspace materialization still consumes the existing fixture/test deadline. Network or local
-filesystem delays can exhaust a preparation budget; successful completion is not guaranteed.
+The runner watchdog is 95 seconds. Helper and runner **bootstrap** failures terminate prerequisite
+process groups, including descendants, before returning failure. Workspace population is
+in-process and fails closed after `rmtree` of a partial target (no SIGKILL path). These
+preparation budgets are fixed implementation settings; they do not change `pytest.mark.timeout`,
+worker concurrency, or the Make `WORKER_TIMEOUT` default of 120 seconds. Cold preparation
+precedes worker execution; workspace materialization still consumes the existing fixture/test
+deadline. Network or local filesystem delays can exhaust a preparation budget; successful
+completion is not guaranteed.
 
 #### Usage and troubleshooting
 
@@ -1609,8 +1613,8 @@ the captured stage, shared path, budget, and subprocess stderr before retrying:
 - **Validation or stale readiness:** check the reported interpreter and marker paths. Missing
   components trigger automatic rebuild on the next call; a marker alone is insufficient. Avoid
   manually publishing a marker or mutating a ready shared base.
-- **Materialization failure:** inspect the workspace path and `cp -a` diagnostic (source is
-  the shared `.skeleton` when ready, otherwise the shared base). Check temporary-directory
+- **Materialization failure:** inspect the workspace path and `RuntimeError` diagnostic
+  (`source=skeleton|base`, optional `elapsed=` on soft deadline). Check temporary-directory
   permissions, disk space, and whether the skeleton/base path still exists and is readable.
   Correct that condition and repeat the Make command; the failed partial `.venv` is removed
   automatically.
