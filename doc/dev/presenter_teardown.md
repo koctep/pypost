@@ -3,9 +3,9 @@
 ## Overview
 
 The UI lifecycle owners use one bounded, idempotent teardown shape for asynchronous work. The
-contract covers request tabs, history, encrypted environment storage, and the `MainWindow`
-composition root. It fences new work, drains work that was accepted before shutdown, suppresses
-late UI delivery, and returns an explicit result to the caller.
+contract covers request tabs, history, collection import, encrypted environment storage, and the
+`MainWindow` composition root. It fences new work, drains work that was accepted before shutdown,
+suppresses late UI delivery, and returns an explicit result to the caller.
 
 The public entry point is:
 
@@ -24,6 +24,7 @@ higher. Repeated calls return the same cached `TeardownResult`; teardown is not 
 | `TabsPresenter` | `begin_teardown()`, `teardown_tab(tab, timeout_ms=None)`, `teardown(timeout_ms=None)` | Request-tab workers, response delivery, chunk buffers, and the environment-update ledger |
 | `HistoryPanel` | `teardown(timeout_ms=None)` | Panel callbacks and widget delivery; it does not stop the shared manager |
 | `HistoryManager` | `begin_teardown()`, `flush(timeout_ms=None)`, `teardown(timeout_ms=None)` | History load/save threads, accepted writes, and deferred writes |
+| `CollectionsPresenter` | `begin_teardown()`, `teardown(timeout_ms=None)` | Collection import admission, file-parse and library workers, and panel close |
 | `EnvPresenter` | `begin_root_teardown()`, `begin_teardown()`, `teardown(timeout_ms=None)` | Environment UI delivery and the storage gateway |
 | `EnvironmentStorageGateway` | `begin_teardown()`, `teardown(timeout_ms=None)`, `wait_idle(timeout_ms=30_000)` | One load/save worker plus queued/coalesced environment work |
 
@@ -42,7 +43,7 @@ The gateway lifecycle applies to the encrypted asynchronous path.
 
 | Field | Meaning |
 | --- | --- |
-| `owner` | Stable owner label, such as `request_tab`, `tabs_presenter`, or `main_window`. |
+| `owner` | Stable owner label, such as `request_tab`, `tabs_presenter`, `collections_presenter`, or `main_window`. |
 | `outcome` | One of `success`, `incomplete`, or `failed`. |
 | `elapsed_ms` | Non-negative elapsed time for the attempt. |
 | `active_count` | Active workers or writes observed when teardown was admitted. |
@@ -66,22 +67,37 @@ an `incomplete` result.
 ## Deadline and shutdown ordering
 
 `MainWindow.teardown()` establishes one deadline for the whole composition. Each child receives a
-non-negative remaining budget, and the root drains every available child even if an earlier child
-fails. The root calls owners in this order:
+non-negative remaining budget
+(`owner_budget = min(allocated, remaining)` where
+`allocated = budget_ms * slots_left / len(owners)`), and the root drains every available child even
+if an earlier child fails. The root calls owners in this order:
 
 1. Mark the root fence and propagate one safe `teardown_id` to its children.
-2. Begin teardown for tabs, the history panel, and the history manager. The environment presenter
-   receives a root fence through `begin_root_teardown()` so normal UI admission closes early.
-3. Teardown request tabs, then the history panel, then the history manager.
+2. Begin teardown for tabs, the history panel, the history manager, and collections (every owner
+   except the last). The environment presenter receives a root fence through
+   `begin_root_teardown()` so normal UI admission closes early.
+3. Teardown request tabs, then the history panel, then the history manager, then collections.
 4. Before environment teardown, drain request-produced environment updates accepted through the
    tabs cutoff into `EnvPresenter.accept_accepted_env_update()`.
 5. Teardown the environment presenter and aggregate child counts and outcomes.
 
+Owner order when all five are present:
+`tabs → history_panel → history_manager → collections → env`. Env stays last so the
+tabs→env drain and `begin_root_teardown` contract remain valid. Collections sits immediately
+before env (PYPOST-1321).
+
+With five owners and overall budget `B`, collections at index 3 receives
+`min(B * 2/5, remaining)` at its turn. Idle collections teardown is effectively free, so
+including collections does not add measurable delay when no import is running.
+
 Request workers are asked to stop cooperatively and are waited on in short bounded intervals.
 History teardown waits for active writes, an asynchronous load, and the save flush within the same
-deadline. Environment teardown pumps the Qt event loop while waiting for the gateway's active and
-queued work. The gateway's separate post-`QThread.finished` native cleanup wait is capped at 100 ms;
-do not replace it with an unbounded GUI-thread wait.
+deadline. Collections teardown fences import admission, cooperatively interrupts the file-parse
+worker, joins/reaps import workers under the allocated share, and closes the collections panel
+(see [Collection Import](collection_import.md) and the section below). Environment teardown pumps
+the Qt event loop while waiting for the gateway's active and queued work. The gateway's separate
+post-`QThread.finished` native cleanup wait is capped at 100 ms; do not replace it with an
+unbounded GUI-thread wait.
 
 `shutdown_for_exit()` first flushes the state manager, then runs the 5-second root teardown. On a
 successful result it performs the existing encrypted-storage idle check and stops MCP services.
@@ -137,6 +153,30 @@ unboundedly because it joins without a timeout; it must not be used from a deadl
 teardown path. A save error yields `failed` with `failure_kind="worker_error"`; a deadline expiry
 yields `incomplete` with `failure_kind="timeout"`.
 
+### Collections presenter and import
+
+`CollectionsPresenter` is a first-class main-window shutdown owner (PYPOST-1321). Lifecycle logic
+lives in `pypost/ui/presenters/collections_presenter_lifecycle.py` so the presenter stays under its
+LOC baseline.
+
+- `begin_teardown()` sets the presenter fence and forwards admission close into
+  `CollectionImportActions.begin_teardown()`. It does not wait for workers and does not close the
+  panel.
+- `teardown(timeout_ms=None)` is idempotent and returns `TeardownResult` with
+  `owner="collections_presenter"`. It fences admission if needed, runs
+  `CollectionImportActions.teardown` (still `bool`), closes the panel, maps `clean` to
+  `outcome="success"` or `outcome="incomplete"` with `failure_kind="timeout"`, and records
+  lifecycle metrics. `active_count` is the number of running parse and/or library workers at
+  admission; `pending_count` is `1` when import state is non-idle, else `0`.
+- After fencing, file and library import entry points reject new work with
+  `reason=teardown` even when idle (not only when `is_busy()`).
+
+Import-phase budgets and cooperative interruption policy remain those of PYPOST-1264; the
+main-window root now supplies the allocated share on app close instead of skipping collections.
+A non-interruptible library worker may consume the full collections share and report
+`incomplete` (PYPOST-1324). See [Collection Import](collection_import.md) for the import-side
+phases, tests, and observability lines.
+
 ### Environment presenter and storage
 
 `EnvPresenter` fences UI selection, manager, load, and save callbacks, then delegates its deadline
@@ -154,9 +194,10 @@ handling; late failures after fencing do not open a dialog or mutate the UI.
 ### MainWindow
 
 `MainWindow` is the lifecycle composition root. It owns the tabs presenter, history panel, history
-manager, and environment presenter, and installs the request-to-environment consumer during
-composition. It is also responsible for applying the aggregate result to the close/exit decision;
-child owners must not independently quit the application.
+manager, collections presenter, and environment presenter, and installs the
+request-to-environment consumer during composition. It is also responsible for applying the
+aggregate result to the close/exit decision; child owners must not independently quit the
+application.
 
 ## Logs and metrics
 
@@ -199,10 +240,14 @@ storage payloads. Correlation IDs are opaque identifiers, not user data.
 The public contract and observability coverage live in:
 
 - `tests/test_presenter_teardown_contract_repro.py` — bounded worker/storage gates, accepted
-  persistence, cutoff dispositions, late-signal fencing, owner ordering, shared deadlines, and
-  close-event aggregation.
+  persistence, cutoff dispositions, late-signal fencing, owner ordering (five owners including
+  collections before env), shared deadlines, and close-event aggregation.
+- `tests/test_main_window_collections_shutdown_repro.py` — main-window teardown invokes
+  collections with a fair budget share; file-import and library-import in-flight paths stay
+  within the allocated share (PYPOST-1321).
 - `tests/test_lifecycle_observability.py` — correlated logs, secret exclusion, Prometheus
-  counters/gauges, OpenTelemetry labels, and all environment dispositions.
+  counters/gauges, OpenTelemetry labels, environment dispositions, and
+  `collections_presenter` owner metrics (`owner_count=5` on the main-window aggregate).
 
 Use public owner methods and injectable dependency seams. Make asynchronous tests deterministic with
 `threading.Event`, Qt signals, and bounded `process_until()` polling; do not use sleeps, `qWait`, or
@@ -211,7 +256,9 @@ repository Make target:
 
 ```sh
 make test WORKERS=1 WORKER_TIMEOUT=60 \
-  PYTEST_ARGS='tests/test_presenter_teardown_contract_repro.py tests/test_lifecycle_observability.py'
+  PYTEST_ARGS='tests/test_presenter_teardown_contract_repro.py \
+  tests/test_main_window_collections_shutdown_repro.py \
+  tests/test_lifecycle_observability.py'
 ```
 
 Also run `make lint` and `make verify-ai-tasks` for documentation or lifecycle changes.

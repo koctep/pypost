@@ -70,6 +70,7 @@ def teardown(window: MainWindow, timeout_ms: int | None = None) -> TeardownResul
                 getattr(window, "tabs", None),
                 getattr(window, "history_panel", None),
                 getattr(window, "history_manager", None),
+                getattr(window, "collections", None),
                 getattr(window, "env", None),
             )
             if owner is not None and callable(getattr(owner, "teardown", None))

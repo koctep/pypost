@@ -23,9 +23,15 @@ from pypost.core.qt.environment_storage_gateway import EnvironmentStorageGateway
 from pypost.models.models import Environment, HistoryEntry, RequestData
 from pypost.models.response import ResponseData
 from pypost.models.settings import AppSettings
+from pypost.ui.presenters.collections_presenter import CollectionsPresenter
 from pypost.ui.presenters.env_presenter import EnvPresenter
 from pypost.ui.presenters.tabs_presenter import RequestTab, TabsPresenter
 from pypost.ui.widgets.history_panel import HistoryPanel
+from tests.helpers.collections_tree import (
+    FakeMetrics,
+    FakeRequestManager,
+    FakeStateManager,
+)
 from tests.helpers.process_until import process_until
 
 pytestmark = pytest.mark.timeout(60)
@@ -216,6 +222,7 @@ class _CompositionRootHarness:
         tabs: _CompositionOwnerDouble,
         history_panel: _CompositionOwnerDouble,
         history_manager: _CompositionOwnerDouble,
+        collections: _CompositionOwnerDouble,
         env: _CompositionOwnerDouble,
     ) -> None:
         from pypost.ui.main_window import MainWindow
@@ -224,6 +231,7 @@ class _CompositionRootHarness:
         self.tabs = tabs
         self.history_panel = history_panel
         self.history_manager = history_manager
+        self.collections = collections
         self.env = env
 
     def teardown(self, timeout_ms: int) -> _TeardownResultDouble:
@@ -286,6 +294,13 @@ def _make_composition_root(
             "history_manager",
             calls,
             _composition_result("history_manager"),
+            budget=budget,
+            consume_ms=10,
+        ),
+        _CompositionOwnerDouble(
+            "collections",
+            calls,
+            _composition_result("collections"),
             budget=budget,
             consume_ms=10,
         ),
@@ -1196,6 +1211,9 @@ def test_each_owner_has_bounded_idle_idempotent_teardown(qapp, tmp_path):
         _make_tabs_presenter(),
         HistoryPanel(HistoryManager(history_path=tmp_path / "idle-history.json")),
         HistoryManager(history_path=tmp_path / "idle-manager.json"),
+        CollectionsPresenter(
+            FakeRequestManager([]), FakeStateManager(), FakeMetrics(), {}
+        ),
         _make_env_presenter(_EnvironmentStorageDouble([])),
         EnvironmentStorageGateway(_EnvironmentStorageDouble([])),
     ]
@@ -1217,7 +1235,13 @@ def test_main_window_teardown_orders_public_owners_and_aggregates(qapp):
 
     _assert_result(result)
     assert result.outcome == "success"
-    assert calls == ["tabs", "history_panel", "history_manager", "env"]
+    assert calls == [
+        "tabs",
+        "history_panel",
+        "history_manager",
+        "collections",
+        "env",
+    ]
     assert all(
         isinstance(owner.timeouts[0], int) and 0 <= owner.timeouts[0] <= 100
         for owner in owners
@@ -1238,7 +1262,7 @@ def test_main_window_teardown_passes_one_shared_remaining_deadline(qapp):
     assert all(isinstance(timeout_ms, int) for timeout_ms in timeouts)
     assert timeouts == sorted(timeouts, reverse=True)
     assert timeouts[0] <= 100
-    assert budget.remaining_ms == 60
+    assert budget.remaining_ms == 50
 
 
 def test_main_window_teardown_aggregates_owner_failure_after_draining_all(qapp):
@@ -1257,7 +1281,13 @@ def test_main_window_teardown_aggregates_owner_failure_after_draining_all(qapp):
 
     _assert_result(result)
     assert result.outcome == "failed"
-    assert calls == ["tabs", "history_panel", "history_manager", "env"]
+    assert calls == [
+        "tabs",
+        "history_panel",
+        "history_manager",
+        "collections",
+        "env",
+    ]
 
 
 def test_main_window_close_event_rejects_incomplete_cleanup(qapp):

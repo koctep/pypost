@@ -107,6 +107,13 @@ user select one or more entries, and asks whether the selected entries should be
 Library imports reuse the same validation, conflict, persistence, and result-summary contracts as
 file imports.
 
+**PYPOST-1321** registers `CollectionsPresenter` as a main-window shutdown owner so application
+close during file or library import runs import teardown under a fair share of the shared
+shutdown budget. The presenter exposes `begin_teardown()` and returns `TeardownResult` from
+`teardown()`; import actions keep a `bool` teardown surface and add an admission fence. See
+[Uniform Presenter Teardown Contract](presenter_teardown.md) and
+[Main-window shutdown ownership](#main-window-shutdown-ownership-pypost-1321).
+
 ## Library-backed import (PYPOST-1279)
 
 ### Architecture
@@ -251,9 +258,13 @@ After:
 - **`pypost/ui/presenters/collection_import_actions.py`** — `CollectionImportActions`,
   a `QObject` orchestrator. Owns worker lifecycle, busy state, and teardown; sequences
   pick → async parse → sync conflict/plan/apply/result. Exposes `is_busy()`, `wait_idle()`,
-  and `teardown()` for bounded lifecycle coordination, signal disconnection, and deferred
-  event processing (PYPOST-1148, PYPOST-1182). Split out of `CollectionsPresenter` the same
-  way `CollectionTreeActions` and `CollectionsAsyncLoader` are.
+  `begin_teardown()` (admission fence), and `teardown() -> bool` for bounded lifecycle
+  coordination, signal disconnection, and deferred event processing (PYPOST-1148,
+  PYPOST-1182, PYPOST-1321). Split out of `CollectionsPresenter` the same way
+  `CollectionTreeActions` and `CollectionsAsyncLoader` are.
+- **`pypost/ui/presenters/collections_presenter_lifecycle.py`** — presenter fencing,
+  `TeardownResult` construction, correlated `lifecycle_teardown_*` logs, and metrics
+  (PYPOST-1321). Keeps `collections_presenter.py` under its LOC baseline.
 - **`pypost/ui/collection_item_dialogs.py`** — four helpers:
   `prompt_import_collection_file`, `show_collection_import_invalid_file_error`,
   `prompt_collection_import_conflict`, `show_collection_import_result`. The
@@ -265,8 +276,9 @@ After:
   row) instead of the bare tree; `presenter.widget` still returns the `QTreeView`, so
   existing callers and automation are unaffected. Injects status-bar show/clear hooks
   for the preparing cue; types the optional `read_import_file` DI seam as `ReadImportFile | None`.
-  Exposes `wait_import_idle()` and `teardown()` delegating to `CollectionImportActions` for clean
-  worker termination and panel closure (PYPOST-1148, PYPOST-1182).
+  Exposes `wait_import_idle()`, `begin_teardown()`, and `teardown() -> TeardownResult`
+  (via `collections_presenter_lifecycle`) for fencing, worker termination, and panel
+  closure (PYPOST-1148, PYPOST-1182, PYPOST-1321).
 
 ### Async parse and busy cue (PYPOST-1005)
 
@@ -504,9 +516,10 @@ is a documented contract checked by the slow latency module, not a runtime check
 `wait_idle(timeout_ms: int | None = None)` and `teardown(timeout_ms: int | None = None)` resolve
 `None` through the policy. `CollectionsPresenter.wait_import_idle` and
 `CollectionsPresenter.teardown` keep the same `None` default and pass `timeout_ms` through
-unchanged; the presenter resolves it only for its own `collections_presenter_teardown_started
-timeout_ms=%d` log line (`self._import_actions.lifecycle_policy.resolve_budget_ms(timeout_ms)`).
-The presenter does not take a policy; it always uses the actions' default.
+unchanged to the actions; the presenter lifecycle helper resolves the budget for its
+`lifecycle_teardown_started` / `collections_presenter_teardown_started` log lines
+(`actions.lifecycle_policy.resolve_budget_ms(timeout_ms)`). The presenter does not take a
+policy; it always uses the actions' default.
 
 #### Preserved behaviour
 
@@ -590,17 +603,42 @@ the worker shutdown path or the policy values.
 
 #### Scope limits
 
-- Application shutdown does not call `CollectionsPresenter.teardown`: the presenter is not in the
-  main-window teardown owner list (`pypost/ui/main_window_lifecycle.py`), so closing the app
-  during an import is not covered by this budget
-  ([PYPOST-1321](https://pypost.atlassian.net/browse/PYPOST-1321)). The main-window 5000 ms
-  literals are not part of this policy
-  ([PYPOST-1325](https://pypost.atlassian.net/browse/PYPOST-1325)).
+- The main-window 5000 ms literals that feed the overall shutdown budget are not part of this
+  import policy ([PYPOST-1325](https://pypost.atlassian.net/browse/PYPOST-1325)). Application
+  close does call collections teardown under a fair share of that budget
+  ([Main-window shutdown ownership](#main-window-shutdown-ownership-pypost-1321)).
 - Other components still have their own `_WORKER_FINISH_WAIT_MS = 100`
   ([PYPOST-1323](https://pypost.atlassian.net/browse/PYPOST-1323)).
 - One test patches the private `_wait_idle_until`, and no runtime code reads
   `budget_tolerance_ms`
   ([PYPOST-1327](https://pypost.atlassian.net/browse/PYPOST-1327)).
+
+### Main-window shutdown ownership (PYPOST-1321)
+
+`main_window_lifecycle.teardown` includes `window.collections` immediately before `env` in the
+owner list (`tabs → history_panel → history_manager → collections → env`). Env stays last for
+the tabs→env drain / `begin_root_teardown` contract. Collections receives
+`min(allocated, remaining)` from the shared deadline formula already used by peer owners.
+
+On close:
+
+1. Early `begin_teardown()` on collections (with the other non-last owners) fences import
+   admission via `CollectionImportActions.begin_teardown()` without waiting or closing the panel.
+2. `CollectionsPresenter.teardown(timeout_ms=owner_budget)` returns `TeardownResult`
+   (`owner="collections_presenter"`), adapts the actions `bool` into `success` /
+   `incomplete` + `failure_kind="timeout"`, closes the panel, and emits correlated
+   `lifecycle_teardown_*` lines plus the legacy `collections_presenter_teardown_*` diagnostics.
+3. File and library import entry points reject new work after the fence even when idle
+   (`collection_import_skipped reason=teardown` /
+   `collection_library_import_skipped reason=teardown`).
+
+Import-phase ordering and budgets inside `CollectionImportActions` are unchanged (PYPOST-1264).
+A non-interruptible library worker may still consume the full collections share
+([PYPOST-1324](https://pypost.atlassian.net/browse/PYPOST-1324)). Full composition-root contract
+details: [Uniform Presenter Teardown Contract](presenter_teardown.md).
+
+Regression coverage: `tests/test_main_window_collections_shutdown_repro.py` (owner order,
+budget share, file-import and library-import in flight).
 
 ### State machine (PYPOST-1228)
 
@@ -904,6 +942,9 @@ without the callback. For a single-argument function, its body does not execute.
   disconnect/interrupt/cleanup sequence); it no longer feeds `is_busy()`.
 - **`lifecycle_policy -> CollectionImportLifecyclePolicy`** (property) — the policy that sets
   every wait limit (PYPOST-1264).
+- **`begin_teardown() -> None`** — sets the admission fence (`_teardown_started`) without
+  waiting for workers (PYPOST-1321). File and library import entry points then no-op with
+  `reason=teardown` even when idle.
 - **`wait_idle(timeout_ms: int | None = None) -> bool`** — `None` uses the policy
   `teardown_budget_ms` (5000 ms). While the action is busy, pumps the Qt
   event loop (`QApplication.processEvents()`) or performs short worker waits
@@ -915,8 +956,9 @@ without the callback. For a single-argument function, its body does not execute.
   to allow deferred deletion (`deleteLater()`) to run. Returns `True` if idle is observed within
   `timeout_ms`, or `False` if the bounded wait expires (PYPOST-1182, PYPOST-1148).
 - **`teardown(timeout_ms: int | None = None) -> bool`** — coordinates interruption, signal
-  disconnection, bounded waiting, and worker cleanup (PYPOST-1148). `None` uses the policy
-  `teardown_budget_ms`. All waits below share one deadline of that budget (PYPOST-1264; see
+  disconnection, bounded waiting, and worker cleanup (PYPOST-1148). Also sets the admission
+  fence. `None` uses the policy `teardown_budget_ms`. All waits below share one deadline of that
+  budget (PYPOST-1264; see
   [Teardown lifecycle policy](#teardown-lifecycle-policy-pypost-1264)):
   1. If the worker is running, requests interruption before waiting so an in-flight parse can
      reach its next checkpoint.
@@ -937,9 +979,11 @@ without the callback. For a single-argument function, its body does not execute.
      process deferred deletions.
   Returns `True` if no bounded wait timed out, or `False` if the idle wait, final join or
   library join timed out. A `False` result does not prevent the reference/state cleanup in
-  steps 5–7.
+  steps 5–7. Callers that need a `TeardownResult` use `CollectionsPresenter.teardown`.
 - **`import_collections() -> None`** — pick file; dispatch async parse; finish on the
-  GUI thread when ready. Callers and the button wire-up do not change.
+  GUI thread when ready. After `begin_teardown` / teardown has started, returns immediately
+  with `collection_import_skipped reason=teardown` (PYPOST-1321). While busy without a
+  teardown fence, still skips with `reason=busy`.
 
 Constructor DI (beyond the original refresh/emit hooks): optional `show_status` /
 `clear_status` for the preparing message; `read_import_file: ReadImportFile` for the worker.
@@ -957,17 +1001,30 @@ presenters, and automated test fixtures to wait, within a bound, for the import 
 guarantee that the native worker has been joined and reaped; call `teardown()` before destroying
 widgets or closing panels (PYPOST-1182).
 
-### `CollectionsPresenter.teardown(timeout_ms: int | None = None) -> bool`
+### `CollectionsPresenter.begin_teardown() -> None`
 
-Deterministically tears down import actions and presenter resources (PYPOST-1148). Delegates to
-`self._import_actions.teardown(timeout_ms=timeout_ms)` and closes the presenter panel
-(`self._panel.close()`). `None` uses the import lifecycle policy budget; the presenter resolves
-it only to log `collections_presenter_teardown_started timeout_ms=<budget>`. Application
-shutdown does not call this method yet
-([PYPOST-1321](https://pypost.atlassian.net/browse/PYPOST-1321)). Returns `True` if background
-worker resources were cleanly drained and stopped. Test fixtures and parent widget cleanup
-routines invoke `teardown()` in `finally:` blocks to prevent background thread leaks and C++
-destructor futex deadlocks during test suite runs.
+Fences import admission without waiting or closing the panel (PYPOST-1321). Forwards into
+`CollectionImportActions.begin_teardown()` and marks collection creation closed. Main-window
+shutdown calls this early for every non-last owner; direct callers that only need a fence may
+use it the same way.
+
+### `CollectionsPresenter.teardown(timeout_ms: int | None = None) -> TeardownResult`
+
+Deterministically tears down import actions and presenter resources (PYPOST-1148, PYPOST-1321).
+Implemented in `collections_presenter_lifecycle`: fences admission if needed, delegates to
+`self._import_actions.teardown(timeout_ms=timeout_ms)` (`bool`), closes the presenter panel
+(`self._panel.close()`), and returns an idempotent `TeardownResult` with
+`owner="collections_presenter"`. `None` uses the import lifecycle policy budget; the helper
+resolves it for `lifecycle_teardown_started` and the legacy
+`collections_presenter_teardown_started timeout_ms=<budget>` line. Maps actions `clean` to
+`outcome="success"` or `outcome="incomplete"` with `failure_kind="timeout"`.
+
+Application shutdown invokes this method through `main_window_lifecycle` with the collections
+fair share of the shared budget
+([Main-window shutdown ownership](#main-window-shutdown-ownership-pypost-1321)). Test fixtures
+and parent widget cleanup routines still invoke `teardown()` in `finally:` blocks; assert on
+`result.outcome == "success"` (or inspect the full `TeardownResult`) rather than treating the
+return value as a bare `bool`.
 
 Presenter integrations should call `wait_import_idle()` before making assertions that depend on
 parse completion, and call `teardown()` before closing the panel or destroying its parent. Do not
@@ -1333,8 +1390,10 @@ deadlock (`futex_wait_queue`) around worker cleanup
   remains busy through preparing, parsing, and applying, and returns idle only through an explicit
   terminal state transition.
 - **Explicit `teardown()` cleanup protocol**:
-  `CollectionImportActions.teardown(timeout_ms)` and `CollectionsPresenter.teardown(timeout_ms)`
-  provide bounded lifecycle cleanup:
+  `CollectionImportActions.teardown(timeout_ms) -> bool` and
+  `CollectionsPresenter.teardown(timeout_ms) -> TeardownResult` provide bounded lifecycle
+  cleanup (the presenter adapts the actions `bool` into a `TeardownResult` for main-window
+  aggregation, PYPOST-1321):
   - **Interrupt**: Requests `worker.requestInterruption()` before waiting so a running reader can
     unwind at its next checkpoint (PYPOST-1229).
   - **Wait**: Runs the `wait_idle()` loop on the shared teardown deadline (PYPOST-1264) to
@@ -1511,25 +1570,35 @@ routinely carries credentials in a header template. Paths are logged for triage
 `ai-tasks/PYPOST-1058/50-observability.md`,
 `ai-tasks/PYPOST-1059/50-observability.md`,
 `ai-tasks/PYPOST-1182/50-observability.md`,
-`ai-tasks/PYPOST-1148/50-observability.md`, and
-`ai-tasks/PYPOST-1264/50-observability.md`.
+`ai-tasks/PYPOST-1148/50-observability.md`,
+`ai-tasks/PYPOST-1264/50-observability.md`, and
+`ai-tasks/PYPOST-1321/50-observability.md`.
 
 ### Async parse, lifecycle synchronization, and teardown (PYPOST-1005 / PYPOST-1182 / PYPOST-1148 /
-PYPOST-1229 / PYPOST-1264)
+PYPOST-1229 / PYPOST-1264 / PYPOST-1321)
 
-In `collections_presenter.py`:
+In `collections_presenter_lifecycle.py` (emitted for `CollectionsPresenter.teardown`):
 
-- **INFO** `collections_presenter_teardown_started timeout_ms=%d` — start of presenter-level
-  teardown sequence (PYPOST-1148); `timeout_ms` is the resolved budget, so a `None` argument
-  logs the policy default 5000 (PYPOST-1264)
-- **INFO** `collections_presenter_teardown_completed clean=%s` — completion of presenter
-  teardown (PYPOST-1148)
+- **INFO** `lifecycle_teardown_started owner=collections_presenter teardown_id=%s timeout_ms=%d
+  active_count=%d pending_count=%d` — correlated shutdown participant start (PYPOST-1321)
+- **INFO** `collections_presenter_teardown_started timeout_ms=%d` — legacy presenter-level
+  start line kept for PYPOST-1148 / PYPOST-1264 diagnostics; `timeout_ms` is the resolved
+  budget, so a `None` argument logs the policy default 5000
+- **INFO** `collections_presenter_teardown_completed clean=%s` — legacy completion line
+  (PYPOST-1148); `clean` is the actions `bool` before `TeardownResult` mapping
+- **INFO** `lifecycle_teardown_completed owner=collections_presenter teardown_id=%s
+  outcome=%s elapsed_ms=%d deadline_ms=%d active_count=%d pending_count=%d` — correlated
+  completion with aggregable outcome (PYPOST-1321)
 
 In `collection_import_actions.py`:
 
 - **DEBUG** `collection_import_state_changed from=%s to=%s` — every `CollectionImportState`
   transition (`_set_state`), e.g. `from=parsing to=applying` (PYPOST-1228)
 - **INFO** `collection_import_skipped reason=busy` — second Import while preparing
+- **INFO** `collection_import_skipped reason=teardown` — file import refused after admission
+  fence (PYPOST-1321)
+- **INFO** `collection_library_import_skipped reason=teardown` — library import refused after
+  admission fence (PYPOST-1321)
 - **INFO** `collection_import_parse_started path=…` — orchestrator dispatched the worker
 - **DEBUG** `collection_import_busy_cue_shown` / `collection_import_busy_cue_cleared`
 - **INFO** `collection_import_wait_idle_started` — entered `wait_idle()` while worker active
@@ -1817,8 +1886,11 @@ the collection id, not its name.
     `make test`, pytest live logging can cost hundreds of ms per WARNING record
     ([PYPOST-1326](https://pypost.atlassian.net/browse/PYPOST-1326)); confirm with
     `PYTEST_ARGS="... -o log_cli=false"` before treating it as a product regression. If the
-    whole app hangs on close during an import, note that application shutdown does not call
-    collection import teardown yet ([PYPOST-1321](https://pypost.atlassian.net/browse/PYPOST-1321)).
+    whole app hangs on close during an import, check the collections share of the main-window
+    budget and correlated `lifecycle_teardown_* owner=collections_presenter` lines
+    ([Main-window shutdown ownership](#main-window-shutdown-ownership-pypost-1321)); a
+    non-interruptible library worker can still consume that share
+    ([PYPOST-1324](https://pypost.atlassian.net/browse/PYPOST-1324)).
 
 - **`test_plan_collection_import_large_dataset_performance` fails with "thread CPU, exceeding
   100ms CPU budget"**
@@ -1850,9 +1922,10 @@ Remaining cancellation and lifecycle work is recorded in
 
 Follow-ups from [PYPOST-1264 technical debt](../../ai-tasks/PYPOST-1264/60-tech-debt.md):
 
-- **[PYPOST-1321](https://pypost.atlassian.net/browse/PYPOST-1321)** (High) — register
-  collection import teardown with main-window shutdown; today app close during an import does
-  not interrupt or join its workers under any budget.
+- **[PYPOST-1321](https://pypost.atlassian.net/browse/PYPOST-1321)** — done: see
+  [Main-window shutdown ownership](#main-window-shutdown-ownership-pypost-1321) and
+  [Uniform Presenter Teardown Contract](presenter_teardown.md). Residual notes remain in
+  [PYPOST-1321 technical debt](../../ai-tasks/PYPOST-1321/60-tech-debt.md).
 - **[PYPOST-1322](https://pypost.atlassian.net/browse/PYPOST-1322)** (Lowest) — test the
   uncapped nested worker-finish join during teardown (Risk 3).
 - **[PYPOST-1323](https://pypost.atlassian.net/browse/PYPOST-1323)** (Low) — move the other

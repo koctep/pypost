@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Callable
+from typing import TYPE_CHECKING
 
 from PySide6.QtCore import QModelIndex, QObject, Qt, Signal
 from PySide6.QtGui import QStandardItem, QStandardItemModel
@@ -25,10 +26,14 @@ from pypost.ui.presenters.collection_tree_incremental import (
     log_tree_refresh,
     try_incremental_tree_refresh,
 )
+from pypost.ui.presenters import collections_presenter_lifecycle
 from pypost.ui.presenters.collections_async_loader import CollectionsAsyncLoader
-from pypost.ui.presenters.collections_presenter_creation import create_workspace_collection
 from pypost.ui.presenters.collections_panel import build_collections_panel
+from pypost.ui.presenters.collections_presenter_creation import create_workspace_collection
 from pypost.ui.widget_ids import COLLECTION_TREE, set_widget_id
+
+if TYPE_CHECKING:
+    from pypost.core.lifecycle import TeardownResult
 
 logger = logging.getLogger(__name__)
 
@@ -392,18 +397,13 @@ class CollectionsPresenter(QObject):
         """Persist and publish one independent workspace copy."""
         return create_workspace_collection(self, source)
 
-    def teardown(self, timeout_ms: int | None = None) -> bool:
-        """Tears down import actions and presenter resources cleanly.
+    def begin_teardown(self) -> None:
+        """Fence import admission without waiting or closing the panel."""
+        collections_presenter_lifecycle.begin_teardown(self)
 
-        ``None`` uses the import lifecycle policy default budget.
-        """
-        self._collection_creation_closed = True
-        budget_ms = self._import_actions.lifecycle_policy.resolve_budget_ms(timeout_ms)
-        logger.info("collections_presenter_teardown_started timeout_ms=%d", budget_ms)
-        result = self._import_actions.teardown(timeout_ms=timeout_ms)
-        self._panel.close()
-        logger.info("collections_presenter_teardown_completed clean=%s", result)
-        return result
+    def teardown(self, timeout_ms: int | None = None) -> TeardownResult:
+        """Tear down import work and the panel; ``None`` uses the policy budget."""
+        return collections_presenter_lifecycle.teardown(self, timeout_ms)
 
     def _show_import_status(self, message: str) -> None:
         """Show a non-modal preparing cue on the main window status bar if present."""

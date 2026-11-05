@@ -36,6 +36,7 @@ _LIFECYCLE_OWNERS = frozenset(
         "history_manager",
         "environment_storage_gateway",
         "env_presenter",
+        "collections_presenter",
     }
 )
 _LIFECYCLE_OUTCOMES = frozenset({"success", "incomplete", "failed"})

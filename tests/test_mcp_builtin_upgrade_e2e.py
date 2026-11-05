@@ -209,5 +209,5 @@ def test_builtin_upgrade_then_workspace_copy_remains_usable(
         registry.clear()
         assert environments.wait_storage_idle(timeout_ms=5000)
         assert environments.teardown(timeout_ms=5000).outcome == "success"
-        assert collections.teardown(timeout_ms=5000)
+        assert collections.teardown(timeout_ms=5000).outcome == "success"
         collections.widget.close()

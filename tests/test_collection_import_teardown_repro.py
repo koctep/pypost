@@ -126,15 +126,17 @@ def test_teardown_structured_logging(caplog, qapp):
     with caplog.at_level(logging.DEBUG):
         clean = presenter.teardown(timeout_ms=100)
 
-    assert clean is True
+    assert clean.outcome == "success"
     messages = [r.message for r in caplog.records]
     assert any("collections_presenter_teardown_started timeout_ms=100" in m for m in messages)
     assert any("collection_import_teardown_started timeout_ms=100" in m for m in messages)
     assert any("collection_import_teardown_completed clean=True" in m for m in messages)
     assert any("collections_presenter_teardown_completed clean=True" in m for m in messages)
 
-    # 2. Worker interruption and reaping when busy
+    # 2. Worker interruption and reaping when busy (fresh presenter: teardown is idempotent)
     caplog.clear()
+    presenter, _ = _make_presenter()
+    actions = presenter._import_actions
     mock_worker = MagicMock()
     mock_worker.isRunning.return_value = True
     mock_worker.wait.return_value = True
@@ -144,7 +146,7 @@ def test_teardown_structured_logging(caplog, qapp):
     with caplog.at_level(logging.DEBUG):
         clean_interrupted = presenter.teardown(timeout_ms=20)
 
-    assert clean_interrupted is False
+    assert clean_interrupted.outcome == "incomplete"
     messages = [r.message for r in caplog.records]
     assert any("collection_import_wait_idle_timeout" in m for m in messages)
     assert any("collection_import_worker_interrupting" in m for m in messages)
