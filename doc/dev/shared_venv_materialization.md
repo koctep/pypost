@@ -1,4 +1,4 @@
-# Shared Virtual Environment Materialization and Skeleton Template (PYPOST-1413, PYPOST-1419)
+# Shared Virtual Environment Materialization and Skeleton Template (PYPOST-1413, PYPOST-1419, PYPOST-1420)
 
 ## Overview
 
@@ -14,24 +14,27 @@ the Make fixture helpers prepare one shared base virtualenv and materialize per-
 
 - **`SharedVenvManager`** (`tests/helpers/shared_venv_manager.py`): owns bootstrap, flock +
   preparation-budget locking, skeleton publication, readiness state, and workspace
-  materialization (PYPOST-1419).
+  materialization (PYPOST-1419 ownership; PYPOST-1420 in-process population).
 - **Stable facades** in `tests/makefile_test_helpers.py`:
   `_get_shared_base_venv`, `_materialize_prewarmed_venv`, `_venv_ready`, and `_build_skeleton`
   delegate to a lazy process-default manager so fixtures and
   `scripts/run_parallel_tests.py` keep their existing import paths.
 - **Skeleton + `.pth` layout** (PYPOST-1413): `_prewarmed_base.pth` points workspace interpreters
-  at the immutable shared base `site-packages`; materialization uses `cp -a` of `.skeleton`
-  (fallback: base).
+  at the immutable shared base `site-packages`.
+- **In-process population** (PYPOST-1420): `materialize` copies `.skeleton` (fallback: base)
+  via injected `tree_copier` (default `shutil.copytree(..., symlinks=True)`). Bootstrap stages
+  still use `preparation_runner`; workspace population does not.
 
 This document describes the architecture, NFS filesystem performance challenges, skeleton
 template pattern, concurrency locking, failure recovery, isolation guarantees, and the
 manager / facade API.
 
-## Architecture (PYPOST-1419)
+## Architecture (PYPOST-1419 / PYPOST-1420)
 
 Lifecycle ownership no longer lives in scattered free functions plus a module-level mutable
 path cache (`_SHARED_BASE_VENV`). A single cohesive manager owns readiness as an instance
-attribute; helpers expose thin facades for continuity.
+attribute; helpers expose thin facades for continuity. PYPOST-1420 keeps that ownership model
+and replaces residual per-workspace `cp -a` fork/exec with in-process tree copy.
 
 ```text
 Consumers (unchanged outward contracts)
@@ -47,22 +50,22 @@ tests/makefile_test_helpers.py
   _get_shared_base_venv()
   _materialize_prewarmed_venv(ws)
   _venv_ready / _build_skeleton wrappers
-  _run_preparation_command (default preparation_runner)
+  _run_preparation_command (default preparation_runner; bootstrap only)
         │
         ▼
 tests/helpers/shared_venv_manager.py
   SharedVenvManager
     owned resolved_base (Path | None)
     lock coordination (fcntl + budget)
-    bootstrap stages (create / install / validate)
+    bootstrap stages (create / install / validate) via preparation_runner
     skeleton publication
-    workspace materialization (cp -a)
+    workspace materialization (tree_copier → shutil.copytree, symlinks=True)
 ```
 
 Constructor-injected collaborators (defaults match production behavior) make lock contention,
 stale readiness, and materialization failure paths unit-testable without a full NFS bootstrap:
-`preparation_runner`, `clock`, `flock`, `base_root` / `tempdir_fn`, marker and interpreter
-settings.
+`preparation_runner`, `tree_copier`, `clock`, `flock`, `base_root` / `tempdir_fn`, marker and
+interpreter settings.
 
 The process-default manager is a **lazy instance convention**, not a path singleton. Tests may
 construct private `SharedVenvManager(...)` instances or call `clear_readiness()` on the default
@@ -115,7 +118,9 @@ an **NFS4 network filesystem** (`nfs4`):
 
 To eliminate NFS RPC latency while maintaining full environment capability and strict workspace
 isolation, PYPOST-1413 introduced the **Lightweight Skeleton Template Pattern**. PYPOST-1419
-did not change on-disk layout or the `cp -a` path; it only encapsulated ownership.
+encapsulated ownership without changing on-disk layout. PYPOST-1420 keeps that layout and
+replaces the residual `cp -a` population step with in-process `shutil.copytree(..., symlinks=True)`
+(optional injectable `tree_copier`).
 
 ### On-Disk Layout
 
@@ -149,7 +154,7 @@ suffix segment, so Python 3.12's base
          e.g. X.Y=3.12 → /tmp/pypost_shared_base_venv_3.lock)
 
                         │
-                        ▼  cp -a .skeleton <ws>/.venv  (< 0.2s)
+                        ▼  shutil.copytree(.skeleton → <ws>/.venv, symlinks=True)
 Workspace Sandbox (<ws>/.venv/)
 ├── pyvenv.cfg
 ├── bin/ (symlinks pointing to shared base binaries)
@@ -179,28 +184,33 @@ the workspace's `bin/python` interpreter starts:
 3. Commands such as `python -m pytest` or `python -m flake8` locate and load packages directly
    from the shared base.
 
-### Fast Materialization via `cp -a`
+### Fast Materialization via In-Process `copytree` (PYPOST-1420)
 
 Instead of copying or linking thousands of files, `SharedVenvManager.materialize` (via the
-`_materialize_prewarmed_venv` facade) copies only the minimal skeleton directory:
+`_materialize_prewarmed_venv` facade) copies only the minimal skeleton directory **in-process**.
+`symlinks=True` recreates skeleton `bin/*` links into the shared base (the in-process analogue of
+archive copy preserving links). Population does **not** call `preparation_runner` or shell out to
+`cp`.
 
 ```python
 skeleton = base.parent / ".skeleton"
 source = skeleton if manager.is_ready(skeleton) else base
-preparation_runner(
-    ["cp", "-a", str(source), str(target)],
-    timeout=20,
-    cleanup_budget=1,
-)
+# default tree_copier:
+shutil.copytree(source, target, symlinks=True)
+# soft copy_timeout checked via injected _clock after the copy returns
 ```
+
+Inject an alternate `tree_copier` in unit tests to simulate copy/`OSError`/`TimeoutError` without
+stubbing `cp` argv. Soft `copy_timeout` is a post-copy deadline (the copy itself is not
+preemptively killed mid-flight).
 
 ### Performance Comparison
 
-| Metric | Legacy (`cp -al` Base) | Skeleton Pattern (`cp -a` Skeleton) | Improvement |
+| Metric | Legacy (`cp -al` Base) | Skeleton + in-process `copytree` | Improvement |
 | --- | --- | --- | --- |
 | **Filesystem Items per WS** | 2,142 items | ~12 items | **99.4% reduction** |
-| **Single-Worker Latency** | 10.4s – 12.9s | 0.09s – 0.21s | **50x – 120x speedup** |
-| **8-Worker Concurrent RPCs** | 17,136 RPCs | ~96 RPCs | **99.4% reduction** |
+| **Single-Worker Latency** | 10.4s – 12.9s | ~0.09s – 0.21s (no fork/exec) | **50x – 120x speedup** |
+| **8-Worker Concurrent RPCs** | 17,136 RPCs | ~96 RPCs (no `cp` processes) | **99.4% reduction** |
 | **8-Worker Execution Time** | >20s (Timeout) | < 0.3s | **Eliminates timeout** |
 
 ## Concurrency and Lifecycle Management
@@ -235,9 +245,10 @@ multiple tests or worker processes start at the same time:
 
 ### Process Group Reaping (`_run_preparation_command`)
 
-Subprocesses invoked during preparation (virtual environment creation, pip installs, directory
-copies) use process group isolation via the default preparation runner in
-`tests/makefile_test_helpers.py` (injectable into `SharedVenvManager`):
+Subprocesses invoked during **bootstrap** (virtual environment creation, pip installs,
+validation) use process group isolation via the default preparation runner in
+`tests/makefile_test_helpers.py` (injectable into `SharedVenvManager`). Workspace population no
+longer uses this path (PYPOST-1420).
 - Started with `start_new_session=True`.
 - On `subprocess.TimeoutExpired`:
   - `os.killpg(proc.pid, signal.SIGKILL)` terminates the child process and any child processes it
@@ -251,10 +262,12 @@ copies) use process group isolation via the default preparation runner in
 
 ### Clean Workspace Teardown
 
-If materialization encounters an error during `cp -a`:
+If materialization encounters a copy error, soft deadline overrun, or injected `tree_copier`
+fault:
 - The partially copied target directory is immediately removed via `shutil.rmtree(target)`.
-- A descriptive `RuntimeError` is raised with the target path and underlying error
-  (`shared venv materialization failed: …`).
+- A descriptive `RuntimeError` is raised with the target path, `source=` kind (`skeleton` or
+  `base`), and underlying error (`shared venv materialization failed: … (source=…): …`).
+- Soft deadline messages also include `elapsed=` seconds versus `copy_timeout`.
 - Corrupted half-copied `.venv` directories are never left on disk to mislead subsequent tests.
 
 Stage-scoped bootstrap failures raise `RuntimeError` messages that identify the failing stage
@@ -285,13 +298,13 @@ materialization.
 
 | Member | Role |
 | --- | --- |
-| `__init__(*, python_version, base_root, marker_name, python_executable, preparation_runner, clock, flock, tempdir_fn)` | Construct with optional collaborator overrides for tests. |
+| `__init__(*, python_version, base_root, marker_name, python_executable, preparation_runner, clock, flock, tempdir_fn, tree_copier)` | Construct with optional collaborator overrides for tests. |
 | `resolved_base` | Owned readiness path, or `None` if not yet validated/published. |
 | `clear_readiness()` | Drop owned readiness so the next `ensure_ready` re-validates on disk. |
 | `is_ready(venv)` | True when marker and `bin/python` exist. |
 | `build_skeleton(venv_dir, skeleton_dir)` | Publish lightweight `.skeleton` template. |
 | `ensure_ready(*, preparation_budget=20)` | Serialize bootstrap under flock; return ready shared base `.venv` path. |
-| `materialize(workspace, *, copy_timeout=20)` | Materialize `workspace/.venv` from skeleton (fallback: base). |
+| `materialize(workspace, *, copy_timeout=20)` | In-process populate `workspace/.venv` from skeleton (fallback: base) via `tree_copier`. |
 
 ### Facades (`tests/makefile_test_helpers.py`)
 
@@ -335,7 +348,8 @@ timeouts and process-group SIGKILL cleanup.
 | Shared base root | `<tempfile.gettempdir()>/pypost_shared_base_venv_<major.minor>` | Overridable via manager `base_root` / `tempdir_fn`. |
 | Ordinary helper budget | 20s across lock + bootstrap | `_get_shared_base_venv(preparation_budget=…)` |
 | Runner cold preparation | 90s (watchdog 95s) | See [testing.md](testing.md) shared Make fixture section. |
-| Workspace copy timeout | 20s (`cleanup_budget=1`) | `materialize(..., copy_timeout=…)` |
+| Workspace copy timeout | 20s soft post-copy deadline | `materialize(..., copy_timeout=…)`; checked via injected `_clock` after `tree_copier` returns (no process-group kill). |
+| Default `tree_copier` | `shutil.copytree(..., symlinks=True)` | Overridable for failure injection in unit tests. |
 | Marker | `.initialized-<major.minor>` | Plus `bin/python` required for readiness. |
 
 These budgets are fixed harness settings; they do not change `pytest.mark.timeout`, worker

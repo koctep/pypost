@@ -3,8 +3,9 @@
 Owns bootstrap, lock coordination, skeleton publication, readiness state,
 and workspace materialization for pre-warmed Make fixtures.
 
-Jira: PYPOST-1419
+Jira: PYPOST-1419 (lifecycle ownership); PYPOST-1420 (in-process materialize)
 Architecture: ai-tasks/PYPOST-1419/20-architecture.md
+  Materialization: ai-tasks/PYPOST-1420/20-architecture.md
 """
 
 from __future__ import annotations
@@ -21,6 +22,7 @@ from pathlib import Path
 from typing import Protocol
 
 PreparationRunner = Callable[..., subprocess.CompletedProcess[str]]
+TreeCopier = Callable[[Path, Path], None]
 
 
 class _Clock(Protocol):
@@ -45,6 +47,11 @@ def _default_flock(lock: object, operation: int) -> None:
     fcntl.flock(lock, operation)  # type: ignore[arg-type]
 
 
+def _default_tree_copier(src: Path, dst: Path) -> None:
+    """Populate ``dst`` from ``src`` in-process, preserving symbolic links."""
+    shutil.copytree(src, dst, symlinks=True)
+
+
 class SharedVenvManager:
     """Own shared-base bootstrap, locking, skeleton publish, and workspace materialization."""
 
@@ -59,6 +66,7 @@ class SharedVenvManager:
         clock: _Clock | None = None,
         flock: Callable[..., None] | None = None,
         tempdir_fn: Callable[[], str] | None = None,
+        tree_copier: TreeCopier | None = None,
     ) -> None:
         """Construct a manager with optional collaborator overrides for tests."""
         self._python_version = python_version or (
@@ -71,6 +79,7 @@ class SharedVenvManager:
         self._clock = clock or _DefaultClock()
         self._flock = flock or _default_flock
         self._tempdir_fn = tempdir_fn or tempfile.gettempdir
+        self._tree_copier = tree_copier or _default_tree_copier
         self._resolved_base: Path | None = None
 
     @property
@@ -235,7 +244,12 @@ class SharedVenvManager:
         return self._resolved_base
 
     def materialize(self, workspace: Path, *, copy_timeout: float = 20) -> None:
-        """Materialize workspace/.venv from skeleton (fallback: base); bounded failure."""
+        """Populate workspace/.venv in-process from skeleton (fallback: base).
+
+        Uses injected ``tree_copier`` (default ``shutil.copytree(..., symlinks=True)``).
+        Soft ``copy_timeout`` is checked via ``_clock`` after the copy returns;
+        copy / soft-deadline failures clean partial targets and raise ``RuntimeError``.
+        """
         base = self.ensure_ready()
         target = workspace / ".venv"
         if self.is_ready(target):
@@ -244,15 +258,22 @@ class SharedVenvManager:
             shutil.rmtree(target)
         skeleton = base.parent / ".skeleton"
         source = skeleton if self.is_ready(skeleton) else base
+        source_kind = "skeleton" if source == skeleton else "base"
         try:
-            self._run(
-                ["cp", "-a", str(source), str(target)],
-                timeout=copy_timeout,
-                cleanup_budget=1,
-            )
-        except (subprocess.SubprocessError, OSError) as error:
+            started = self._clock.monotonic()
+            self._tree_copier(source, target)
+            elapsed = self._clock.monotonic() - started
+            if elapsed > copy_timeout:
+                raise TimeoutError(
+                    f"shared venv materialization exceeded {copy_timeout}s "
+                    f"(elapsed={elapsed:.3f}s source={source_kind})"
+                )
+        except (OSError, shutil.Error, TimeoutError) as error:
+            # TimeoutError is an OSError subclass; listed explicitly for the soft
+            # copy_timeout contract (post-copy deadline via injected _clock).
             if target.exists():
                 shutil.rmtree(target)
             raise RuntimeError(
-                f"shared venv materialization failed: {target}: {error}"
+                f"shared venv materialization failed: {target} "
+                f"(source={source_kind}): {error}"
             ) from error

@@ -1,6 +1,7 @@
-"""SharedVenvManager lifecycle ownership and DI-isolated stage tests (PYPOST-1419).
+"""SharedVenvManager lifecycle ownership and DI-isolated stage tests.
 
 Architecture: ai-tasks/PYPOST-1419/20-architecture.md
+Failing repro (in-process materialization): ai-tasks/PYPOST-1420/20-architecture.md
 """
 
 from __future__ import annotations
@@ -109,7 +110,7 @@ def test_ensure_ready_recovers_incomplete_base_via_injected_runner(
 def test_materialize_timeout_cleans_partial_target_and_identifies_stage(
     tmp_path: Path,
 ) -> None:
-    """FR5: materialization TimeoutExpired yields stage-aware error and cleans partials."""
+    """FR5: materialization failure yields stage-aware error and cleans partials."""
     base = tmp_path / ".venv"
     _seed_interpreter(base)
     (base / helpers.MARKER_NAME).touch()
@@ -120,18 +121,16 @@ def test_materialize_timeout_cleans_partial_target_and_identifies_stage(
     workspace = tmp_path / "workspace"
     workspace.mkdir()
 
-    def fail_copy(cmd: list[str], **kwargs: Any) -> subprocess.CompletedProcess[str]:
-        if cmd and cmd[0] == "cp":
-            target = Path(cmd[-1])
-            target.mkdir(parents=True, exist_ok=True)
-            (target / "partial-copy").touch()
-            raise subprocess.TimeoutExpired(cmd, 1)
-        return _successful_bootstrap(cmd, **kwargs)
+    def fail_copy(src: Path, dst: Path) -> None:
+        dst.mkdir(parents=True, exist_ok=True)
+        (dst / "partial-copy").touch()
+        raise TimeoutError("simulated materialization timeout")
 
     manager = SharedVenvManager(
         base_root=tmp_path,
-        preparation_runner=fail_copy,
+        preparation_runner=_successful_bootstrap,
         flock=lambda *_args, **_kwargs: None,
+        tree_copier=fail_copy,
     )
     # On-disk base+skeleton are already ready; ensure_ready should adopt them.
     assert manager.ensure_ready(preparation_budget=5) == base
@@ -141,3 +140,55 @@ def test_materialize_timeout_cleans_partial_target_and_identifies_stage(
 
     target = workspace / ".venv"
     assert not target.exists() or not (target / "partial-copy").exists()
+
+
+def test_materialize_populates_without_preparation_runner_or_cp(
+    tmp_path: Path,
+) -> None:
+    """FR1/FR2: materialize yields a ready isolated .venv without preparation_runner/cp."""
+    base = tmp_path / ".venv"
+    _seed_interpreter(base)
+    (base / helpers.MARKER_NAME).touch()
+    (base / "probe.txt").write_text("base-probe", encoding="utf-8")
+
+    skeleton = tmp_path / ".skeleton"
+    _seed_interpreter(skeleton)
+    (skeleton / helpers.MARKER_NAME).touch()
+    (skeleton / "probe.txt").write_text("skeleton-probe", encoding="utf-8")
+
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+
+    runner_calls: list[list[str]] = []
+
+    def spy_runner(
+        cmd: list[str], **kwargs: Any,
+    ) -> subprocess.CompletedProcess[str]:
+        runner_calls.append(list(cmd))
+        return _successful_bootstrap(cmd, **kwargs)
+
+    manager = SharedVenvManager(
+        base_root=tmp_path,
+        preparation_runner=spy_runner,
+        flock=lambda *_args, **_kwargs: None,
+    )
+
+    manager.materialize(workspace)
+
+    target = workspace / ".venv"
+    assert manager.is_ready(target)
+    assert (target / "probe.txt").read_text(encoding="utf-8") == "skeleton-probe"
+
+    cp_calls = [call for call in runner_calls if call and call[0] == "cp"]
+    assert not cp_calls, (
+        "materialize must not populate via preparation_runner/cp; "
+        f"saw: {cp_calls!r}"
+    )
+    assert runner_calls == [], (
+        "with a ready shared base, materialize must not invoke preparation_runner "
+        f"for population; saw: {runner_calls!r}"
+    )
+
+    (target / "probe.txt").write_text("mutated-workspace", encoding="utf-8")
+    assert (skeleton / "probe.txt").read_text(encoding="utf-8") == "skeleton-probe"
+    assert (base / "probe.txt").read_text(encoding="utf-8") == "base-probe"

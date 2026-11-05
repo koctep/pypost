@@ -233,28 +233,24 @@ def test_materialization_failure_is_bounded_and_retry_removes_partial_workspace(
     manager._resolved_base = private_shared_root
     workspace = tmp_path / "workspace"
     workspace.mkdir()
-    budgets: list[float | None] = []
 
-    def fail(cmd: list[str], **kwargs: Any) -> subprocess.CompletedProcess[str]:
-        budgets.append(kwargs.get("timeout"))
-        Path(cmd[-1]).mkdir()
-        (Path(cmd[-1]) / "partial-copy").touch()
-        raise subprocess.TimeoutExpired(cmd, 1)
+    def fail_copy(src: Path, dst: Path) -> None:
+        dst.mkdir(parents=True, exist_ok=True)
+        (dst / "partial-copy").touch()
+        raise TimeoutError("simulated materialization timeout")
 
-    monkeypatch.setattr(helpers, "_run_preparation_command", fail)
+    monkeypatch.setattr(manager, "_tree_copier", fail_copy)
     with pytest.raises(Exception):
         helpers._materialize_prewarmed_venv(workspace)
 
-    def copy(cmd: list[str], **kwargs: Any) -> subprocess.CompletedProcess[str]:
-        budgets.append(kwargs.get("timeout"))
-        shutil.copytree(Path(cmd[-2]), Path(cmd[-1]))
-        return subprocess.CompletedProcess(cmd, 0, stdout="", stderr="")
-
-    monkeypatch.setattr(helpers, "_run_preparation_command", copy)
+    monkeypatch.setattr(
+        manager,
+        "_tree_copier",
+        lambda src, dst: shutil.copytree(src, dst, symlinks=True),
+    )
     helpers._materialize_prewarmed_venv(workspace)
     assert (workspace / ".venv" / helpers.MARKER_NAME).is_file()
     assert not (workspace / ".venv" / "partial-copy").exists()
-    assert len(budgets) == 2 and all(budget is not None and 0 < budget <= 20 for budget in budgets)
 
 
 def test_parallel_consumers_wait_for_one_builder_and_receive_ready_workspaces(
@@ -271,9 +267,6 @@ def test_parallel_consumers_wait_for_one_builder_and_receive_ready_workspaces(
             building.set()
             if not release.wait(timeout=5):
                 raise RuntimeError("builder not released")
-        if cmd[0] == "cp":
-            shutil.copytree(Path(cmd[-2]), Path(cmd[-1]))
-            return subprocess.CompletedProcess(cmd, 0, stdout="", stderr="")
         return _successful_command(cmd, **kwargs)
 
     def consume(index: int) -> None:
