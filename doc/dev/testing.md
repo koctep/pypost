@@ -1532,15 +1532,21 @@ further decomposed into 7 focused files (all with `pytestmark = pytest.mark.time
 - `tests/test_makefile_target_filtering.py`: marker filtering, PYTEST_ARGS narrowing, lint.
 - `tests/test_makefile_slow_smoke.py`: slow editable install smoke with real `pyproject.toml`.
 
-### Shared Make fixture preparation (PYPOST-1262 / PYPOST-1298 / PYPOST-1413)
+### Shared Make fixture preparation (PYPOST-1262 / PYPOST-1298 / PYPOST-1413 / PYPOST-1419)
 
-`tests/makefile_test_helpers.py` prepares one shared base virtualenv containing `pytest` and
-`flake8`, constructs a lightweight `.skeleton` directory template with `.pth` linkage, and then
-materializes separate class-scoped `make_workspace` fixtures by cloning `.skeleton` via `cp -a`
-(with fallback to base). This replaces the legacy full-environment hardlink copy (`cp -al`) to
-eliminate NFS network filesystem latency and parallel materialization timeouts under load.
-See [Shared Virtual Environment Materialization](shared_venv_materialization.md) for full design
-and architectural benchmarks. Treat the published shared base as immutable.
+`SharedVenvManager` in `tests/helpers/shared_venv_manager.py` owns shared-base bootstrap, flock +
+budget locking, skeleton publication, readiness state, and workspace materialization.
+`tests/makefile_test_helpers.py` keeps fixtures and thin facades
+(`_get_shared_base_venv`, `_materialize_prewarmed_venv`, `_venv_ready`, `_build_skeleton`) that
+delegate to a lazy process-default manager so existing imports stay stable (PYPOST-1419).
+
+The helpers prepare one shared base virtualenv containing `pytest` and `flake8`, construct a
+lightweight `.skeleton` directory template with `.pth` linkage, and then materialize separate
+class-scoped `make_workspace` fixtures by cloning `.skeleton` via `cp -a` (with fallback to
+base). This replaces the legacy full-environment hardlink copy (`cp -al`) to eliminate NFS
+network filesystem latency and parallel materialization timeouts under load.
+See [Shared Virtual Environment Materialization](shared_venv_materialization.md) for full design,
+manager API, and architectural benchmarks. Treat the published shared base as immutable.
 
 For both `make test` and `make test-cov`, `scripts/run_parallel_tests.py` prepares that base
 after discovery and coverage validation, before submitting any workers. Preparation runs in a
@@ -1551,15 +1557,17 @@ directory. Contract-only Makefile selections may therefore warm the base too. Un
 selections and copied runners in helper-free workspaces skip preparation. Future fixture
 consumers outside this filename family must extend the selection rule.
 
-`_get_shared_base_venv(preparation_budget=20)` retains its zero-argument helper API. Its base is
+`_get_shared_base_venv(preparation_budget=20)` retains its helper API and delegates to
+`SharedVenvManager.ensure_ready`. Its base is
 `<tempfile.gettempdir()>/pypost_shared_base_venv_<major.minor>/.venv` (normally under `/tmp`).
 Readiness requires both `.initialized-<major.minor>` and `bin/python`. A new base publishes the
 marker only after interpreter creation, package installation, successful `pytest`/`flake8`
-imports, and lightweight `.skeleton` template generation via `_build_skeleton`. Each cache reuse
-checks marker and interpreter presence; a missing component clears the process cache and triggers
-bounded recovery.
+imports, and lightweight `.skeleton` template generation via `build_skeleton`. Owned readiness
+lives on the manager instance (`resolved_base`); a missing on-disk component clears that state
+(`clear_readiness` / failed validation) and triggers bounded recovery. There is no module-level
+mutable path cache as the readiness source of truth.
 
-One monotonic deadline covers lock waiting and all bootstrap stages. The helper polls an
+One monotonic deadline covers lock waiting and all bootstrap stages. The manager polls an
 exclusive nonblocking `fcntl.flock` in intervals of at most 50 ms, then checks readiness again
 under the lock so only one competing caller builds. Incomplete bases are removed before
 rebuilding while holding the lock. Failure leaves readiness unpublished and releases the lock;
@@ -1584,7 +1592,7 @@ filesystem delays can exhaust a preparation budget; successful completion is not
 Run fixture and runner regressions through the standard Make targets:
 
 ```bash
-make test PYTEST_ARGS='tests/test_makefile_shared_readiness.py tests/test_run_parallel_tests.py'
+make test PYTEST_ARGS='tests/test_shared_venv_manager.py tests/test_makefile_shared_readiness.py tests/test_run_parallel_tests.py'
 make test PYTEST_ARGS='tests/test_makefile_markers.py tests/test_makefile_stamp_test_idempotency.py'
 make test-cov PYTEST_ARGS='tests/test_makefile_markers.py'
 ```
@@ -1601,14 +1609,18 @@ the captured stage, shared path, budget, and subprocess stderr before retrying:
 - **Validation or stale readiness:** check the reported interpreter and marker paths. Missing
   components trigger automatic rebuild on the next call; a marker alone is insufficient. Avoid
   manually publishing a marker or mutating a ready shared base.
-- **Materialization failure:** inspect the workspace path and copy diagnostic for filesystem,
-  space, or hardlink support problems. Correct that condition and repeat the Make command;
-  the failed partial `.venv` is removed automatically.
+- **Materialization failure:** inspect the workspace path and `cp -a` diagnostic (source is
+  the shared `.skeleton` when ready, otherwise the shared base). Check temporary-directory
+  permissions, disk space, and whether the skeleton/base path still exists and is readable.
+  Correct that condition and repeat the Make command; the failed partial `.venv` is removed
+  automatically.
 
 Keep the existing test deadlines and worker settings when investigating prerequisite failures.
-The focused readiness regressions cover contention, stale caches, cumulative deadlines, retry,
-partial copies, and descendant cleanup; runner regressions cover ordering, fail-closed dispatch,
-coverage preparation, and selection exclusions.
+`tests/test_shared_venv_manager.py` covers manager ownership and injected-collaborator stages;
+`tests/test_makefile_shared_readiness.py` covers contention, stale readiness, cumulative
+deadlines, retry, partial copies, descendant cleanup, and parallel load budget. Runner
+regressions cover ordering, fail-closed dispatch, coverage preparation, and selection
+exclusions.
 
 ### Offline missing-runner checks (PYPOST-1299)
 

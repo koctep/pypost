@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import errno
 import fcntl
 import json
 import os
@@ -16,6 +15,8 @@ import tomllib
 from pathlib import Path
 
 import pytest
+
+from tests.helpers.shared_venv_manager import SharedVenvManager
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 MAKEFILE = REPO_ROOT / "Makefile"
@@ -394,9 +395,6 @@ def _assert_post_install_sanity(bin_python: Path) -> None:
         assert proc.returncode == 0, proc.stderr or proc.stdout
 
 
-_SHARED_BASE_VENV: Path | None = None
-
-
 def _run_preparation_command(
     cmd: list[str], *, timeout: float, cleanup_budget: float = 5,
 ) -> subprocess.CompletedProcess[str]:
@@ -423,141 +421,68 @@ def _run_preparation_command(
     return subprocess.CompletedProcess(cmd, proc.returncode, stdout, stderr)
 
 
+def _module_preparation_runner(
+    cmd: list[str], *, timeout: float, cleanup_budget: float = 5,
+) -> subprocess.CompletedProcess[str]:
+    """Late-bind preparation runner so monkeypatches on this module apply."""
+    return _run_preparation_command(cmd, timeout=timeout, cleanup_budget=cleanup_budget)
+
+
+class _ModuleClock:
+    """Clock that resolves ``time`` through this module for monkeypatch seams."""
+
+    def monotonic(self) -> float:
+        return time.monotonic()
+
+    def sleep(self, seconds: float) -> None:
+        time.sleep(seconds)
+
+
+def _module_flock(lock: object, operation: int) -> None:
+    """Late-bind flock so monkeypatches on ``fcntl`` in this module apply."""
+    fcntl.flock(lock, operation)  # type: ignore[arg-type]
+
+
+def _module_tempdir() -> str:
+    """Late-bind tempdir so monkeypatches on ``tempfile.gettempdir`` apply."""
+    return tempfile.gettempdir()
+
+
+_shared_venv_manager: SharedVenvManager | None = None
+
+
+def _get_shared_venv_manager() -> SharedVenvManager:
+    """Return the process-default SharedVenvManager (lazy convention, not a path cache)."""
+    global _shared_venv_manager
+    if _shared_venv_manager is None:
+        _shared_venv_manager = SharedVenvManager(
+            python_version=PYTHON_VERSION,
+            marker_name=MARKER_NAME,
+            python_executable=sys.executable,
+            preparation_runner=_module_preparation_runner,
+            clock=_ModuleClock(),
+            flock=_module_flock,
+            tempdir_fn=_module_tempdir,
+        )
+    return _shared_venv_manager
+
+
 def _venv_ready(venv: Path) -> bool:
-    return (venv / MARKER_NAME).is_file() and (venv / "bin" / "python").is_file()
+    return _get_shared_venv_manager().is_ready(venv)
 
 
 def _build_skeleton(venv_dir: Path, skeleton_dir: Path) -> None:
     """Construct lightweight materialization template from base venv."""
-    if skeleton_dir.exists():
-        shutil.rmtree(skeleton_dir)
-    tmp_skeleton = skeleton_dir.with_name(f"{skeleton_dir.name}.tmp")
-    if tmp_skeleton.exists():
-        shutil.rmtree(tmp_skeleton)
-    try:
-        tmp_skeleton.mkdir(parents=True, exist_ok=True)
-        cfg_src = venv_dir / "pyvenv.cfg"
-        if cfg_src.is_file():
-            shutil.copy2(cfg_src, tmp_skeleton / "pyvenv.cfg")
-        else:
-            (tmp_skeleton / "pyvenv.cfg").write_text("home = /usr/bin\n", encoding="utf-8")
-
-        bin_dir = tmp_skeleton / "bin"
-        bin_dir.mkdir(parents=True, exist_ok=True)
-        base_bin = venv_dir / "bin"
-        if base_bin.is_dir():
-            for item in base_bin.iterdir():
-                (bin_dir / item.name).symlink_to(item)
-
-        site_packages = (
-            tmp_skeleton / "lib" / f"python{PYTHON_VERSION}" / "site-packages"
-        )
-        site_packages.mkdir(parents=True, exist_ok=True)
-        base_site_packages = (
-            venv_dir / "lib" / f"python{PYTHON_VERSION}" / "site-packages"
-        )
-        (site_packages / "_prewarmed_base.pth").write_text(
-            f"{base_site_packages}\n", encoding="utf-8",
-        )
-        (tmp_skeleton / MARKER_NAME).touch()
-        if skeleton_dir.exists():
-            shutil.rmtree(skeleton_dir)
-        tmp_skeleton.replace(skeleton_dir)
-    finally:
-        if tmp_skeleton.exists():
-            shutil.rmtree(tmp_skeleton)
+    _get_shared_venv_manager().build_skeleton(venv_dir, skeleton_dir)
 
 
 def _get_shared_base_venv(*, preparation_budget: float = 20) -> Path:
     """Publish readiness after one bounded, serialized and validated bootstrap."""
-    global _SHARED_BASE_VENV
-    deadline = time.monotonic() + preparation_budget
-    if _SHARED_BASE_VENV is not None and _venv_ready(_SHARED_BASE_VENV):
-        return _SHARED_BASE_VENV
-    _SHARED_BASE_VENV = None
-    base_dir = Path(tempfile.gettempdir()) / f"pypost_shared_base_venv_{PYTHON_VERSION}"
-    venv_dir = base_dir / ".venv"
-    skeleton_dir = base_dir / ".skeleton"
-    marker = venv_dir / MARKER_NAME
-    if _venv_ready(venv_dir) and _venv_ready(skeleton_dir):
-        _SHARED_BASE_VENV = venv_dir
-        return _SHARED_BASE_VENV
-    lock_file = base_dir.with_suffix(".lock")
-    lock_file.parent.mkdir(parents=True, exist_ok=True)
-
-    def remaining(stage: str) -> float:
-        budget = deadline - time.monotonic()
-        if budget <= 0:
-            raise RuntimeError(
-                f"shared venv {stage} deadline exceeded: {venv_dir} "
-                f"({preparation_budget}s preparation budget)"
-            )
-        return budget
-
-    with open(lock_file, "w", encoding="utf-8") as lock:
-        while True:
-            remaining("lock")
-            try:
-                fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
-                break
-            except OSError as error:
-                if error.errno not in (errno.EACCES, errno.EAGAIN):
-                    raise
-                time.sleep(min(0.05, remaining("lock")))
-        try:
-            if not _venv_ready(venv_dir):
-                if venv_dir.exists():
-                    shutil.rmtree(venv_dir)
-                if skeleton_dir.exists():
-                    shutil.rmtree(skeleton_dir)
-                base_dir.mkdir(parents=True, exist_ok=True)
-                commands = [
-                    ("creation", [sys.executable, "-m", "venv", str(venv_dir)]),
-                    ("installation", [
-                        str(venv_dir / "bin" / "python"), "-m", "pip", "install",
-                        "--quiet", "pytest>=8,<9", "flake8>=7,<8",
-                    ]),
-                    ("validation", [str(venv_dir / "bin" / "python"), "-c",
-                                    "import pytest, flake8"]),
-                ]
-                for stage, command in commands:
-                    try:
-                        _run_preparation_command(command, timeout=remaining(stage))
-                    except (subprocess.SubprocessError, OSError) as error:
-                        detail = getattr(error, "stderr", None) or getattr(error, "output", None)
-                        raise RuntimeError(
-                            f"shared venv {stage} failed: {venv_dir} "
-                            f"({preparation_budget}s preparation budget): {error}; {detail or ''}"
-                        ) from error
-                remaining("publication")
-                if not (venv_dir / "bin" / "python").is_file():
-                    raise RuntimeError(f"shared venv validation missing interpreter: {venv_dir}")
-                marker.touch()
-            if not _venv_ready(skeleton_dir):
-                _build_skeleton(venv_dir, skeleton_dir)
-        finally:
-            fcntl.flock(lock, fcntl.LOCK_UN)
-    _SHARED_BASE_VENV = venv_dir
-    return _SHARED_BASE_VENV
+    return _get_shared_venv_manager().ensure_ready(preparation_budget=preparation_budget)
 
 
 def _materialize_prewarmed_venv(ws: Path) -> None:
-    base = _get_shared_base_venv()
-    target = ws / ".venv"
-    if _venv_ready(target):
-        return
-    if target.exists():
-        shutil.rmtree(target)
-    skeleton = base.parent / ".skeleton"
-    source = skeleton if _venv_ready(skeleton) else base
-    try:
-        _run_preparation_command(
-            ["cp", "-a", str(source), str(target)], timeout=20, cleanup_budget=1,
-        )
-    except (subprocess.SubprocessError, OSError) as error:
-        if target.exists():
-            shutil.rmtree(target)
-        raise RuntimeError(f"shared venv materialization failed: {target}: {error}") from error
+    _get_shared_venv_manager().materialize(ws)
 
 
 @pytest.fixture(scope="class")

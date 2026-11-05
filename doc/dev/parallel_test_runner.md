@@ -399,10 +399,13 @@ wrappers (`_run_make`, `_prerequisites`), pyproject seed generators, and post-in
 are centralized in `tests/makefile_test_helpers.py`.
 
 In PYPOST-1262, a pre-warmed virtual environment cache was introduced to prevent heavy
-contention from concurrent `python -m venv` and `pip install` operations:
+contention from concurrent `python -m venv` and `pip install` operations. PYPOST-1413 replaced
+full-base hardlink copies with a lightweight `.skeleton` + `.pth` template (`cp -a`);
+PYPOST-1419 encapsulated that lifecycle in `SharedVenvManager` with stable facades in
+`tests/makefile_test_helpers.py` (see [Shared Virtual Environment Materialization](shared_venv_materialization.md)):
 - A shared base virtualenv is initialized once in `/tmp/pypost_shared_base_venv_<PYTHON_VERSION>`
-  guarded by an exclusive file lock (`fcntl.flock(lock, fcntl.LOCK_EX)`).
-- Workspaces materialize the pre-warmed environment using `cp -al` (hardlinks) in milliseconds.
+  guarded by an exclusive file lock (`fcntl.flock` non-blocking poll within a preparation budget).
+- Workspaces materialize from `.skeleton` via `cp -a` (fallback: base) in milliseconds.
 - Class-scoped `make_workspace` fixtures reuse workspaces across tests in the same test class.
 This caching, combined with file decomposition, guarantees that each Makefile test file completes
 reliably within the 120s parallel worker timeout under full 8-worker parallel load.
