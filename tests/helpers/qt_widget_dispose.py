@@ -1,4 +1,9 @@
-"""Shared Qt top-level widget dispose for export UI test fixtures (PYPOST-1315)."""
+"""Shared Qt top-level widget dispose for GUI test fixtures.
+
+Used by environment export (PYPOST-1315), collection export (PYPOST-1357),
+and environment list/import (PYPOST-1358) suites that create unparented
+Qt roots and must drain DeferredDelete while ``qapp`` is still alive.
+"""
 
 from __future__ import annotations
 

@@ -1,31 +1,38 @@
-# Export UI Qt Dispose / Teardown (PYPOST-1315 / PYPOST-1357)
+# Qt Dispose / Teardown for Export UI and Environment List (PYPOST-1315 / PYPOST-1357 / PYPOST-1358)
 
 ## Overview
 
-Environment and collection export UI tests build unparented Qt roots (`EnvironmentListWidget`,
-collections panel + tree). Closing those widgets alone is not enough: pending
-`QObject.deleteLater` work must run **while** the module-scoped `qapp` is still alive. If
-DeferredDelete is never drained, Shiboken wrappers can survive until worker process exit and
-cause a post-PASS native crash (`SIGSEGV` / `exit_code=-11`, sometimes `SIGBUS` / `-7`) under
-parallel load.
+Environment export, collection export, and environment list/import tests build
+unparented Qt roots (`EnvironmentListWidget`, collections panel + tree). Closing
+those widgets alone is not enough: pending `QObject.deleteLater` work must run
+**while** the module-scoped `qapp` is still alive. If DeferredDelete is never
+drained, Shiboken wrappers can survive until worker process exit and cause a
+post-PASS native crash (`SIGSEGV` / `exit_code=-11`, sometimes `SIGBUS` / `-7`)
+under parallel load.
 
-Shared helpers in `tests/helpers/qt_widget_dispose.py` implement the dispose contract used by
-`tests/test_environment_export_ui.py` and `tests/test_collection_export_ui.py`. Production
-export paths under `pypost/` are unchanged.
+Shared helpers in `tests/helpers/qt_widget_dispose.py` implement the dispose
+contract used by:
+
+- `tests/test_environment_export_ui.py`
+- `tests/test_collection_export_ui.py`
+- `tests/test_environment_list_widget.py` (list + import; PYPOST-1358)
+
+Production paths under `pypost/` are unchanged.
 
 | Ticket | Scope |
 | --- | --- |
 | PYPOST-1315 | Shared `dispose_qt_root` / collections wrapper; env-export registry + autouse; env teardown repro |
 | PYPOST-1357 | Collections registry + autouse (missed-`finally` guard); collections teardown repro (A / R-autouse / B) |
+| PYPOST-1358 | Environment list/import registry + autouse on the same `EnvironmentListWidget` type; list teardown repro (A / R-dispose / B) |
 
 Related crash classes (do not conflate):
 
 | Class | Doc / ticket | Relation |
 | --- | --- | --- |
-| Export UI incomplete dispose | This page / PYPOST-1315 / PYPOST-1357 | Post-PASS worker death after green assertions |
+| Incomplete dispose (export / list UI) | This page / PYPOST-1315 / PYPOST-1357 / PYPOST-1358 | Post-PASS worker death after green assertions |
 | Large-batch `apply_theme` | [gui_batch_segfault.md](gui_batch_segfault.md) / PYPOST-1212 | Mid-batch style engine; reuse subprocess evidence patterns only |
 | Presenter async lifecycle | [presenter_teardown.md](presenter_teardown.md) / PYPOST-1256 | Collections `teardown()` fences import; still needs widget dispose after |
-| Window activation harness | [qt_activation_helper.md](qt_activation_helper.md) | Uses `processEvents` only; weaker than export dispose (see Troubleshooting) |
+| Window activation harness | [qt_activation_helper.md](qt_activation_helper.md) | Uses `processEvents` only; weaker than dispose (see Troubleshooting) |
 
 ## Architecture
 
@@ -34,14 +41,16 @@ Related crash classes (do not conflate):
 | `dispose_qt_root` | `tests/helpers/qt_widget_dispose.py` | Close → pump → `deleteLater` → drain DeferredDelete → pump |
 | `dispose_collections_export_fixture` | same | Presenter `teardown` → detach tree model → dispose panel |
 | Env export fixture | `tests/test_environment_export_ui.py` | `_created_widgets` registry + autouse `dispose_qt_root` |
-| Collection export suite | `tests/test_collection_export_ui.py` | `_created_presenters` registry + autouse `dispose_collections_export_fixture`; product tests still call dispose in `finally` (belt-and-suspenders) |
-| Env contract repro | `tests/test_environment_export_ui_teardown_repro.py` | Asserts disposed roots are invalid / not in `topLevelWidgets()` |
+| Env list/import suite | `tests/test_environment_list_widget.py` | Same registry + autouse pattern; product tests still `close()` in `finally` (belt-and-suspenders) |
+| Collection export suite | `tests/test_collection_export_ui.py` | `_created_presenters` registry + autouse `dispose_collections_export_fixture`; product tests still call dispose in `finally` |
+| Env export contract repro | `tests/test_environment_export_ui_teardown_repro.py` | Asserts disposed roots are invalid / not in `topLevelWidgets()` |
+| Env list contract repro | `tests/test_environment_list_widget_teardown_repro.py` | A-complete / A-incomplete / R-dispose / B (see below) |
 | Collections contract repro | `tests/test_collection_export_ui_teardown_repro.py` | A-complete / A-incomplete / R-autouse / B (see below) |
 | Module `qapp` | `tests/conftest.py` | Must remain alive for the whole dispose sequence |
 
 ```mermaid
 flowchart LR
-  Test["Export UI test body"] --> Root["Top-level QWidget / panel"]
+  Test["GUI test body\n(export / list / import)"] --> Root["Top-level QWidget / panel"]
   Test --> Registry["Module registry\n_created_widgets / _created_presenters"]
   Registry --> Autouse["autouse fixture teardown"]
   Autouse --> Dispose["dispose_qt_root /\ndispose_collections_export_fixture"]
@@ -56,9 +65,9 @@ process DeferredDelete for roots such as `EnvironmentListWidget`. After `deleteL
 becomes false before process exit.
 
 **Why registry + autouse (not `finally` alone):** a missed `finally` leaves the close-only
-production `teardown()` path and is a classic post-PASS SIGSEGV class (PYPOST-1315 TD-5 /
-PYPOST-1357 R-autouse). Both export suites register roots at construction and dispose from an
-autouse fixture so omit-dispose still reaches the contract while `qapp` is alive.
+path and is a classic post-PASS SIGSEGV class (PYPOST-1315 TD-5 / PYPOST-1357 R-autouse /
+PYPOST-1358 H1). Export and list/import suites register roots at construction and dispose
+from an autouse fixture so omit-dispose still reaches the contract while `qapp` is alive.
 
 ## API / Usage
 
@@ -98,7 +107,7 @@ Order inside the helper:
 2. `tree.setModel(None)` when the presenter's widget is a live `QAbstractItemView`
 3. `dispose_qt_root(presenter.panel, qapp)`
 
-### Environment export fixture pattern
+### Environment export / list-import registry + autouse pattern
 
 Register created roots and dispose them from an autouse fixture (do not rely on `close()` alone
 in `finally`):
@@ -109,12 +118,26 @@ from tests.helpers.qt_widget_dispose import dispose_qt_root
 _created_widgets: list[QWidget] = []
 
 
+def _make_widget(...):
+    w = EnvironmentListWidget(...)
+    _created_widgets.append(w)
+    return w
+
+
 @pytest.fixture(autouse=True)
 def _cleanup_widgets(qapp):
     yield
     while _created_widgets:
         dispose_qt_root(_created_widgets.pop(), qapp)
 ```
+
+Used in:
+
+- `tests/test_environment_export_ui.py`
+- `tests/test_environment_list_widget.py` (PYPOST-1358)
+
+The list/import suite still ends many tests with `finally: widget.close()` as belt-and-suspenders;
+full C++ teardown comes from autouse `dispose_qt_root` (idempotent with the earlier close).
 
 ### Collection export registry + autouse pattern
 
@@ -149,7 +172,7 @@ Used in `tests/test_collection_export_ui.py` and
 ### Contract after dispose
 
 - `shiboken6.isValid(root)` is false for disposed roots
-- No disposed export UI root types remain in `qapp.topLevelWidgets()`
+- No disposed export / list UI root types remain in `qapp.topLevelWidgets()`
 - Existing product assertions and `pytest.mark.timeout(60)` markers stay unchanged
 
 Validate with:
@@ -158,8 +181,25 @@ Validate with:
 make test PYTEST_ARGS="tests/test_environment_export_ui_teardown_repro.py \
   tests/test_environment_export_ui.py \
   tests/test_collection_export_ui_teardown_repro.py \
-  tests/test_collection_export_ui.py"
+  tests/test_collection_export_ui.py \
+  tests/test_environment_list_widget_teardown_repro.py \
+  tests/test_environment_list_widget.py"
 ```
+
+## Environment list teardown repro (PYPOST-1358)
+
+Module: `tests/test_environment_list_widget_teardown_repro.py`.
+
+| Member | Role | Polarity |
+| --- | --- | --- |
+| **A-complete** | Full `dispose_qt_root` → desired end-state | Positive guard: root invalid; no leftover `EnvironmentListWidget` |
+| **A-incomplete** | Close-only (no DeferredDelete drain) | **Green** negative control: asserts residual liveness *in the test body*, then disposes in `finally` so later tests stay clean. Does **not** mirror the product suite's full teardown (registry + autouse) |
+| **R-dispose** | Applies suite dispose helper (`dispose_qt_root`) | Desired end-state; durable suite-teardown contract (was RED under close-only in Step 3) |
+| **B** | Bounded subprocess of the thirteen-node list/import file | Fails only on native-crash exit codes; zero-crash matrix + dependency versions is an accepted diagnostic when live SIGSEGV is unavailable |
+
+Cause fork: **R-dispose** (H1) — list/import close-only left live `EnvironmentListWidget` C++
+roots; same widget type / dispose helper family as env export (PYPOST-1315). Step 4 wired
+registry + autouse into `tests/test_environment_list_widget.py`.
 
 ## Collections teardown repro (PYPOST-1357)
 
@@ -221,11 +261,18 @@ already use `QT_QPA_PLATFORM=offscreen` and the shared `qapp` fixture (see
   `sendPostedEvents(..., DeferredDelete)` as in `dispose_qt_root`; do not weaken the helper back
   to close + one `processEvents`.
 
-- **New GUI test creates unparented export-style roots**  
-  Prefer `dispose_qt_root` over inventing another close sequence. For a full
+- **New GUI test creates unparented export- or list-style roots**  
+  Prefer `dispose_qt_root` over inventing another close sequence. Register on
+  `_created_widgets` (or an equivalent autouse registry). For a full
   `CollectionsPresenter`, register on `_created_presenters` (or call
   `dispose_collections_export_fixture` so production `teardown()` runs before widget
   destruction). Do not rely on `finally` alone.
+
+- **List/import suite still has `finally: widget.close()`**  
+  That close is redundant with autouse `dispose_qt_root` (which starts with `close()`). It is
+  intentional belt-and-suspenders until redundant finallys are dropped (tracked with export
+  TD-4 / [PYPOST-1481](https://pypost.atlassian.net/browse/PYPOST-1481)). Do not treat
+  close-only as the suite's full teardown when writing repros or docs.
 
 - **R-autouse / end-state assert fails with “still valid”**  
   Asserting desired end-state in the test body runs *before* autouse dispose. Queue the assert
@@ -235,8 +282,8 @@ already use `QT_QPA_PLATFORM=offscreen` and the shared `qapp` fixture (see
 - **`ActivatedWindow` / `qt_activation` still uses `processEvents` only**  
   That harness is a different helper; aligning it with DeferredDelete drain is tracked
   separately ([PYPOST-1478](https://pypost.atlassian.net/browse/PYPOST-1478)). Prefer
-  `dispose_qt_root` for export UI and other top-level widget teardown that must be C++-dead
-  before process exit.
+  `dispose_qt_root` for export / list UI and other top-level widget teardown that must be
+  C++-dead before process exit.
 
 - **Do not “fix” with `os._exit` in session finish, skips, or timeout removal**  
   Those mask lifetime bugs and are out of scope for this dispose class.
