@@ -524,7 +524,11 @@ bounded by the deadline:
 - **Nested worker-finish join** — if `_on_worker_finished` runs inside P1's `processEvents()`, its
   `wait(worker_finish_join_ms)` is uncapped (design Risk 3). `finished` is emitted after `run()`
   returns, so this join is normally instant, and probing with `wait(0)` could reap a thread that
-  is still exiting. Test coverage is [PYPOST-1322](https://pypost.atlassian.net/browse/PYPOST-1322).
+  is still exiting. Characterized by
+  `tests/test_collection_import_teardown_policy.py::test_nested_worker_finish_join_overrun_during_wait_idle`
+  ([PYPOST-1322](https://pypost.atlassian.net/browse/PYPOST-1322)): uncapped join of exactly
+  `worker_finish_join_ms`, overrun past the caller budget ≤ that allowance, and WARNING
+  `collection_import_worker_finish_wait_timeout wait_ms=…` on stall.
 - **Long queued GUI slots** — a slot that runs inside a `processEvents()` call (for example an
   apply) is only checked against the deadline when it returns.
 
@@ -575,7 +579,9 @@ policy; it always uses the actions' default.
   `timeout(30)`) — an injected policy drives the default waits; a deadline used up in P1 leaves
   only `wait(0)` probes; no-app poll slices; idle teardown is clean and idempotent; the presenter
   resolves `None` to 5000; exact log fields via `caplog` including `phase=p0` / `phase=p3` and
-  cancelled-join `wait_ms` / `elapsed_ms`; metrics `outcome=cancelled`.
+  cancelled-join `wait_ms` / `elapsed_ms`; metrics `outcome=cancelled`; Risk 3 nested
+  worker-finish join during wait-idle
+  (`test_nested_worker_finish_join_overrun_during_wait_idle`, PYPOST-1322).
 - **`tests/test_library_operation_interrupt_repro.py`** (PYPOST-1324, `timeout(30)`) — teardown
   calls library `cancel()` then bounded final join; cancel-aware op stops cleanly; cancel-
   ignoring op stays within the caller budget.
@@ -1873,7 +1879,9 @@ the collection id, not its name.
   - Cause: The short post-`finished` join did not complete within the policy
     `worker_finish_join_ms` (100 ms). This join is not on the teardown deadline, so when it
     runs during teardown it can push `elapsed_ms` past the budget (design Risk 3,
-    [PYPOST-1322](https://pypost.atlassian.net/browse/PYPOST-1322)).
+    [PYPOST-1322](https://pypost.atlassian.net/browse/PYPOST-1322)). The contract is locked by
+    `test_nested_worker_finish_join_overrun_during_wait_idle` in
+    `tests/test_collection_import_teardown_policy.py`.
   - Fix: This is the same class of issue as storage gateway finish hygiene (PYPOST-829).
     It is usually transient; escalate if paired with crashes under rapid import churn.
 
@@ -2004,8 +2012,10 @@ Follow-ups from [PYPOST-1264 technical debt](../../ai-tasks/PYPOST-1264/60-tech-
   [Main-window shutdown ownership](#main-window-shutdown-ownership-pypost-1321) and
   [Uniform Presenter Teardown Contract](presenter_teardown.md). Residual notes remain in
   [PYPOST-1321 technical debt](../../ai-tasks/PYPOST-1321/60-tech-debt.md).
-- **[PYPOST-1322](https://pypost.atlassian.net/browse/PYPOST-1322)** (Lowest) — test the
-  uncapped nested worker-finish join during teardown (Risk 3).
+- **[PYPOST-1322](https://pypost.atlassian.net/browse/PYPOST-1322)** — done: characterization
+  of the uncapped nested worker-finish join during teardown (Risk 3) in
+  `tests/test_collection_import_teardown_policy.py::test_nested_worker_finish_join_overrun_during_wait_idle`.
+  See [Teardown lifecycle policy](#teardown-lifecycle-policy-pypost-1264).
 - **[PYPOST-1323](https://pypost.atlassian.net/browse/PYPOST-1323)** (Low) — move the other
   `_WORKER_FINISH_WAIT_MS = 100` constants behind named lifecycle policies.
 - **[PYPOST-1324](https://pypost.atlassian.net/browse/PYPOST-1324)** — done: library

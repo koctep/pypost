@@ -288,3 +288,56 @@ def test_exhausted_budget_logs_zero_wait_probes(qapp, caplog) -> None:
     assert len(completed) == 1
     assert completed[0].startswith("collection_import_teardown_completed clean=False ")
     assert completed[0].endswith(" timeout_ms=100")
+
+
+def test_nested_worker_finish_join_overrun_during_wait_idle(qapp, caplog) -> None:
+    """Risk 3: nested finish join during P1 is uncapped and warns on stall.
+
+    Characterization of PYPOST-1264 design Risk 3 (PYPOST-1322). When
+    ``_on_worker_finished`` runs inside wait-idle ``processEvents`` after the
+    remaining caller budget is exhausted, the join still waits the full
+    ``worker_finish_join_ms`` (not deadline-bounded), teardown overrun past the
+    caller budget attributable to that join is at most that allowance, and the
+    stall path emits ``collection_import_worker_finish_wait_timeout``.
+    """
+    join_ms = 100
+    budget_ms = 50
+    clock = FakeClock()
+    policy = CollectionImportLifecyclePolicy(
+        teardown_budget_ms=200,
+        final_join_ms=30,
+        worker_finish_join_ms=join_ms,
+    )
+    actions = _make_actions(QWidget(), lifecycle_policy=policy, clock=clock)
+    file_spy = _SpyWorker(clock, join_ok=False)
+    actions._worker = file_spy  # type: ignore[assignment]
+    actions._state = CollectionImportState.PARSING
+    t0 = clock._now
+    nest_fired = False
+
+    def nested_process_events(*_args: Any, **_kwargs: Any) -> None:
+        nonlocal nest_fired
+        if nest_fired:
+            return
+        nest_fired = True
+        # Exhaust remaining caller budget, then nest the finish join (Risk 3).
+        clock.advance(budget_ms)
+        actions._on_worker_finished()
+        actions._state = CollectionImportState.IDLE
+
+    with (
+        caplog.at_level(logging.WARNING, logger=_MODULE),
+        patch.object(qapp, "processEvents", side_effect=nested_process_events),
+    ):
+        actions.teardown(timeout_ms=budget_ms)
+
+    assert file_spy.waits == [join_ms]
+    elapsed_ms = int(round((clock._now - t0) * 1000))
+    overrun_ms = max(0, elapsed_ms - budget_ms)
+    assert overrun_ms <= join_ms
+    assert any(
+        r.levelno == logging.WARNING
+        and f"collection_import_worker_finish_wait_timeout wait_ms={join_ms}"
+        in r.message
+        for r in caplog.records
+    )
