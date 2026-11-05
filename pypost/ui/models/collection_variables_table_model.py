@@ -1,6 +1,11 @@
-"""Virtualized collection variables table model for import dialog."""
+"""Virtualized collection variables table model for import dialog.
+
+Supports extreme catalogs (50k–100k variables) via LRU chunk materialization and
+sparse selection/strategy overlays so model cache overhead stays bounded.
+"""
 from __future__ import annotations
 
+from collections import OrderedDict
 from dataclasses import dataclass
 import logging
 from typing import Any
@@ -19,6 +24,7 @@ from pypost.core.collection_variable_import import (
     format_variable_value,
 )
 from pypost.core.constants import HIDDEN_MASK
+from pypost.models.collection_variable import CollectionVariable
 from pypost.models.models import Collection, Environment
 
 logger = logging.getLogger(__name__)
@@ -45,6 +51,10 @@ HEADERS = [
     "Description",
 ]
 
+# Paged materialization budget (PYPOST-1427).
+CHUNK_SIZE = 256
+MAX_CACHED_CHUNKS = 8
+
 
 @dataclass
 class CollectionVariableRowRecord:
@@ -68,7 +78,15 @@ class CollectionVariableRowRecord:
 
 
 class CollectionVariablesTableModel(QAbstractTableModel):
-    """Virtualized table model representing collection variables and conflict diffs."""
+    """Virtualized table model representing collection variables and conflict diffs.
+
+    Row records are materialized in fixed-size LRU chunks. Selection and conflict
+    strategy mutations are stored in sparse overlays so eviction does not lose
+    import decisions across extreme catalogs.
+    """
+
+    CHUNK_SIZE = CHUNK_SIZE
+    MAX_CACHED_CHUNKS = MAX_CACHED_CHUNKS
 
     selection_changed = Signal()
     strategy_changed = Signal(int, object)
@@ -81,7 +99,21 @@ class CollectionVariablesTableModel(QAbstractTableModel):
         super().__init__(parent)
         self._target_environment = target_environment
         self._collection: Collection | None = None
-        self._records: list[CollectionVariableRowRecord] = []
+        self._variables: list[CollectionVariable] = []
+        self._preset_name: str | None = None
+        self._preset_values: dict[str, Any] = {}
+        self._chunk_cache: OrderedDict[int, list[CollectionVariableRowRecord]] = (
+            OrderedDict()
+        )
+        self._selected_default = True
+        self._selection_overrides: dict[int, bool] = {}
+        self._strategy_default = ConflictStrategy.SKIP
+        self._strategy_overrides: dict[int, ConflictStrategy] = {}
+
+    @property
+    def cached_record_count(self) -> int:
+        """Number of currently materialized row records across the LRU cache."""
+        return sum(len(chunk) for chunk in self._chunk_cache.values())
 
     def rowCount(
         self,
@@ -89,7 +121,7 @@ class CollectionVariablesTableModel(QAbstractTableModel):
     ) -> int:
         if parent.isValid():
             return 0
-        return len(self._records)
+        return len(self._variables)
 
     def columnCount(
         self,
@@ -117,9 +149,9 @@ class CollectionVariablesTableModel(QAbstractTableModel):
             return None
         row = index.row()
         col = index.column()
-        if row < 0 or row >= len(self._records):
+        rec = self._ensure_record(row)
+        if rec is None:
             return None
-        rec = self._records[row]
 
         if role == Qt.ItemDataRole.CheckStateRole:
             if col == COL_SELECT:
@@ -172,7 +204,8 @@ class CollectionVariablesTableModel(QAbstractTableModel):
         if index.column() == COL_SELECT:
             flags |= Qt.ItemFlag.ItemIsUserCheckable
         elif index.column() == COL_STRATEGY:
-            if 0 <= index.row() < len(self._records) and self._records[index.row()].is_collision:
+            rec = self._ensure_record(index.row())
+            if rec is not None and rec.is_collision:
                 flags |= Qt.ItemFlag.ItemIsEditable
         return flags
 
@@ -186,9 +219,9 @@ class CollectionVariablesTableModel(QAbstractTableModel):
             return False
         row = index.row()
         col = index.column()
-        if row < 0 or row >= len(self._records):
+        rec = self._ensure_record(row)
+        if rec is None:
             return False
-        rec = self._records[row]
 
         if col == COL_SELECT and role == Qt.ItemDataRole.CheckStateRole:
             checked = (
@@ -198,6 +231,7 @@ class CollectionVariablesTableModel(QAbstractTableModel):
             )
             if rec.is_selected != checked:
                 rec.is_selected = checked
+                self._store_selection_override(row, checked)
                 self.dataChanged.emit(index, index, [Qt.ItemDataRole.CheckStateRole])
                 self.selection_changed.emit()
             return True
@@ -216,6 +250,7 @@ class CollectionVariablesTableModel(QAbstractTableModel):
                 strat = ConflictStrategy.SKIP
             if rec.strategy != strat:
                 rec.strategy = strat
+                self._store_strategy_override(row, strat)
                 logger.debug(
                     "collection_variables_table_model_strategy_changed row=%d var_name=%s "
                     "strategy=%s",
@@ -242,17 +277,17 @@ class CollectionVariablesTableModel(QAbstractTableModel):
         return False
 
     def get_record(self, row: int) -> CollectionVariableRowRecord | None:
-        if 0 <= row < len(self._records):
-            return self._records[row]
-        return None
+        return self._ensure_record(row)
 
     def get_strategy(self, row: int) -> ConflictStrategy | None:
-        if 0 <= row < len(self._records) and self._records[row].is_collision:
-            return self._records[row].strategy
+        rec = self._ensure_record(row)
+        if rec is not None and rec.is_collision:
+            return rec.strategy
         return None
 
     def set_row_strategy(self, row: int, strategy: ConflictStrategy) -> None:
-        if 0 <= row < len(self._records) and self._records[row].is_collision:
+        rec = self._ensure_record(row)
+        if rec is not None and rec.is_collision:
             self.setData(
                 self.index(row, COL_STRATEGY),
                 strategy,
@@ -260,7 +295,7 @@ class CollectionVariablesTableModel(QAbstractTableModel):
             )
 
     def set_row_selected(self, row: int, selected: bool) -> None:
-        if 0 <= row < len(self._records):
+        if self._ensure_record(row) is not None:
             self.setData(
                 self.index(row, COL_SELECT),
                 Qt.CheckState.Checked if selected else Qt.CheckState.Unchecked,
@@ -268,37 +303,39 @@ class CollectionVariablesTableModel(QAbstractTableModel):
             )
 
     def set_all_selected(self, selected: bool) -> None:
-        if not self._records:
+        if not self._variables:
             return
-        changed = False
-        for rec in self._records:
-            if rec.is_selected != selected:
+        self._selected_default = selected
+        self._selection_overrides.clear()
+        for chunk in self._chunk_cache.values():
+            for rec in chunk:
                 rec.is_selected = selected
-                changed = True
-        if changed:
-            top_left = self.index(0, COL_SELECT)
-            bottom_right = self.index(len(self._records) - 1, COL_SELECT)
-            self.dataChanged.emit(
-                top_left,
-                bottom_right,
-                [Qt.ItemDataRole.CheckStateRole],
-            )
-            self.selection_changed.emit()
+        top_left = self.index(0, COL_SELECT)
+        bottom_right = self.index(len(self._variables) - 1, COL_SELECT)
+        self.dataChanged.emit(
+            top_left,
+            bottom_right,
+            [Qt.ItemDataRole.CheckStateRole],
+        )
+        self.selection_changed.emit()
 
     def set_all_collision_strategy(self, strategy: ConflictStrategy) -> int:
-        if not self._records:
+        if not self._variables:
             return 0
+        env_vars = self._target_environment.variables
         colliding_count = 0
-        changed = False
-        for rec in self._records:
-            if rec.is_collision:
+        for var in self._variables:
+            if var.name in env_vars:
                 colliding_count += 1
-                if rec.strategy != strategy:
+        self._strategy_default = strategy
+        self._strategy_overrides.clear()
+        for chunk in self._chunk_cache.values():
+            for rec in chunk:
+                if rec.is_collision:
                     rec.strategy = strategy
-                    changed = True
-        if changed:
+        if colliding_count:
             top_left = self.index(0, COL_STRATEGY)
-            bottom_right = self.index(len(self._records) - 1, COL_STRATEGY)
+            bottom_right = self.index(len(self._variables) - 1, COL_STRATEGY)
             self.dataChanged.emit(
                 top_left,
                 bottom_right,
@@ -306,10 +343,11 @@ class CollectionVariablesTableModel(QAbstractTableModel):
             )
         logger.debug(
             "collection_variables_table_model_bulk_strategy_set strategy=%s "
-            "affected_rows=%d total_rows=%d",
+            "affected_rows=%d total_rows=%d cached_records=%d",
             strategy.value,
             colliding_count,
-            len(self._records),
+            len(self._variables),
+            self.cached_record_count,
         )
         return colliding_count
 
@@ -317,11 +355,12 @@ class CollectionVariablesTableModel(QAbstractTableModel):
         will_add = 0
         will_overwrite = 0
         will_keep = 0
-        for rec in self._records:
-            if not rec.is_selected:
+        env_vars = self._target_environment.variables
+        for row, var in enumerate(self._variables):
+            if not self._is_selected(row):
                 continue
-            if rec.is_collision:
-                if rec.strategy == ConflictStrategy.OVERWRITE:
+            if var.name in env_vars:
+                if self._strategy_for_row(row) == ConflictStrategy.OVERWRITE:
                     will_overwrite += 1
                 else:
                     will_keep += 1
@@ -330,10 +369,19 @@ class CollectionVariablesTableModel(QAbstractTableModel):
         return will_add, will_overwrite, will_keep
 
     def get_selected_keys(self) -> set[str]:
-        return {rec.name for rec in self._records if rec.is_selected}
+        return {
+            var.name
+            for row, var in enumerate(self._variables)
+            if self._is_selected(row)
+        }
 
     def get_conflict_strategies(self) -> dict[str, ConflictStrategy]:
-        return {rec.name: rec.strategy for rec in self._records if rec.is_collision}
+        env_vars = self._target_environment.variables
+        return {
+            var.name: self._strategy_for_row(row)
+            for row, var in enumerate(self._variables)
+            if var.name in env_vars
+        }
 
     def load_collection(
         self,
@@ -342,76 +390,170 @@ class CollectionVariablesTableModel(QAbstractTableModel):
     ) -> None:
         self.beginResetModel()
         self._collection = collection
-        self._records.clear()
-        if collection and collection.variables:
-            preset_values = (
-                collection.presets.get(preset_name, {})
-                if (preset_name and collection.presets)
-                else {}
-            )
-            for var in collection.variables:
-                name = var.name
-                is_env_secret = name in self._target_environment.hidden_keys
-                is_col_secret = bool(var.secret)
-                is_effective_secret = is_env_secret or is_col_secret
-                is_collision = name in self._target_environment.variables
-
-                if is_collision:
-                    raw_curr = self._target_environment.variables[name]
-                    curr_str = format_variable_value(raw_curr)
-                    curr_display = HIDDEN_MASK if is_effective_secret else curr_str
-                else:
-                    raw_curr = None
-                    curr_display = "—"
-
-                raw_cand = preset_values.get(name, var.default)
-                cand_str = format_variable_value(raw_cand)
-                cand_display = HIDDEN_MASK if is_effective_secret else cand_str
-
-                status_str = "Exists (Collision)" if is_collision else "New"
-                desc_str = var.description or ""
-
-                rec = CollectionVariableRowRecord(
-                    name=name,
-                    current_display=curr_display,
-                    candidate_display=cand_display,
-                    raw_current=raw_curr,
-                    raw_candidate=raw_cand,
-                    var_default=var.default,
-                    strategy=ConflictStrategy.SKIP,
-                    var_type=var.type,
-                    is_collection_secret=is_col_secret,
-                    is_env_secret=is_env_secret,
-                    is_effective_secret=is_effective_secret,
-                    is_collision=is_collision,
-                    status=status_str,
-                    description=desc_str,
-                    is_selected=True,
-                )
-                self._records.append(rec)
+        # Bind catalog list by reference — do not eagerly copy/materialize records.
+        self._variables = (
+            collection.variables
+            if collection and collection.variables
+            else []
+        )
+        self._preset_name = preset_name
+        self._preset_values = (
+            collection.presets.get(preset_name, {})
+            if (collection and preset_name and collection.presets)
+            else {}
+        )
+        self._chunk_cache.clear()
+        self._selection_overrides.clear()
+        self._strategy_overrides.clear()
+        self._selected_default = True
+        self._strategy_default = ConflictStrategy.SKIP
         self.endResetModel()
+        collisions = sum(
+            1
+            for var in self._variables
+            if var.name in self._target_environment.variables
+        )
         logger.debug(
-            "collection_variables_table_model_loaded collection_name=%s row_count=%d "
-            "collisions=%d preset=%s",
+            "collection_variables_table_model_loaded collection_name=%s "
+            "row_count=%d collisions=%d preset=%s cached_records=%d "
+            "chunk_size=%d max_cached_chunks=%d",
             self._collection.name if self._collection else "None",
-            len(self._records),
-            sum(1 for r in self._records if r.is_collision),
+            len(self._variables),
+            collisions,
             preset_name,
+            self.cached_record_count,
+            self.CHUNK_SIZE,
+            self.MAX_CACHED_CHUNKS,
         )
 
     def update_preset(self, preset_name: str | None) -> None:
-        if not self._collection or not self._records:
+        if not self._collection or not self._variables:
             return
-        preset_values = (
+        self._preset_name = preset_name
+        self._preset_values = (
             self._collection.presets.get(preset_name, {})
             if (preset_name and self._collection.presets)
             else {}
         )
-        for rec in self._records:
-            raw_cand = preset_values.get(rec.name, rec.var_default)
-            cand_str = format_variable_value(raw_cand)
-            rec.candidate_display = HIDDEN_MASK if rec.is_effective_secret else cand_str
-            rec.raw_candidate = raw_cand
+        # Drop cached candidate displays; rematerialize on next access.
+        evicted = len(self._chunk_cache)
+        self._chunk_cache.clear()
         top_left = self.index(0, COL_CANDIDATE_VALUE)
-        bottom_right = self.index(len(self._records) - 1, COL_CANDIDATE_VALUE)
+        bottom_right = self.index(len(self._variables) - 1, COL_CANDIDATE_VALUE)
         self.dataChanged.emit(top_left, bottom_right, [Qt.ItemDataRole.DisplayRole])
+        logger.debug(
+            "collection_variables_table_model_preset_updated preset=%s "
+            "row_count=%d evicted_chunks=%d",
+            preset_name,
+            len(self._variables),
+            evicted,
+        )
+
+    def _is_selected(self, row: int) -> bool:
+        if row in self._selection_overrides:
+            return self._selection_overrides[row]
+        return self._selected_default
+
+    def _strategy_for_row(self, row: int) -> ConflictStrategy:
+        if row in self._strategy_overrides:
+            return self._strategy_overrides[row]
+        return self._strategy_default
+
+    def _store_selection_override(self, row: int, selected: bool) -> None:
+        if selected == self._selected_default:
+            self._selection_overrides.pop(row, None)
+        else:
+            self._selection_overrides[row] = selected
+
+    def _store_strategy_override(self, row: int, strategy: ConflictStrategy) -> None:
+        if strategy == self._strategy_default:
+            self._strategy_overrides.pop(row, None)
+        else:
+            self._strategy_overrides[row] = strategy
+
+    def _ensure_record(self, row: int) -> CollectionVariableRowRecord | None:
+        if row < 0 or row >= len(self._variables):
+            return None
+        chunk_idx = row // self.CHUNK_SIZE
+        chunk = self._touch_chunk(chunk_idx)
+        return chunk[row % self.CHUNK_SIZE]
+
+    def _touch_chunk(self, chunk_idx: int) -> list[CollectionVariableRowRecord]:
+        cached = self._chunk_cache.get(chunk_idx)
+        if cached is not None:
+            self._chunk_cache.move_to_end(chunk_idx)
+            return cached
+        records = self._materialize_chunk(chunk_idx)
+        self._chunk_cache[chunk_idx] = records
+        self._chunk_cache.move_to_end(chunk_idx)
+        while len(self._chunk_cache) > self.MAX_CACHED_CHUNKS:
+            evicted_idx, evicted_rows = self._chunk_cache.popitem(last=False)
+            logger.debug(
+                "collection_variables_table_model_chunk_evicted chunk_idx=%d "
+                "rows=%d cached_chunks=%d cached_records=%d",
+                evicted_idx,
+                len(evicted_rows),
+                len(self._chunk_cache),
+                self.cached_record_count,
+            )
+        return records
+
+    def _materialize_chunk(
+        self,
+        chunk_idx: int,
+    ) -> list[CollectionVariableRowRecord]:
+        start = chunk_idx * self.CHUNK_SIZE
+        end = min(start + self.CHUNK_SIZE, len(self._variables))
+        records = [self._build_record(row) for row in range(start, end)]
+        logger.debug(
+            "collection_variables_table_model_chunk_fetched chunk_idx=%d "
+            "start_row=%d end_row=%d rows=%d cached_chunks=%d",
+            chunk_idx,
+            start,
+            end,
+            len(records),
+            len(self._chunk_cache) + 1,
+        )
+        return records
+
+    def _build_record(self, row: int) -> CollectionVariableRowRecord:
+        var = self._variables[row]
+        name = var.name
+        is_env_secret = name in self._target_environment.hidden_keys
+        is_col_secret = bool(var.secret)
+        is_effective_secret = is_env_secret or is_col_secret
+        is_collision = name in self._target_environment.variables
+
+        if is_collision:
+            raw_curr = self._target_environment.variables[name]
+            curr_str = format_variable_value(raw_curr)
+            curr_display = HIDDEN_MASK if is_effective_secret else curr_str
+        else:
+            raw_curr = None
+            curr_display = "—"
+
+        raw_cand = self._preset_values.get(name, var.default)
+        cand_str = format_variable_value(raw_cand)
+        cand_display = HIDDEN_MASK if is_effective_secret else cand_str
+
+        status_str = "Exists (Collision)" if is_collision else "New"
+        strategy = (
+            self._strategy_for_row(row) if is_collision else ConflictStrategy.SKIP
+        )
+        return CollectionVariableRowRecord(
+            name=name,
+            current_display=curr_display,
+            candidate_display=cand_display,
+            raw_current=raw_curr,
+            raw_candidate=raw_cand,
+            var_default=var.default,
+            strategy=strategy,
+            var_type=var.type,
+            is_collection_secret=is_col_secret,
+            is_env_secret=is_env_secret,
+            is_effective_secret=is_effective_secret,
+            is_collision=is_collision,
+            status=status_str,
+            description=var.description or "",
+            is_selected=self._is_selected(row),
+        )
