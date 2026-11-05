@@ -1388,6 +1388,54 @@ When using `HistoryManager` with `tempfile.TemporaryDirectory`, call `hm.flush()
 context exits. SSE probe tests must inject `TemplateService()` (or rely on the `HTTPClient`
 default from PYPOST-403).
 
+### Env persistence temp-dir fence (PYPOST-1311)
+
+Encrypted environment load is asynchronous: `EnvPresenter.load_environments()` dispatches
+`EnvironmentStorageGateway.load_async()` and returns without waiting for the worker. Tests that
+patch storage into a `tempfile.TemporaryDirectory` must settle and tear down the presenter
+**before** the temp directory exits; otherwise `TemporaryDirectory.cleanup()` / `rmtree` can fail
+with `OSError: [Errno 39] Directory not empty` under suite load (often green in isolation).
+
+**Pattern** (keep inside the temp-dir context):
+
+```python
+presenter = EnvPresenter(...)
+try:
+    presenter.load_environments()
+    assert presenter.wait_storage_idle(timeout_ms=30_000)
+    # product asserts after idle when they depend on settled load
+finally:
+    presenter.teardown(timeout_ms=5_000)
+```
+
+Rules of thumb:
+
+- `wait_storage_idle` proves the gateway is idle; it does **not** replace `teardown()`.
+- Put `teardown` in `finally` so assert failures still fence before temp-dir exit.
+- Prefer asserting product UI state only after idle when encryption is on (avoids asserting the
+  pre-load “No Environment” default while the worker is still running).
+- Sync encryption-off scenarios do not leave a gateway worker on the tree; still call `teardown`
+  when the presenter owned async-capable lifecycle seams.
+
+Coverage homes:
+
+| Module | Role |
+| --- | --- |
+| `tests/test_env_persistence_e2e.py` | Named missing-key product scenario (`timeout(120)`) |
+| `tests/test_env_persistence_tempdir_cleanup_repro.py` | Durable gated race + cleanup contract (`timeout(60)`) |
+
+Focused Make validation:
+
+```bash
+make test PYTEST_ARGS='tests/test_env_persistence_e2e.py \
+  tests/test_env_persistence_tempdir_cleanup_repro.py'
+```
+
+Lifecycle contract detail:
+[Uniform Presenter Teardown Contract — Encrypted EnvPresenter + TemporaryDirectory](presenter_teardown.md#encrypted-envpresenter--temporarydirectory-pypost-1311).
+Async routing:
+[Async Environment Storage](environment_storage_async.md).
+
 ## Parallel Test Execution
 
 `make test` and `make test-cov` run test modules concurrently through the parallel file-level

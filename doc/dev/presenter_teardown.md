@@ -267,3 +267,37 @@ make test WORKERS=1 WORKER_TIMEOUT=60 \
 ```
 
 Also run `make lint` and `make verify-ai-tasks` for documentation or lifecycle changes.
+
+### Encrypted `EnvPresenter` + `TemporaryDirectory` (PYPOST-1311)
+
+When a test points encrypted environment storage at a `tempfile.TemporaryDirectory` (or patches
+`user_data_dir` into one) and calls `EnvPresenter.load_environments()` with encryption enabled,
+the presenter returns after dispatching `EnvironmentStorageGateway.load_async()`. The worker may
+still read or write under that workspace. Leaving the temp-dir context (or calling
+`TemporaryDirectory.cleanup()`) while the worker is in flight commonly raises
+`OSError: [Errno 39] Directory not empty`.
+
+**Required fence** (inside the temp-dir lifetime, preferably `try` / `finally`):
+
+1. After product-relevant work that may have started an encrypted async load, call
+   `presenter.wait_storage_idle(timeout_ms=...)` and assert it returns `True` when the scenario
+   depends on settled storage.
+2. Call `presenter.teardown(timeout_ms=...)` before the temp directory exits or is cleaned up.
+
+`wait_storage_idle` / gateway `wait_idle` are **bounded synchronization helpers only**. They are
+not substitutes for `teardown()`’s admission fence, drain, and `TeardownResult`. Idle-then-teardown
+is the correct ordering; teardown alone is still required even after a successful idle wait.
+
+Reference implementations:
+
+- Named product e2e:
+  `tests/test_env_persistence_e2e.py::test_presenter_load_shows_no_env_when_key_missing_for_encrypted_data`
+  (idle budget 30 s under suite load, teardown 5 s).
+- Durable cleanup contract:
+  `tests/test_env_persistence_tempdir_cleanup_repro.py::test_tempdir_cleanup_survives_in_flight_encrypted_async_load`
+  (gated storage double; release + idle + teardown before `tmp.cleanup()`).
+
+Sync-only paths (encryption off) do not dispatch the gateway worker; they still benefit from
+`teardown` for presenter lifecycle hygiene. See
+[Testing — env persistence temp-dir fence](testing.md#env-persistence-temp-dir-fence-pypost-1311)
+and [Async Environment Storage](environment_storage_async.md).
