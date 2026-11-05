@@ -124,10 +124,15 @@ class CollectionImportActions(QObject):
         self._worker: CollectionImportParseWorker | None = None
         self._library_worker: LibraryOperationWorker | None = None
         self._state: CollectionImportState = CollectionImportState.IDLE
+        self._teardown_started = False
 
     def is_busy(self) -> bool:
         """True while an import is in flight (any stage but idle)."""
         return self._state is not CollectionImportState.IDLE
+
+    def begin_teardown(self) -> None:
+        """Reject new import admission without waiting for in-flight work."""
+        self._teardown_started = True
 
     @property
     def lifecycle_policy(self) -> CollectionImportLifecyclePolicy:
@@ -182,6 +187,7 @@ class CollectionImportActions(QObject):
         deadline checks. The documented allowed wall-time overrun is the policy
         ``budget_tolerance_ms`` (50 ms); it is a contract value, not a runtime check.
         """
+        self._teardown_started = True
         deadline = self._start_deadline(timeout_ms)
         logger.info(
             "collection_import_teardown_started timeout_ms=%d", deadline.budget_ms
@@ -279,6 +285,9 @@ class CollectionImportActions(QObject):
 
     def import_collections_from_file(self) -> None:
         """Pick a file, parse off-thread, then finish import on the GUI thread."""
+        if self._teardown_started:
+            logger.info("collection_import_skipped reason=teardown")
+            return
         if self.is_busy():
             logger.info("collection_import_skipped reason=busy")
             return
@@ -292,6 +301,9 @@ class CollectionImportActions(QObject):
 
     def import_collections_from_library(self) -> None:
         """Select connected library collections and apply them on the GUI thread."""
+        if self._teardown_started:
+            logger.info("collection_library_import_skipped reason=teardown")
+            return
         if self.is_busy():
             logger.info("collection_library_import_skipped reason=busy")
             return
@@ -406,6 +418,12 @@ class CollectionImportActions(QObject):
 
     def refresh_linked_collection(self, collection_id: str) -> bool:
         """Refresh one linked active collection from its connected library source."""
+        if self._teardown_started:
+            logger.info(
+                "collection_library_refresh_skipped collection_id=%s reason=teardown",
+                collection_id,
+            )
+            return False
         collection = next(
             (
                 candidate

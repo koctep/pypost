@@ -16,6 +16,7 @@ _LIFECYCLE_OWNER_BY_CLASS = {
     "HistoryPanel": "history_panel",
     "HistoryManager": "history_manager",
     "EnvironmentStorageGateway": "environment_storage_gateway",
+    "CollectionsPresenter": "collections_presenter",
 }
 
 

@@ -17,8 +17,13 @@ from pypost.core.metrics_otel import OtelMetricsTracker
 from pypost.core.metrics_registry import MetricsRegistry
 from pypost.models.settings import AppSettings
 from pypost.ui.main_window_lifecycle import teardown as teardown_main_window
+from pypost.ui.presenters.collections_presenter import CollectionsPresenter
 from pypost.ui.presenters.env_presenter import EnvPresenter
 from pypost.ui.presenters.tabs_presenter import TabsPresenter
+from tests.helpers.collections_tree import (
+    FakeRequestManager as CollectionsFakeRequestManager,
+    FakeStateManager as CollectionsFakeStateManager,
+)
 from tests.test_tabs_presenter import FakeRequestManager, FakeStateManager, _make_request
 
 pytestmark = pytest.mark.timeout(60)
@@ -142,6 +147,44 @@ def test_request_teardown_logs_correlated_start_and_completion_once(qapp, caplog
     )
 
 
+def test_collections_teardown_emits_correlated_lifecycle_log_and_metrics(qapp, caplog):
+    """PYPOST-1321: collections owner keeps lifecycle_teardown_* + metrics labels."""
+    metrics = MetricsRegistry()
+    presenter = CollectionsPresenter(
+        CollectionsFakeRequestManager([]),
+        CollectionsFakeStateManager(),
+        metrics,
+        {},
+    )
+    logger_name = "pypost.ui.presenters.collections_presenter_lifecycle"
+    with caplog.at_level(logging.INFO, logger=logger_name):
+        result = presenter.teardown(timeout_ms=100)
+        repeated = presenter.teardown(timeout_ms=100)
+
+    assert result == repeated
+    assert result.owner == "collections_presenter"
+    started = _messages(caplog, "lifecycle_teardown_started")
+    completed = _messages(caplog, "lifecycle_teardown_completed")
+    assert len(started) == len(completed) == 1
+    assert _teardown_ids(started) == _teardown_ids(completed)
+    assert "owner=collections_presenter" in started[0]
+    assert "owner=collections_presenter" in completed[0]
+    assert "deadline_ms=100" in completed[0]
+    legacy = _messages(caplog, "collections_presenter_teardown_")
+    assert any("collections_presenter_teardown_started timeout_ms=100" in m for m in legacy)
+    assert any(
+        "collections_presenter_teardown_completed clean=True" in m for m in legacy
+    )
+    scraped = _scrape(metrics)
+    assert (
+        'lifecycle_teardowns_total{outcome="success",owner="collections_presenter"} 1.0'
+        in scraped
+    )
+    assert (
+        'lifecycle_teardown_active_workers{owner="collections_presenter"} 0.0' in scraped
+    )
+
+
 def test_environment_teardown_suppresses_late_signal_and_keeps_safe_context(
     qapp, caplog
 ):
@@ -184,12 +227,13 @@ def test_main_window_aggregate_logs_and_metrics_one_correlated_attempt(caplog):
     metrics = MetricsRegistry()
     owners = {
         name: _AggregateOwner(name)
-        for name in ("tabs", "history_panel", "history_manager", "env")
+        for name in ("tabs", "history_panel", "history_manager", "collections", "env")
     }
     window = SimpleNamespace(
         tabs=owners["tabs"],
         history_panel=owners["history_panel"],
         history_manager=owners["history_manager"],
+        collections=owners["collections"],
         env=owners["env"],
         metrics=metrics,
         _teardown_lock=None,
@@ -205,9 +249,11 @@ def test_main_window_aggregate_logs_and_metrics_one_correlated_attempt(caplog):
     completed = _messages(caplog, "lifecycle_teardown_completed")
     assert len(started) == len(completed) == 1
     assert _teardown_ids(started) == _teardown_ids(completed)
+    assert "owner_count=5" in started[0]
     assert owners["tabs"].begin_calls == 1
     assert owners["history_panel"].begin_calls == 1
     assert owners["history_manager"].begin_calls == 1
+    assert owners["collections"].begin_calls == 1
     assert owners["env"].begin_calls == 1
     assert (
         'lifecycle_teardowns_total{outcome="success",owner="main_window"} 1.0'

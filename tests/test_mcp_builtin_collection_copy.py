@@ -78,7 +78,7 @@ def owner(qapp, storage):
     presenter = CollectionsPresenter(manager, FakeStateManager(), storage=storage)
     presenter.refresh_tree()
     yield presenter
-    assert presenter.teardown(timeout_ms=5000)
+    assert presenter.teardown(timeout_ms=5000).outcome == "success"
     presenter.widget.close()
 
 
@@ -259,7 +259,7 @@ def test_creation_rejects_busy_or_disposed_owner_without_publishing(
     callback = creation(owner)
     with monkeypatch.context() as admission_patch:
         if busy == "teardown":
-            assert owner.teardown(timeout_ms=5000)
+            assert owner.teardown(timeout_ms=5000).outcome == "success"
         elif busy == "load":
             admission_patch.setattr(owner._async_loader, "is_busy", lambda: True)
         else:

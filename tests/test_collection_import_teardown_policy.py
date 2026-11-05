@@ -162,7 +162,8 @@ def test_presenter_teardown_defaults_to_policy_budget(qapp, caplog) -> None:
         FakeRequestManager([]), FakeStateManager(), FakeMetrics(), {}
     )
     with caplog.at_level(logging.INFO):
-        assert presenter.teardown() is True
+        result = presenter.teardown()
+    assert result.outcome == "success"
     messages = [r.message for r in caplog.records]
     assert "collections_presenter_teardown_started timeout_ms=5000" in messages
     assert "collection_import_teardown_started timeout_ms=5000" in messages
