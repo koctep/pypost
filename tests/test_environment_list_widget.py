@@ -1,11 +1,10 @@
 """Qt-level tests for EnvironmentListWidget.import_environments (PYPOST-986)."""
 
-import pytest
-
 import logging
 from pathlib import Path
 from unittest.mock import patch
 
+import pytest
 from PySide6.QtCore import Qt
 from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QPushButton
@@ -14,6 +13,7 @@ from pypost.core.environment_import import EnvironmentImportFileError, ImportCon
 from pypost.models.models import Environment
 from pypost.ui.widget_ids import ENV_IMPORT_BUTTON
 from pypost.ui.widgets.environments.environment_list_widget import EnvironmentListWidget
+from tests.helpers.qt_widget_dispose import dispose_qt_root
 
 pytestmark = pytest.mark.timeout(60)
 
@@ -21,8 +21,20 @@ pytestmark = pytest.mark.timeout(60)
 _MODULE = "pypost.ui.widgets.environments.environment_list_widget"
 
 
+_created_widgets: list[EnvironmentListWidget] = []
+
+
 def _make_widget(environments, read_import_file=None):
-    return EnvironmentListWidget(environments, read_import_file=read_import_file)
+    w = EnvironmentListWidget(environments, read_import_file=read_import_file)
+    _created_widgets.append(w)
+    return w
+
+
+@pytest.fixture(autouse=True)
+def _cleanup_widgets(qapp):
+    yield
+    while _created_widgets:
+        dispose_qt_root(_created_widgets.pop(), qapp)
 
 
 class TestImportEnvironments:
