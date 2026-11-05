@@ -465,6 +465,15 @@ Previous dialog workflows relied on modal error message boxes (`QMessageBox.crit
    - Clicking `retry_fetch_btn` invokes `_start_fetch_remote_collection()` when a library
      collection is selected; otherwise restarts `_start_manifest_discovery()`.
    - If the user changes the dropdown selection or cancels, the error container is automatically hidden and reset.
+4. **Flaky network and corrupted manifests (PYPOST-1426)**:
+   - The same inline error + Retry path covers `ConnectionResetError`, `BrokenPipeError`,
+     truncated JSON (`CollectionSerializationError`), and malformed variable schemas raised
+     from `read_collection` / deserialization.
+   - Failed fetches clear the table model so partial or corrupt payloads are never shown.
+   - Cancel during a mid-stream blocked read still uses transport abort (PYPOST-1425) and
+     must not present a fetch-failure banner for the cancelled generation.
+   - Automated coverage: `tests/test_remote_collection_fault_injection_repro.py` with helpers
+     in `tests/helpers/remote_collection_faults.py`.
 
 ---
 
@@ -546,6 +555,15 @@ Automated test coverage is maintained in:
   - **Transport Abort on Cancel**: Asserts `CollectionFetchWorker` /
     `ManifestDiscoveryWorker.cancel()` fires `CancellationToken` abort callbacks and
     unblocks in-flight library I/O promptly (does not wait out the full remote budget).
+- `tests/test_remote_collection_fault_injection_repro.py` (PYPOST-1426):
+  - **Flaky network / TCP reset**: Injects `ConnectionResetError` and `BrokenPipeError`
+    from `read_collection`; asserts inline error banner, Retry, empty table (no partial
+    rows), and successful retry after reset.
+  - **Corrupted manifests**: Feeds truncated JSON and malformed variable schemas through
+    real `deserialize_collection_from_json` (via `tests/helpers/remote_collection_faults`);
+    asserts recoverable UX and worker `fetch_failed` emission.
+  - **Cancel mid-stream**: Combines PYPOST-1425 transport abort with a blocked mid-stream
+    read; cancel must abort promptly without a false fetch-failure banner.
 - `tests/test_variable_import_virtualization_repro.py`:
   - **Zero-Widget Scaling**: Asserts zero persistent cell widgets across 1,000+ variables, verifying virtualized memory and rendering scaling.
   - **Background Collection Fetching**: Verifies `CollectionFetchWorker` executes off-thread without freezing the UI, showing the loading container and cancel button (waits for async discovery first).
