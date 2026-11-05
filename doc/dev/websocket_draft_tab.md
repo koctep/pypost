@@ -150,10 +150,16 @@ Plus-tab index is ignored. Then:
 
 1. `confirm_close_websocket_draft(...)`. **False** (Keep) returns with
    no teardown.
-2. Duck-typed `presenter.teardown()` when callable.
-3. `removeTab`. Empty strip opens HTTP via
-   `add_new_tab(save_state=False)` ([PYPOST-1159](https://pypost.atlassian.net/browse/PYPOST-1159)).
-4. `save_tabs_state()`.
+2. Duck-typed `presenter.teardown()` when callable (session close).
+3. For `WebSocketTab`, `dispose_websocket_tab_page(..., mode="tab_close")`
+   runs export-safe cleanup, removes the strip entry, and either
+   `deleteLater`s the page or defers disposal until export ownership ends
+   ([PYPOST-1301](https://pypost.atlassian.net/browse/PYPOST-1301); see
+   [websocket_message_stream.md](websocket_message_stream.md)). Other tab
+   types still use bare `removeTab`.
+4. Empty strip opens HTTP via `add_new_tab(save_state=False)`
+   ([PYPOST-1159](https://pypost.atlassian.net/browse/PYPOST-1159)).
+5. `save_tabs_state()`.
 
 ### `TabsPresenter.open_websocket_tab(connection, save_state=True)`
 

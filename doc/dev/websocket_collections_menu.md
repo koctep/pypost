@@ -81,8 +81,13 @@ When a WebSocket profile or a collection containing profiles is deleted:
 4. If a tab has unsaved edits (`is_websocket_saved_tab_dirty`) or an active
    session (`CONNECTING`, `RECONNECTING`, `OPEN`, `CLOSING`), the user sees
    `prompt_deleted_websocket_profile_tab_close`.
-5. On proceed (or when clean and idle), tabs are removed; empty workspace falls
-   back to a blank HTTP tab (existing rule).
+5. On proceed (or when clean and idle), each tab runs session
+   `presenter.teardown()` then
+   `dispose_websocket_tab_page(..., mode="tab_close")` so stream export is
+   waited/deferred before the page is disposed
+   ([PYPOST-1301](https://pypost.atlassian.net/browse/PYPOST-1301); see
+   [websocket_message_stream.md](websocket_message_stream.md)). Empty
+   workspace falls back to a blank HTTP tab (existing rule).
 
 HTTP delete continues silent close via `close_tabs_for_request_ids`.
 

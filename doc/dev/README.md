@@ -18,7 +18,7 @@ conventions.
 1. [Architecture Decision Records (ADR) index](../adr/README.md)
 1. [Request Execution](request_execution.md)
 1. [WebSocket Transport Seam and Session Engine (PYPOST-1127)](websocket_session_engine.md)
-1. [WebSocket Message Stream, Codecs, and Transcript Export (PYPOST-1130)](websocket_message_stream.md)
+1. [WebSocket Message Stream, Codecs, and Transcript Export (PYPOST-1130 / PYPOST-1286 / PYPOST-1301)](websocket_message_stream.md)
 1. [WebSocket TLS and Connection-Security Policy (PYPOST-1131)](websocket_tls_security.md)
 1. [WebSocket UI Client and Live Stream Inspector (PYPOST-1132)](websocket_ui_client.md)
 1. [WebSocket Stream Inspector and Virtualized Live Stream Viewer (PYPOST-1133)](websocket_stream_inspector.md)

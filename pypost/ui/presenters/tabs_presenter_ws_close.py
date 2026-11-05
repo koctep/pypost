@@ -76,8 +76,20 @@ def close_tabs_for_websocket_ids(
             ):
                 continue
         indices_to_close.append(i)
+    from pypost.ui.presenters.tabs_presenter_ws_export_teardown import (
+        dispose_websocket_tab_page,
+    )
+
     for index in reversed(indices_to_close):
-        presenter._tabs.removeTab(index)
+        tab = presenter._tabs.widget(index)
+        if not isinstance(tab, WebSocketTab):
+            presenter._tabs.removeTab(index)
+            continue
+        tab_presenter = getattr(tab, "presenter", None)
+        teardown = getattr(tab_presenter, "teardown", None)
+        if callable(teardown):
+            teardown()
+        dispose_websocket_tab_page(presenter, tab, mode="tab_close")
     if presenter._request_tab_count() == 0:
         presenter.add_new_tab(save_state=False)
     elif indices_to_close:
