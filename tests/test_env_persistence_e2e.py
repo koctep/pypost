@@ -1,9 +1,8 @@
-
-import pytest
-
 import logging
 import tempfile
 from unittest.mock import MagicMock, patch
+
+import pytest
 
 from pypost.core.config_manager import ConfigManager
 from pypost.core.storage import StorageManager
@@ -204,7 +203,13 @@ def test_presenter_load_shows_no_env_when_key_missing_for_encrypted_data(qapp): 
                         get_collections=_empty_collections,
                         metrics=MagicMock(),
                     )
-                    presenter.load_environments()
+                    try:
+                        presenter.load_environments()
+                        # Settle encrypted async load before product asserts /
+                        # TemporaryDirectory exit (PYPOST-1311 cleanup fence).
+                        assert presenter.wait_storage_idle(timeout_ms=30_000)
 
-                    assert presenter.environment_count() == 1
-                    assert presenter.current_environment_index() == 0
+                        assert presenter.environment_count() == 1
+                        assert presenter.current_environment_index() == 0
+                    finally:
+                        presenter.teardown(timeout_ms=5_000)

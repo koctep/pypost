@@ -2043,7 +2043,9 @@ PYPOST-1264 runs also saw these filed, pre-existing failures (all reproduced or 
 
 - **PYPOST-1299** — `tests/test_pytest_exit_policy.py` times out at 120 s.
 - **PYPOST-1311** — `tests/test_env_persistence_e2e.py` tmp cleanup `OSError: Directory not
-  empty`.
+  empty` (addressed: idle + teardown fence before temp-dir exit; see
+  [presenter_teardown.md](presenter_teardown.md#encrypted-envpresenter--temporarydirectory-pypost-1311)
+  / [testing.md](testing.md#env-persistence-temp-dir-fence-pypost-1311)).
 - **PYPOST-1315** — `tests/test_environment_export_ui.py` process exits -11/-7 after its tests
   pass.
 - **PYPOST-1320** — intermittent hang in

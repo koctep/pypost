@@ -262,6 +262,16 @@ QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest \
   tests/test_storage_gateway_h3_stress.py
 ```
 
+### Temp-dir cleanup with encrypted async load (PYPOST-1311)
+
+Harnesses that bind encrypted load/save to a temporary workspace must call
+`EnvPresenter.wait_storage_idle(...)` then `EnvPresenter.teardown(...)` before
+`TemporaryDirectory` exit. `wait_idle` / `wait_storage_idle` only synchronize; they are not a
+substitute for teardown. Full fence pattern and Make targets:
+[Testing — env persistence temp-dir fence](testing.md#env-persistence-temp-dir-fence-pypost-1311)
+and
+[Presenter teardown — Encrypted EnvPresenter + TemporaryDirectory](presenter_teardown.md#encrypted-envpresenter--temporarydirectory-pypost-1311).
+
 ### H3 worker-lifecycle canary (PYPOST-829)
 
 `tests/test_storage_gateway_h3_stress.py` runs ≥200 rapid load/save + pending-restart
