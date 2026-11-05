@@ -1596,7 +1596,7 @@ completion is not guaranteed.
 Run fixture and runner regressions through the standard Make targets:
 
 ```bash
-make test PYTEST_ARGS='tests/test_shared_venv_manager.py tests/test_makefile_shared_readiness.py tests/test_run_parallel_tests.py'
+make test PYTEST_ARGS='tests/test_shared_venv_manager.py tests/test_makefile_shared_readiness.py tests/test_shared_venv_extreme_concurrency.py tests/test_run_parallel_tests.py'
 make test PYTEST_ARGS='tests/test_makefile_markers.py tests/test_makefile_stamp_test_idempotency.py'
 make test-cov PYTEST_ARGS='tests/test_makefile_markers.py'
 ```
@@ -1622,9 +1622,10 @@ the captured stage, shared path, budget, and subprocess stderr before retrying:
 Keep the existing test deadlines and worker settings when investigating prerequisite failures.
 `tests/test_shared_venv_manager.py` covers manager ownership and injected-collaborator stages;
 `tests/test_makefile_shared_readiness.py` covers contention, stale readiness, cumulative
-deadlines, retry, partial copies, descendant cleanup, and parallel load budget. Runner
-regressions cover ordering, fail-closed dispatch, coverage preparation, and selection
-exclusions.
+deadlines, retry, partial copies, descendant cleanup, and parallel load budget.
+`tests/test_shared_venv_extreme_concurrency.py` (PYPOST-1422) stresses 16+ concurrent
+`materialize` calls under simulated disk latency. Runner regressions cover ordering,
+fail-closed dispatch, coverage preparation, and selection exclusions.
 
 ### Offline missing-runner checks (PYPOST-1299)
 
