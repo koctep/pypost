@@ -1966,8 +1966,11 @@ PYPOST-1264 runs also saw these filed, pre-existing failures (all reproduced or 
   pass.
 - **PYPOST-1320** — intermittent hang in
   `tests/test_collection_import_teardown_repro.py` and `tests/test_collections_import_ui.py`:
-  the main thread blocks starting the `process_until` watchdog `threading.Timer`, before any
-  teardown code runs.
+  historically the main thread blocked in per-wait `process_until` `threading.Timer.start` /
+  `_started.wait` (before teardown ran) while a QThread held logging limbo. Mitigated by the
+  shared `_DeadlineScheduler` posted-quit backstop in `tests/helpers/process_until.py` (no
+  per-wait `Timer.start` on the hot path; see [gui_testing.md](gui_testing.md)
+  § Bounded nested `QEventLoop` waits).
 
 These baseline issues do not explain a cancellation regression. A cancellation-specific failure
 is indicated by a missing `parse_cancelled` signal, an unexpected `parse_completed`/`parse_failed`
