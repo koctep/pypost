@@ -19,7 +19,6 @@ from pypost.core.mcp_tool_contract import (
     normalize_mcp_tool_name,
 )
 from pypost.core.metrics_protocol import MetricsTrackerProtocol
-from pypost.core.qt.websocket_probe_runner import WebSocketProbeRunner
 from pypost.core.template_service import TemplateService
 from pypost.core.websocket_probe import (
     WebSocketProbeConfig,
@@ -30,6 +29,9 @@ from pypost.core.websocket_transport_protocol import HandshakeTarget
 from pypost.models.models import McpToolParam
 from pypost.models.settings import AppSettings
 from pypost.models.websocket import WebSocketConnection
+
+# WebSocketProbeRunner (PySide6) is imported lazily inside execute_websocket_probe
+# so headless mcp_worker_process import graphs never load Qt.
 
 logger = logging.getLogger(__name__)
 
@@ -236,7 +238,11 @@ def execute_websocket_probe(
         stop_when=stop_when,
     )
 
-    # 3. Execute probe on a short-lived QThread
+    # 3. Execute probe on a short-lived QThread (Qt only when probe runs).
+    from PySide6.QtCore import QCoreApplication
+
+    from pypost.core.qt.websocket_probe_runner import WebSocketProbeRunner
+
     runner = WebSocketProbeRunner(config)
     runner.start()
 
@@ -246,7 +252,6 @@ def execute_websocket_probe(
     wait_deadline_ms = eff_dur + 3000  # hard deadline + 3 s grace
     wait_started = time.monotonic()
     while not runner.isFinished():
-        from PySide6.QtCore import QCoreApplication
         QCoreApplication.processEvents()
         elapsed_ms = (time.monotonic() - wait_started) * 1000.0
         if elapsed_ms >= wait_deadline_ms:

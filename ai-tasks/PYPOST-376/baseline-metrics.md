@@ -15,7 +15,7 @@
 | --- | ---: | ---: | ---: |
 | `pypost/core/collection_item_dispatch.py` | — | 83 | 83 |
 | `pypost/core/http_client.py` | 198 | 381 | 418 |
-| `pypost/core/mcp_server_impl.py` | 231 | 391 | 407 |
+| `pypost/core/mcp_server_impl.py` | 231 | 396 | 407 |
 | `pypost/core/qt/metrics.py` | 286 | 63 | 70 |
 | `pypost/core/qt/metrics_tracking.py` | — | 166 | 180 |
 | `pypost/core/qt/metrics_websocket.py` | — | 40 | 45 |
@@ -25,7 +25,7 @@
 | `pypost/core/storage.py` | 80 | 364 | 380 |
 | `pypost/core/template_service.py` | 36 | 264 | 265 |
 | `pypost/core/websocket_registry.py` | — | 129 | 131 |
-| `pypost/ui/mcp_server_controller.py` | — | 784 | 795 |
+| `pypost/ui/mcp_server_controller.py` | — | 785 | 795 |
 | `pypost/ui/presenters/collections_presenter.py` | — | 534 | 535 |
 | `pypost/ui/presenters/env_presenter.py` | — | 468 | 482 |
 | `pypost/ui/presenters/mcp_controls_presenter.py` | — | 384 | 407 |

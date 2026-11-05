@@ -142,6 +142,33 @@ def test_runtime_becomes_ready_without_gui_when_no_mcp_rows(tmp_path):
     assert application is QCoreApplication.instance()
 
 
+def test_runtime_applies_mcp_execution_mode_from_settings(tmp_path):
+    """DaemonRuntime honors AppSettings.mcp_execution_mode when building the registry."""
+    QCoreApplication.instance() or QCoreApplication([])
+    metrics = FakeMetrics()
+    runtime = DaemonRuntime(
+        SimpleNamespace(
+            collections_dir=tmp_path,
+            environments_dir=tmp_path,
+            collections_source="cli",
+            environments_source="cli",
+        ),
+        config_manager=SimpleNamespace(
+            load_config_strict=lambda: AppSettings(mcp_execution_mode="process")
+        ),
+        storage=EmptyStorage(),
+        metrics=metrics,
+    )
+
+    runtime.start()
+
+    assert runtime.is_ready
+    assert runtime._registry is not None
+    assert runtime._registry._execution_mode == "process"
+    assert runtime._registry._process_supervisor is not None
+    runtime.shutdown()
+
+
 def test_runtime_reports_each_affected_server_without_persisted_values(
     caplog, tmp_path
 ):
