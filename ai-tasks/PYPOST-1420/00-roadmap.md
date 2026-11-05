@@ -41,12 +41,12 @@
   - [x] Soft post-copy timeout + silent skeleton fallback documented; `cp -a`
     overhead closed; sibling tickets 1421/1422/1440 referenced; no new
     failing-test NON-BLOCKERs in this batch
-- [/] **STEP 8: Dev Docs**
-  - [/] `doc/dev/shared_venv_materialization.md` — in-process `shutil.copytree` /
+- [x] **STEP 8: Dev Docs**
+  - [x] `doc/dev/shared_venv_materialization.md` — in-process `shutil.copytree` /
     `tree_copier`; bootstrap-only `preparation_runner`; soft `copy_timeout`
-  - [/] `doc/dev/testing.md`, `doc/dev/parallel_test_runner.md`, `doc/dev/README.md`
+  - [x] `doc/dev/testing.md`, `doc/dev/parallel_test_runner.md`, `doc/dev/README.md`
     — aligned residual `cp -a` narrative with PYPOST-1420
-- [ ] **COMMIT: Commit Changes**
+- [x] **COMMIT: Commit Changes**
 
 ## Status Legend
 
