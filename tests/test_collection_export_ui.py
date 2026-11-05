@@ -30,8 +30,14 @@ _ALL_SAVE = f"{_MODULE}.prompt_export_all_collections_file"
 _ALL_RESULT = f"{_MODULE}.show_all_collections_export_result"
 _ALL_ERROR = f"{_MODULE}.show_all_collections_export_error"
 
+# Missed-finally safety net (PYPOST-1357 / PYPOST-1315 TD-5): register presenters and
+# dispose via autouse even when a test omits its finally dispose call.
+_created_presenters: list[CollectionsPresenter] = []
 
-def _make_presenter(collections=None, serialize_collection=None):
+
+def _make_presenter(
+    collections=None, serialize_collection=None
+) -> tuple[CollectionsPresenter, FakeRequestManager]:
     manager = FakeRequestManager(list(collections or []))
     presenter = CollectionsPresenter(
         manager,
@@ -41,7 +47,16 @@ def _make_presenter(collections=None, serialize_collection=None):
         serialize_collection=serialize_collection,
     )
     presenter.refresh_tree()
+    _created_presenters.append(presenter)
     return presenter, manager
+
+
+@pytest.fixture(autouse=True)
+def _cleanup_collections_export_presenters(qapp):
+    """Missed-finally safety net: dispose any registered presenters after each test."""
+    yield
+    while _created_presenters:
+        dispose_collections_export_fixture(_created_presenters.pop(), qapp)
 
 
 def _select_collection(presenter, collection_id: str) -> None:
