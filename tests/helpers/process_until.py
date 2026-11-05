@@ -1,9 +1,10 @@
 """Hang-resistant nested QEventLoop wait for gateway/worker tests.
 
-Wall-clock deadline plus a daemon thread that posts ``loop.quit()`` onto the
-GUI-thread event loop so a silent QTimer cannot hang ``exec()`` past the
-deadline (PYPOST-823 / PYPOST-827). Distinct from ``qt_wait.wait_until``, which
-polls via ``processEvents`` without nested ``exec()``.
+Wall-clock deadline plus a module-scoped daemon deadline scheduler that posts
+``loop.quit()`` onto the GUI-thread event loop so a silent QTimer cannot hang
+``exec()`` past the deadline (PYPOST-823 / PYPOST-827 / PYPOST-1320). Distinct
+from ``qt_wait.wait_until``, which polls via ``processEvents`` without nested
+``exec()``.
 
 Timeout AssertionError text can include a lazy diagnostic snapshot
 (PYPOST-828).
@@ -11,9 +12,12 @@ Timeout AssertionError text can include a lazy diagnostic snapshot
 
 from __future__ import annotations
 
+import heapq
+import itertools
 import threading
 import time
 from collections.abc import Callable
+from dataclasses import dataclass, field
 from typing import Protocol
 
 from PySide6.QtCore import QEventLoop, QTimer
@@ -83,6 +87,102 @@ def gateway_timeout_detail(gateway: _StorageAsyncGateway) -> Callable[[], str]:
     return detail
 
 
+@dataclass(order=True)
+class _DeadlineEntry:
+    """Heap entry for a cancellable posted-quit deadline."""
+
+    deadline: float
+    seq: int
+    cancelled: bool = field(default=False, compare=False)
+    callback: Callable[[], None] | None = field(default=None, compare=False)
+
+
+class _DeadlineScheduler:
+    """Single daemon thread that fires wall-clock callbacks without per-arm start.
+
+    ``process_until`` must not call ``threading.Thread.start`` on the hot path
+    while a QThread may hold logging / limbo locks (PYPOST-1320). Bootstrap
+    happens once on first arm; later arms only enqueue under a Condition.
+    """
+
+    def __init__(self) -> None:
+        self._cv = threading.Condition()
+        self._heap: list[_DeadlineEntry] = []
+        self._seq = itertools.count()
+        self._thread: threading.Thread | None = None
+
+    def arm(self, delay_s: float, callback: Callable[[], None]) -> Callable[[], None]:
+        """Schedule ``callback`` after ``delay_s``; return a cancel callable."""
+        self._ensure_started()
+        deadline = time.monotonic() + max(0.0, delay_s)
+        with self._cv:
+            entry = _DeadlineEntry(
+                deadline=deadline,
+                seq=next(self._seq),
+                callback=callback,
+            )
+            heapq.heappush(self._heap, entry)
+            self._cv.notify()
+
+        def cancel() -> None:
+            with self._cv:
+                entry.cancelled = True
+                entry.callback = None
+                self._cv.notify()
+
+        return cancel
+
+    def _ensure_started(self) -> None:
+        with self._cv:
+            if self._thread is not None:
+                return
+            thread = threading.Thread(
+                target=self._run,
+                name="process-until-deadline",
+                daemon=True,
+            )
+            self._thread = thread
+            thread.start()
+
+    def _run(self) -> None:
+        while True:
+            callback: Callable[[], None] | None = None
+            with self._cv:
+                while True:
+                    while self._heap and self._heap[0].cancelled:
+                        heapq.heappop(self._heap)
+                    if not self._heap:
+                        self._cv.wait()
+                        continue
+                    now = time.monotonic()
+                    remaining = self._heap[0].deadline - now
+                    if remaining > 0:
+                        self._cv.wait(timeout=remaining)
+                        continue
+                    entry = heapq.heappop(self._heap)
+                    if not entry.cancelled:
+                        callback = entry.callback
+                    break
+            if callback is not None:
+                callback()
+
+
+_deadline_scheduler = _DeadlineScheduler()
+
+
+def _arm_posted_quit(loop: QEventLoop, remaining_s: float) -> Callable[[], None]:
+    """Schedule GUI-thread ``loop.quit`` after ``remaining_s``; return cancel.
+
+    Must not call ``threading.Thread.start`` on the per-wait path after the
+    shared deadline scheduler has bootstrapped.
+    """
+
+    def post_quit() -> None:
+        QTimer.singleShot(0, loop, loop.quit)
+
+    return _deadline_scheduler.arm(remaining_s, post_quit)
+
+
 def process_until(
     predicate: Callable[[], bool],
     *,
@@ -92,7 +192,7 @@ def process_until(
 ) -> None:
     """Pump nested QEventLoop until predicate() or wall-clock deadline.
 
-    Posts ``loop.quit()`` from a daemon thread via
+    Posts ``loop.quit()`` from the shared deadline scheduler via
     ``QTimer.singleShot(0, loop, loop.quit)`` so a silent QTimer cannot hang
     ``exec()`` past the deadline.
 
@@ -127,17 +227,11 @@ def process_until(
     # bare QTimer.singleShot from a worker thread would own the timer there
     # and never fire (no event loop on that thread).
     remaining_s = max(0.0, deadline - time.monotonic())
-
-    def post_quit() -> None:
-        QTimer.singleShot(0, loop, loop.quit)
-
-    watchdog = threading.Timer(remaining_s, post_quit)
-    watchdog.daemon = True
-    watchdog.start()
+    cancel_watchdog = _arm_posted_quit(loop, remaining_s)
     try:
         loop.exec()
     finally:
-        watchdog.cancel()
+        cancel_watchdog()
         if timer is not None:
             timer.stop()
 

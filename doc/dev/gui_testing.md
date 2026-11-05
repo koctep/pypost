@@ -129,7 +129,7 @@ after the last PASS (PYPOST-1315).
   § Bounded nested `QEventLoop` waits below). Use the shared `qapp` fixture — do not create a
   second module-local `QApplication` (including via `setUpClass`).
 
-### Bounded nested `QEventLoop` waits (PYPOST-823 / PYPOST-827 / PYPOST-828)
+### Bounded nested `QEventLoop` waits (PYPOST-823 / PYPOST-827 / PYPOST-828 / PYPOST-1320)
 
 Waiting for `QThread` queued signals with a nested `QEventLoop.exec()` is fine **only** if the
 wait is guaranteed to return to Python on a wall-clock deadline. A QTimer-only timeout is not
@@ -144,7 +144,21 @@ wall-clock deadline.
 | --- | --- |
 | Qt poll `QTimer` (10 ms) | Checks the predicate and pumps the nested loop |
 | `time.monotonic()` deadline | Deadline independent of timer tick delivery |
-| Daemon Timer + posted quit | `singleShot(0, loop, loop.quit)` on GUI thread if poll dies |
+| Shared deadline scheduler + posted quit | Module-scoped daemon arms |
+| | `QTimer.singleShot(0, loop, loop.quit)` on the GUI |
+| | thread if poll dies (no per-wait `Timer.start`; |
+| | PYPOST-1320) |
+
+The posted-quit backstop is armed through a **module-scoped** `_DeadlineScheduler` in
+`process_until.py`: one long-lived daemon thread (`process-until-deadline`) owns a cancellable
+deadline heap. Each wait enqueues/cancels under a `Condition`; it does **not** call
+`threading.Timer.start` (or `Thread.start`) on the per-wait hot path. That avoids the historical
+hang where the GUI thread blocked in `Timer.start` / `_started.wait` while a `QThread` held
+logging limbo mid-`logger.error(..., exc_info=True)`.
+
+**Bootstrap (first wait only):** the first `process_until` in a worker process starts the daemon
+via `Thread.start`. Later arms only enqueue. Contended first-wait scenarios are rare after
+process warm-up; hang-regression and watchdog coverage exercise the hot path after bootstrap.
 
 Contract:
 
@@ -154,6 +168,8 @@ Contract:
    Qt event-loop tests.
 4. Prefer shared `qapp` from `tests/conftest.py` (parameter or
    `usefixtures("qapp")` on `TestCase` — see § Shared `qapp` above).
+5. Keep `use_poll_timer=False` hang-regression: posted quit alone must still exit near
+   `timeout_ms` when Qt poll timers never run.
 
 #### Timeout diagnostics (PYPOST-828)
 
@@ -216,6 +232,12 @@ Hang-regression coverage in `tests/test_env_storage_responsiveness.py`:
 
 - `test_process_until_exits_on_wall_clock_deadline`
 - `test_process_until_exits_via_posted_quit_without_poll_timer`
+
+Watchdog / limbo coverage (PYPOST-1320) in `tests/test_process_until_watchdog_repro.py`:
+
+- `test_process_until_exits_near_deadline_under_qthread_exc_info` — wait finishes within
+  ~2×`timeout_ms` while a QThread holds limbo mid-`exc_info` logging (proves no per-wait
+  `Timer.start` on the hot path)
 
 Modules that use the shared helper (PYPOST-827 / PYPOST-828 / PYPOST-877):
 
@@ -393,6 +415,8 @@ Engine DI examples: [websocket_session_engine.md](websocket_session_engine.md) �
 - [PYPOST-823](https://pypost.atlassian.net/browse/PYPOST-823) — nested `QEventLoop` hang defense
 - [PYPOST-827](https://pypost.atlassian.net/browse/PYPOST-827) — shared `process_until` for siblings
 - [PYPOST-828](https://pypost.atlassian.net/browse/PYPOST-828) — richer timeout diagnostics
+- [PYPOST-1320](https://pypost.atlassian.net/browse/PYPOST-1320) —
+  shared `_DeadlineScheduler` posted-quit backstop (no per-wait `Timer.start`)
 - [PYPOST-830](https://pypost.atlassian.net/browse/PYPOST-830) —
   gateway shared `qapp` alignment (initial `usefixtures` on `TestCase`)
 - [PYPOST-885](https://pypost.atlassian.net/browse/PYPOST-885) —

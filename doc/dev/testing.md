@@ -311,11 +311,12 @@ PYPOST-976).
 When a test must nest `QEventLoop.exec()` to deliver `QThread` queued signals, do **not** rely
 on a QTimer-only timeout or on `pytest-timeout` SIGALRM alone — SIGALRM does not interrupt a
 stuck C++ `exec()` without Python callbacks. Use the shared
-`tests.helpers.process_until.process_until` helper (wall-clock deadline plus a daemon
-`threading.Timer` that posts `QTimer.singleShot(0, loop, loop.quit)` onto the GUI thread;
-PYPOST-823 / PYPOST-827). On timeout, the message is neutral and can include a lazy
-`timeout_detail` snapshot (busy/pending / worker — PYPOST-828). Full contract and
-troubleshooting: [gui_testing.md](gui_testing.md) § Bounded nested `QEventLoop` waits.
+`tests.helpers.process_until.process_until` helper (wall-clock deadline plus a module-scoped
+deadline scheduler that posts `QTimer.singleShot(0, loop, loop.quit)` onto the GUI thread;
+no per-wait `threading.Timer.start` — PYPOST-823 / PYPOST-827 / PYPOST-1320). On timeout, the
+message is neutral and can include a lazy `timeout_detail` snapshot (busy/pending / worker —
+PYPOST-828). Full contract and troubleshooting: [gui_testing.md](gui_testing.md) § Bounded
+nested `QEventLoop` waits.
 
 See [gui_testing.md](gui_testing.md) for patterns, representative modules, focused commands,
 and troubleshooting (including ELF core dumps from native Qt crashes —
