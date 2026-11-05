@@ -81,6 +81,7 @@ class AppSettings(BaseModel):
     confirm_overwrite_request: bool = False
     mcp_port: int = 1080
     mcp_host: str = "127.0.0.1"
+    mcp_execution_mode: Literal["thread", "process"] = "thread"
     mcp_servers: List[McpServerConfiguration] = []
     metrics_port: int = 9080
     metrics_host: str = "127.0.0.1"

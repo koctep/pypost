@@ -127,6 +127,7 @@ class DaemonRuntime(QObject):
                 environment_lookup=environments.get,
                 metrics=metrics,
                 template_service=TemplateService(metrics),
+                execution_mode=settings.mcp_execution_mode,
             )
             for configuration in enabled:
                 registry.upsert(configuration.model_copy(deep=True))

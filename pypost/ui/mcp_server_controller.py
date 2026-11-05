@@ -430,6 +430,7 @@ class McpServerSettingsController:
                 metrics=metrics,
                 template_service=template_service,
                 library_service=library_service,
+                execution_mode=self._settings_provider().mcp_execution_mode,
             )
         self.registry.reconfiguration_finished.connect(
             self._on_mcp_server_reconfiguration_finished

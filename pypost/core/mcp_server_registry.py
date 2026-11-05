@@ -13,6 +13,12 @@ from typing import Any, Callable, Literal
 from PySide6.QtCore import QObject, Signal
 
 from pypost.core.builtin_collections import BuiltinCollectionView
+from pypost.core.mcp_process_supervisor import McpProcessSupervisor
+from pypost.core.mcp_server_runner import (
+    ProcessServerRunner,
+    ServerStartSpec,
+    ThreadServerRunner,
+)
 from pypost.core.metrics_protocol import MetricsTrackerProtocol
 from pypost.core.predefined_library import PredefinedLibraryService
 from pypost.core.qt.mcp_server import MCPServerManager
@@ -87,8 +93,13 @@ class MCPServerRegistry(QObject):
         template_service: TemplateService | None = None,
         library_service=None,
         builtin_view: BuiltinCollectionView | None = None,
+        execution_mode: Literal["thread", "process"] = "thread",
     ) -> None:
         super().__init__()
+        if execution_mode not in ("thread", "process"):
+            raise ValueError(
+                f"Unsupported MCP execution_mode: {execution_mode!r}"
+            )
         self._collection_lookup = collection_lookup or (lambda _id: None)
         self._environment_lookup = environment_lookup or (lambda _id: None)
         self._metrics = metrics
@@ -96,11 +107,22 @@ class MCPServerRegistry(QObject):
         self.library_service = library_service
         self._builtin_view = builtin_view or BuiltinCollectionView()
         self._bundled_adapter = _BundledLibraryAdapter(self._builtin_view)
+        self._execution_mode = execution_mode
         self._configurations: dict[str, McpServerConfiguration] = {}
         self._managers: dict[str, MCPServerManager] = {}
+        self._runners: dict[str, ThreadServerRunner | ProcessServerRunner] = {}
         self._statuses: dict[str, McpServerStatus] = {}
         self._pending_reconfigurations: dict[str, _PendingReconfiguration] = {}
         self._reconfiguration_lock = threading.RLock()
+        self._process_supervisor: McpProcessSupervisor | None = None
+        logger.info(
+            "mcp_registry_execution_mode_selected execution_mode=%s",
+            execution_mode,
+        )
+        if execution_mode == "process":
+            self._process_supervisor = McpProcessSupervisor(
+                on_unexpected_exit=self._on_worker_unexpected_exit,
+            )
 
     def get(self, instance_id: str) -> McpServerConfiguration | None:
         """Return the configuration for instance_id, or None if not found."""
@@ -134,6 +156,7 @@ class MCPServerRegistry(QObject):
         self._configurations.clear()
         self._statuses.clear()
         self._managers.clear()
+        self._runners.clear()
 
     def snapshot(self) -> dict[str, McpServerConfiguration]:
         """Return an isolated configuration snapshot for a higher-level transaction."""
@@ -147,6 +170,7 @@ class MCPServerRegistry(QObject):
         }
         self._statuses = {key: McpServerStatus(key, "stopped") for key in self._configurations}
         self._managers.clear()
+        self._runners.clear()
 
     def install_library_candidate(
         self, candidate: McpServerConfiguration, candidate_overlay=None
@@ -181,11 +205,13 @@ class MCPServerRegistry(QObject):
     def start(self, instance_id: str) -> None:
         configuration = self._configuration(instance_id)
         logger.info(
-            "mcp_registry_start_requested instance_id=%s port=%d environment_id=%s standalone=%s",
+            "mcp_registry_start_requested instance_id=%s port=%d environment_id=%s "
+            "standalone=%s execution_mode=%s",
             instance_id,
             configuration.port,
             configuration.environment_id,
             configuration.environment_id is None,
+            self._execution_mode,
         )
         runtime = self._runtime_inputs(configuration)
         if runtime is None:
@@ -197,10 +223,15 @@ class MCPServerRegistry(QObject):
             )
             return
 
+        if self._execution_mode == "process":
+            self._start_process_runner(instance_id, configuration, runtime)
+            return
+
         manager = self._managers.get(instance_id)
         if manager is None:
             manager = self._new_manager(instance_id, configuration.port)
             self._managers[instance_id] = manager
+            self._runners[instance_id] = ThreadServerRunner(manager)
         if manager.is_running():
             return
 
@@ -211,6 +242,7 @@ class MCPServerRegistry(QObject):
         if (
             instance_id not in self._configurations
             and instance_id not in self._managers
+            and instance_id not in self._runners
             and instance_id not in self._pending_reconfigurations
         ):
             raise KeyError(f"Unknown MCP server instance: {instance_id}")
@@ -227,6 +259,7 @@ class MCPServerRegistry(QObject):
         with self._reconfiguration_lock:
             pending = self._pending_reconfigurations.pop(instance_id, None)
             manager = self._managers.get(instance_id)
+            runner = self._runners.get(instance_id)
             self._set_status(instance_id, "stopped")
 
         stopped_exc: BaseException | None = None
@@ -241,7 +274,21 @@ class MCPServerRegistry(QObject):
                     exc_info=True,
                 )
                 stopped_exc = exc
-        if manager is not None:
+        if (
+            self._execution_mode == "process"
+            and isinstance(runner, ProcessServerRunner)
+        ):
+            try:
+                runner.stop()
+            except Exception as exc:
+                logger.error(
+                    "mcp_registry_runner_stop_error instance_id=%s error=%s",
+                    instance_id,
+                    exc,
+                    exc_info=True,
+                )
+                stopped_exc = exc
+        elif manager is not None:
             try:
                 manager.stop_server()
             except Exception as exc:
@@ -274,6 +321,7 @@ class MCPServerRegistry(QObject):
             target_ids = tuple(
                 dict.fromkeys(
                     list(self._managers.keys())
+                    + list(self._runners.keys())
                     + list(self._pending_reconfigurations.keys())
                     + list(self._configurations.keys())
                 )
@@ -604,9 +652,6 @@ class MCPServerRegistry(QObject):
         from pypost.models.library_manifest import LocalLibraryOverlay
 
         for instance_id in instance_ids:
-            manager = self._managers.get(instance_id)
-            if manager is None:
-                continue
             configuration = self._configuration(instance_id)
             if configuration.bundled_library:
                 selection = configuration.library_selection
@@ -633,6 +678,15 @@ class MCPServerRegistry(QObject):
                 hidden_set = set(environment.hidden_keys)
                 overridable_set = set(environment.mcp_overridable_keys)
 
+            runner = self._runners.get(instance_id)
+            if isinstance(runner, ProcessServerRunner):
+                runner.update_variables(vars_dict, hidden_set, overridable_set)
+                continue
+
+            manager = self._managers.get(instance_id)
+            if manager is None:
+                continue
+
             def supply_variables(snapshot: dict[str, str] = vars_dict) -> dict[str, str]:
                 return dict(snapshot)
 
@@ -653,19 +707,36 @@ class MCPServerRegistry(QObject):
                 pending.candidate_manager.stop_server()
             self.stop(instance_id)
             self._managers.pop(instance_id, None)
+            self._runners.pop(instance_id, None)
             self._configurations.pop(instance_id, None)
             self._statuses.pop(instance_id, None)
             self._publish_instance_metrics()
 
     def is_running(self, instance_id: str) -> bool:
+        if self._execution_mode == "process":
+            runner = self._runners.get(instance_id)
+            return runner is not None and runner.is_running()
         manager = self._managers.get(instance_id)
         return manager is not None and manager.is_running()
 
     def manager_for(self, instance_id: str) -> MCPServerManager:
         return self._managers[instance_id]
 
+    def runner_for(
+        self, instance_id: str
+    ) -> ThreadServerRunner | ProcessServerRunner:
+        """Return the lifecycle runner for ``instance_id``."""
+        return self._runners[instance_id]
+
     def status(self, instance_id: str) -> McpServerStatus:
         self._refresh_async_failure(instance_id)
+        if self._execution_mode == "process":
+            runner = self._runners.get(instance_id)
+            if runner is not None and runner.is_running():
+                current = self._statuses[instance_id]
+                if current.state == "starting":
+                    self._set_status(instance_id, "running")
+            return self._statuses[instance_id]
         manager = self._managers.get(instance_id)
         if manager is not None and manager.is_running():
             current = self._statuses[instance_id]
@@ -692,6 +763,20 @@ class MCPServerRegistry(QObject):
         return self.status(instance_id).state == state
 
     def _refresh_async_failure(self, instance_id: str) -> None:
+        if self._execution_mode == "process":
+            runner = self._runners.get(instance_id)
+            if runner is None or runner.last_start_error is None:
+                return
+            configuration = self._configuration(instance_id)
+            current = self._statuses[instance_id]
+            if current.state not in ("stopped", "failed"):
+                self._set_status(
+                    instance_id,
+                    "failed",
+                    f"{instance_id} on port {configuration.port}: "
+                    f"{runner.last_start_error}",
+                )
+            return
         manager = self._managers.get(instance_id)
         if manager is None or manager.last_start_error is None:
             return
@@ -961,6 +1046,72 @@ class MCPServerRegistry(QObject):
                 exc,
             )
             raise
+
+    def _start_process_runner(
+        self,
+        instance_id: str,
+        configuration: McpServerConfiguration,
+        runtime: tuple[list, dict[str, str], set[str], set[str]],
+    ) -> None:
+        tools, variables, hidden_keys, overridable_keys = runtime
+        runner = self._runners.get(instance_id)
+        if isinstance(runner, ProcessServerRunner) and runner.is_running():
+            return
+        if self._process_supervisor is None:
+            self._process_supervisor = McpProcessSupervisor(
+                on_unexpected_exit=self._on_worker_unexpected_exit,
+            )
+        runner = ProcessServerRunner(
+            instance_id,
+            supervisor=self._process_supervisor,
+        )
+        self._runners[instance_id] = runner
+        self._set_status(instance_id, "starting")
+        spec = ServerStartSpec(
+            configuration=configuration,
+            tools=list(tools),
+            variables=dict(variables),
+            hidden_keys=set(hidden_keys),
+            overridable_keys=set(overridable_keys),
+        )
+        try:
+            runner.start(spec)
+        except Exception as exc:
+            self._set_status(
+                instance_id,
+                "failed",
+                f"{instance_id} on port {configuration.port}: {exc}",
+            )
+            return
+        self._set_status(instance_id, "running")
+
+    def _on_worker_unexpected_exit(
+        self, instance_id: str, exitcode: int | None
+    ) -> None:
+        configuration = self._configurations.get(instance_id)
+        port = configuration.port if configuration is not None else 0
+        current = self._statuses.get(instance_id)
+        logger.error(
+            "mcp_registry_unexpected_child_exit instance_id=%s port=%d "
+            "exitcode=%s prior_state=%s",
+            instance_id,
+            port,
+            exitcode,
+            None if current is None else current.state,
+        )
+        runner = self._runners.get(instance_id)
+        if isinstance(runner, ProcessServerRunner):
+            runner.mark_failed(
+                f"unexpected worker exit (exitcode={exitcode})"
+            )
+        if current is not None and current.state == "stopped":
+            return
+        self._set_status(
+            instance_id,
+            "failed",
+            f"{instance_id} on port {port}: unexpected worker exit "
+            f"(exitcode={exitcode})",
+        )
 
     def _new_manager(self, instance_id: str, port: int) -> MCPServerManager:
         manager = MCPServerManager(metrics=self._metrics, template_service=self._template_service)

@@ -2,7 +2,8 @@
 
 Jira: [PYPOST-1438](https://pypost.atlassian.net/browse/PYPOST-1438)  
 Related: [PYPOST-1418](mcp_concurrent_multiserver.md),
-[PYPOST-1437](mcp_server_registry.md)
+[PYPOST-1437](mcp_server_registry.md),
+[PYPOST-1439](mcp_process_isolation.md) (Phase 2 implementation)
 
 ## 1. Executive Summary
 
@@ -24,8 +25,9 @@ introduces critical systemic vulnerabilities:
    reclamation to avoid socket exhaustion.
 
 This document presents a comprehensive evaluation of a dedicated multi-process supervisor model,
-establishes a trade-off matrix against thread-based execution, outlines an architectural blueprint
-for future process isolation, and specifies an automated 10+ server stress testing suite.
+establishes a trade-off matrix against thread-based execution, outlines the architectural blueprint
+later delivered as Phase 2 ([PYPOST-1439](mcp_process_isolation.md)), and specifies an automated
+10+ server stress testing suite.
 
 ---
 
@@ -212,19 +214,30 @@ for PyPost's thread-based runtime:
    - 10 active servers added ~65 MB to the application heap, confirming thread concurrency remains
      extremely resource-efficient when server code is trusted and non-faulty.
    - However, because all 10 servers share the single CPython GIL and host process address space,
-     Phase 2 multi-process supervision remains the necessary architectural path for enterprise
-     crash containment and compute-heavy parallel tool execution.
+     Phase 2 multi-process supervision (implemented in PYPOST-1439; see
+     [`mcp_process_isolation.md`](mcp_process_isolation.md)) is the architectural path for
+     enterprise crash containment and compute-heavy parallel tool execution.
 
 ---
 
 ## 6. Implementation & Adoption Roadmap
 
-1. **Phase 1 (PYPOST-1438)**:
+1. **Phase 1 (PYPOST-1438)** — completed:
    - Deliver architecture evaluation and blueprint.
    - Implement `EphemeralPortReserve` and 10+ server stress test suite.
    - Validate socket reclamation and stability of thread-based runtime under 10+ servers.
-2. **Phase 2 (Future Initiative)**:
-   - Extract `MCPServerRunnerProtocol` to allow interchangeable execution backends:
-     `ThreadServerRunner` (default lightweight) and `ProcessServerRunner` (isolated).
-   - Implement headless `pypost.core.mcp_worker_process`.
-   - Provide operator setting in PyPost settings: `mcp.execution_mode = "thread" | "process"`.
+2. **Phase 2 (PYPOST-1439)** — implemented:
+   - Extracted `MCPServerRunnerProtocol` with interchangeable backends:
+     `ThreadServerRunner` (default) and `ProcessServerRunner` (isolated).
+   - Implemented `McpProcessSupervisor` (`spawn`), headless
+     `pypost.core.mcp_worker_process`, and IPC
+     (`START` / `UPDATE_VARIABLES` / `HEARTBEAT` / `STOP`, plus gated `DEBUG_*`).
+   - Operator setting: `AppSettings.mcp_execution_mode = "thread" | "process"`
+     (default `thread`), wired into `MCPServerRegistry` from the GUI controller and
+     daemon runtime.
+   - Bounded stop: IPC `STOP` → `SIGTERM` (`terminate`) → `SIGKILL` (`kill`) within
+     ~2.0s (`DEFAULT_STOP_BUDGET_S`).
+   - Developer contracts and usage:
+     [`mcp_process_isolation.md`](mcp_process_isolation.md).
+   - Acceptance tests:
+     [`tests/test_mcp_process_isolation_repro.py`](../../tests/test_mcp_process_isolation_repro.py).

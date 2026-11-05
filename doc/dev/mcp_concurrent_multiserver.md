@@ -43,6 +43,11 @@ multi-server operations:
    ([`tests/test_mcp_multiserver_stress_10x.py`](../../tests/test_mcp_multiserver_stress_10x.py))
    covering barrier startup, namespace isolation under load, TCP RST drops, and immediate socket
    reclamation.
+8. **Process vs Thread Execution Mode (PYPOST-1439)**: Operators can select
+   `mcp_execution_mode` (`thread` default, or `process`) so standalone servers run under
+   `McpProcessSupervisor` with spawn-isolated workers, IPC variable snapshots, and
+   STOP→SIGTERM→SIGKILL reclamation. Contracts and debug env gates are documented in
+   [`mcp_process_isolation.md`](mcp_process_isolation.md).
 
 ---
 
@@ -580,5 +585,6 @@ make check
 - [Multiple Independent MCP Servers (PYPOST-1044)](mcp_server_registry.md)
 - [Cancellation Architecture (PYPOST-1437)](../../ai-tasks/PYPOST-1437/20-architecture.md)
 - [Multi-Process Supervisor Evaluation (PYPOST-1438)](mcp_process_supervisor_evaluation.md)
+- [MCP Process vs Thread Execution Mode (PYPOST-1439)](mcp_process_isolation.md)
 - [Adaptive Backoff Thread Join Implementation](file:///home/src/pypost/core/cancellation.py)
 - [Ephemeral TCP Port Allocation Helper](file:///home/src/tests/helpers/port_allocation.py)

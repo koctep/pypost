@@ -332,6 +332,11 @@ class MCPServerImpl:
         variables = self._build_execution_variables(
             args, env_vars, hidden_keys, overridable_keys, request_data=request_data
         )
+        from pypost.core.mcp_test_echo import maybe_echo_execution_variables
+
+        echoed = maybe_echo_execution_variables(variables)
+        if echoed is not None:
+            return echoed
         return self._create_request_service().execute(
             request_data, variables, hidden_keys=hidden_keys
         )
