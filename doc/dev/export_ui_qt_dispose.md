@@ -1,4 +1,4 @@
-# Export UI Qt Dispose / Teardown (PYPOST-1315)
+# Export UI Qt Dispose / Teardown (PYPOST-1315 / PYPOST-1357)
 
 ## Overview
 
@@ -13,11 +13,16 @@ Shared helpers in `tests/helpers/qt_widget_dispose.py` implement the dispose con
 `tests/test_environment_export_ui.py` and `tests/test_collection_export_ui.py`. Production
 export paths under `pypost/` are unchanged.
 
+| Ticket | Scope |
+| --- | --- |
+| PYPOST-1315 | Shared `dispose_qt_root` / collections wrapper; env-export registry + autouse; env teardown repro |
+| PYPOST-1357 | Collections registry + autouse (missed-`finally` guard); collections teardown repro (A / R-autouse / B) |
+
 Related crash classes (do not conflate):
 
 | Class | Doc / ticket | Relation |
 | --- | --- | --- |
-| Export UI incomplete dispose | This page / PYPOST-1315 | Post-PASS worker death after green assertions |
+| Export UI incomplete dispose | This page / PYPOST-1315 / PYPOST-1357 | Post-PASS worker death after green assertions |
 | Large-batch `apply_theme` | [gui_batch_segfault.md](gui_batch_segfault.md) / PYPOST-1212 | Mid-batch style engine; reuse subprocess evidence patterns only |
 | Presenter async lifecycle | [presenter_teardown.md](presenter_teardown.md) / PYPOST-1256 | Collections `teardown()` fences import; still needs widget dispose after |
 | Window activation harness | [qt_activation_helper.md](qt_activation_helper.md) | Uses `processEvents` only; weaker than export dispose (see Troubleshooting) |
@@ -28,15 +33,18 @@ Related crash classes (do not conflate):
 | --- | --- | --- |
 | `dispose_qt_root` | `tests/helpers/qt_widget_dispose.py` | Close → pump → `deleteLater` → drain DeferredDelete → pump |
 | `dispose_collections_export_fixture` | same | Presenter `teardown` → detach tree model → dispose panel |
-| Env export fixture | `tests/test_environment_export_ui.py` | Autouse cleanup calls `dispose_qt_root` on created roots |
-| Collection export tests | `tests/test_collection_export_ui.py` | `finally` calls `dispose_collections_export_fixture` |
-| Contract repro | `tests/test_environment_export_ui_teardown_repro.py` | Asserts disposed roots are invalid / not in `topLevelWidgets()` |
+| Env export fixture | `tests/test_environment_export_ui.py` | `_created_widgets` registry + autouse `dispose_qt_root` |
+| Collection export suite | `tests/test_collection_export_ui.py` | `_created_presenters` registry + autouse `dispose_collections_export_fixture`; product tests still call dispose in `finally` (belt-and-suspenders) |
+| Env contract repro | `tests/test_environment_export_ui_teardown_repro.py` | Asserts disposed roots are invalid / not in `topLevelWidgets()` |
+| Collections contract repro | `tests/test_collection_export_ui_teardown_repro.py` | A-complete / A-incomplete / R-autouse / B (see below) |
 | Module `qapp` | `tests/conftest.py` | Must remain alive for the whole dispose sequence |
 
 ```mermaid
 flowchart LR
   Test["Export UI test body"] --> Root["Top-level QWidget / panel"]
-  Test --> Dispose["dispose_qt_root / dispose_collections_export_fixture"]
+  Test --> Registry["Module registry\n_created_widgets / _created_presenters"]
+  Registry --> Autouse["autouse fixture teardown"]
+  Autouse --> Dispose["dispose_qt_root /\ndispose_collections_export_fixture"]
   Dispose --> QApp["module-scoped qapp"]
   Dispose --> DD["sendPostedEvents DeferredDelete"]
   DD --> Exit["Worker exits 0 after last PASS"]
@@ -46,6 +54,11 @@ flowchart LR
 process DeferredDelete for roots such as `EnvironmentListWidget`. After `deleteLater`, call
 `QCoreApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)` so `shiboken6.isValid`
 becomes false before process exit.
+
+**Why registry + autouse (not `finally` alone):** a missed `finally` leaves the close-only
+production `teardown()` path and is a classic post-PASS SIGSEGV class (PYPOST-1315 TD-5 /
+PYPOST-1357 R-autouse). Both export suites register roots at construction and dispose from an
+autouse fixture so omit-dispose still reaches the contract while `qapp` is alive.
 
 ## API / Usage
 
@@ -76,11 +89,7 @@ panel root.
 ```python
 from tests.helpers.qt_widget_dispose import dispose_collections_export_fixture
 
-try:
-    # exercise CollectionExportActions / panel UI
-    ...
-finally:
-    dispose_collections_export_fixture(presenter, qapp)
+dispose_collections_export_fixture(presenter, qapp)
 ```
 
 Order inside the helper:
@@ -107,6 +116,36 @@ def _cleanup_widgets(qapp):
         dispose_qt_root(_created_widgets.pop(), qapp)
 ```
 
+### Collection export registry + autouse pattern
+
+Same shape as env export: `_make_presenter` appends to `_created_presenters`; autouse drains the
+registry with `dispose_collections_export_fixture`. Product suite tests still dispose in
+`finally` as well (idempotent double dispose); the durable missed-`finally` guard is the
+autouse path.
+
+```python
+from tests.helpers.qt_widget_dispose import dispose_collections_export_fixture
+
+_created_presenters: list[CollectionsPresenter] = []
+
+
+def _make_presenter(...):
+    presenter = CollectionsPresenter(...)
+    presenter.refresh_tree()
+    _created_presenters.append(presenter)
+    return presenter, manager
+
+
+@pytest.fixture(autouse=True)
+def _cleanup_collections_export_presenters(qapp):
+    yield
+    while _created_presenters:
+        dispose_collections_export_fixture(_created_presenters.pop(), qapp)
+```
+
+Used in `tests/test_collection_export_ui.py` and
+`tests/test_collection_export_ui_teardown_repro.py`.
+
 ### Contract after dispose
 
 - `shiboken6.isValid(root)` is false for disposed roots
@@ -117,8 +156,51 @@ Validate with:
 
 ```bash
 make test PYTEST_ARGS="tests/test_environment_export_ui_teardown_repro.py \
-  tests/test_environment_export_ui.py tests/test_collection_export_ui.py"
+  tests/test_environment_export_ui.py \
+  tests/test_collection_export_ui_teardown_repro.py \
+  tests/test_collection_export_ui.py"
 ```
+
+## Collections teardown repro (PYPOST-1357)
+
+Module: `tests/test_collection_export_ui_teardown_repro.py`.
+
+| Member | Role | Polarity |
+| --- | --- | --- |
+| **A-complete** | Full `dispose_collections_export_fixture` → desired end-state | Positive guard: panel invalid; no leftover panel / top-level `QTreeView` |
+| **A-incomplete** | Production `teardown` / close-only (no DeferredDelete drain) | **Green** negative control: asserts residual liveness *in the test body*, then disposes in `finally` so later tests stay clean |
+| **R-autouse** | Omits dispose in the test body (missed-`finally`) | Desired end-state after registry autouse; durable “missed finally still safe” guard |
+| **B** | Bounded subprocess of the nineteen-node collection export UI file | Fails only on native-crash exit codes; zero-crash matrix + dependency versions is an accepted diagnostic when live SIGSEGV is unavailable |
+
+Cause fork on the restored host was **R-autouse** (not residual incomplete dispose, not live
+env crash): A-complete and B were already green; the red→green driver was omitted dispose
+until Step 4 landed registry + autouse.
+
+### Why end-state asserts run in a separate fixture teardown (LIFO)
+
+Pytest tears fixtures down in **LIFO** order relative to setup. R-autouse must assert the
+desired end-state **after** autouse dispose has run. If the test body asserted
+`not shiboken6.isValid(panel)` immediately, the panel would still be live (dispose has not
+happened yet) and the guard would be meaningless or falsely red.
+
+The repro therefore uses two fixtures:
+
+1. `_collections_export_end_state_checks` — yields a list of callables; on teardown, runs them.
+2. `_cleanup_collections_export_presenters` (**autouse**) — **depends on** the end-state
+   fixture, so it is set up *after* and torn down *before* those checks.
+
+```text
+setup:   end_state_checks  →  autouse cleanup
+teardown (LIFO):  autouse dispose registry  →  run queued end-state asserts
+```
+
+R-autouse appends `_assert_desired_collections_dispose_end_state` to the end-state list and
+deliberately skips `dispose_collections_export_fixture` in the body. Autouse dispose runs first;
+then the queued assert confirms the panel is C++-dead.
+
+A-incomplete must **not** rely on that post-autouse assert path for its polarity: it checks
+residual liveness in the test body (before any full dispose) so the negative control stays
+meaningful after autouse exists.
 
 ## Configuration
 
@@ -130,9 +212,9 @@ already use `QT_QPA_PLATFORM=offscreen` and the shared `qapp` fixture (see
 
 - **Worker dies with `exit_code=-11` / `-7` after all tests PASSED**  
   Suspect leftover top-level widgets or undrained DeferredDelete. Confirm teardown uses
-  `dispose_qt_root` (or the collections wrapper), not `close()` / single `processEvents` only.
-  The parallel runner records this as a file failure — see
-  [parallel_test_runner.md](parallel_test_runner.md).
+  `dispose_qt_root` (or the collections wrapper) via registry autouse (and/or `finally`), not
+  `close()` / single `processEvents` only. The parallel runner records this as a file failure —
+  see [parallel_test_runner.md](parallel_test_runner.md).
 
 - **`shiboken6.isValid(widget)` stays True after cleanup**  
   `processEvents` alone is insufficient for DeferredDelete on some roots. Use
@@ -141,8 +223,14 @@ already use `QT_QPA_PLATFORM=offscreen` and the shared `qapp` fixture (see
 
 - **New GUI test creates unparented export-style roots**  
   Prefer `dispose_qt_root` over inventing another close sequence. For a full
-  `CollectionsPresenter`, call `dispose_collections_export_fixture` so production
-  `teardown()` runs before widget destruction.
+  `CollectionsPresenter`, register on `_created_presenters` (or call
+  `dispose_collections_export_fixture` so production `teardown()` runs before widget
+  destruction). Do not rely on `finally` alone.
+
+- **R-autouse / end-state assert fails with “still valid”**  
+  Asserting desired end-state in the test body runs *before* autouse dispose. Queue the assert
+  through `_collections_export_end_state_checks` (or an equivalent fixture that tears down
+  *after* the dispose autouse via LIFO dependency).
 
 - **`ActivatedWindow` / `qt_activation` still uses `processEvents` only**  
   That harness is a different helper; aligning it with DeferredDelete drain is tracked
