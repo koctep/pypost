@@ -337,6 +337,12 @@ sequenceDiagram
 - **Graceful State Degradation**: The collided server transitions directly to `state="failed"`.
   The error message is formatted via `format_mcp_bind_error` and includes the port number and bind
   resolution guidance.
+- **Failure vs thread cleanup (PYPOST-1362)**: `start_failed` / registry `failed` can precede the
+  worker finishing `_run_uvicorn`’s `finally`. `is_running()` is False as soon as `_start_error`
+  is set (PYPOST-1436). When the worker returns, it clears `_server_thread` if it is the current
+  thread so settled bookkeeping matches “not running”. Tests wait for `failed`, then use a
+  **bounded** poll until `not is_running(...)` before isolation asserts — no unbounded sleeps,
+  and the hard “not running” assert remains.
 - **Log Hygiene**: Error logs emit `mcp_server_start_failed` at `ERROR` level without leaking
   credentials or secret variables.
 - **Peer Server Isolation**: Running peer servers (such as Server 1 in the diagram) experience zero
@@ -461,10 +467,11 @@ polling to dynamically balance rapid termination response with minimal CPU overh
    ```
    The function returns `False`. In
    [`MCPServerManager.stop_server`](file:///home/src/pypost/core/qt/mcp_server.py),
-   `self._server_thread` is only set to `None` if `not self._server_thread.is_alive()`. When a
-   join times out, the thread reference is preserved so that `is_running() == True` remains
-   truthful, preventing premature port rebinding while the orphaned worker still holds the
-   listen socket.
+   join uses a local thread snapshot (the worker may clear `_server_thread` on its own exit —
+   PYPOST-1362). The manager sets `_server_thread = None` only when that snapshot is no longer
+   alive. When a join times out, the thread reference is preserved so that
+   `is_running() == True` remains truthful, preventing premature port rebinding while the
+   orphaned worker still holds the listen socket.
 
 ### Teardown Contracts
 

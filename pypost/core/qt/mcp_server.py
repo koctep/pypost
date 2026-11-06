@@ -207,17 +207,20 @@ class MCPServerManager(QObject):
             else None
         )
         joined = True
-        if self._server_thread:
+        server_thread = self._server_thread
+        if server_thread is not None:
             # Adaptive join polling with progressive backoff.
             # Keep the ref if join times out so is_running() stays truthful while
             # the orphaned worker still holds the listen socket (PYPOST-1196).
+            # The worker may clear ``_server_thread`` on its own exit (PYPOST-1362);
+            # join against the local ref so that race cannot AttributeError.
             joined = adaptive_thread_join(
-                self._server_thread,
+                server_thread,
                 timeout=timeout,
                 token=token,
                 thread_name=f"mcp-server-{self._current_port}",
             )
-            if not self._server_thread.is_alive():
+            if not server_thread.is_alive():
                 self._server_thread = None
 
         if self._cancellation_source is not None:
@@ -352,3 +355,8 @@ class MCPServerManager(QObject):
             elif not self._stop_event.is_set() and self._startup_notified:
                 logger.warning("mcp_server_unexpected_exit")
                 self.status_changed.emit(False)
+            # Drop the worker self-ref on exit so failed/stopped bookkeeping matches
+            # thread liveness once ``run()`` returns (PYPOST-1362). Stop paths that
+            # join from another thread also clear when ``is_alive()`` is false.
+            if self._server_thread is threading.current_thread():
+                self._server_thread = None

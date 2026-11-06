@@ -39,7 +39,9 @@ This class acts as the bridge between the PySide6 UI and the background MCP serv
     about server state. `status_changed(True)` is emitted only after uvicorn completes
     `startup()` (socket bound and listening), not when the worker thread starts
     (PYPOST-556). Bind failures emit `start_failed(str)` with an operator-facing message and
-    `status_changed(False)`.
+    `status_changed(False)`. `is_running()` is False once `_start_error` is set; the worker
+    clears `_server_thread` on exit so failure bookkeeping settles with thread liveness
+    (PYPOST-1362).
 *   **Tool-set restart (PYPOST-1178 / PYPOST-1196)**: `update_tools()` stops then starts on the same
     host/port when the exposed-tool signature changes. Between `stop_server()` and
     `start_server()`, `_wait_until_port_bindable()` polls (default 10.0s, 50ms sleep) until a
