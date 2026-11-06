@@ -340,9 +340,17 @@ In [`MCPServerRegistry`](file:///home/src/pypost/core/mcp_server_registry.py):
 - **Standalone Reference Reconciliation (`reconcile_references`)**:
   - Previously, `reconcile_references()` assumed all local servers require workspace collections and workspace environments, stopping library servers without workspace environments with `"cannot run: missing environment"`.
   - Under the standalone architecture, `reconcile_references()` introduces dedicated branches:
-    - **Library servers (`configuration.library_id`)**: checks if the library connection exists via `self.library_service.get_connection(configuration.library_id)`. If `configuration.environment_id is None`, it logs `mcp_registry_reconcile_standalone_library_server` (`skipping_environment_check=True`) and skips the workspace environment check. If `environment_id` is explicitly set, it validates existence against valid environment IDs.
+    - **Library servers (`configuration.library_id`, non-Built-in)**: checks the library
+      connection via `self.library_service.get_connection` **and** that the selected library
+      collection still resolves (`_ordinary_library_collection_resolves`, aligned with
+      `LibraryRuntimeResolver` readability checks — PYPOST-1347). If
+      `configuration.environment_id is None`, it logs
+      `mcp_registry_reconcile_standalone_library_server`
+      (`skipping_environment_check=True`) and skips the workspace environment check. If
+      `environment_id` is set, it validates existence against valid environment IDs.
+      Workspace `valid_collection_ids` are never consulted for these rows.
     - **Bundled library servers (`configuration.bundled_library`)**: if `configuration.environment_id is None`, it logs `mcp_registry_reconcile_standalone_bundled_server` and skips workspace environment verification.
-  - **Architectural Invariant**: Standalone MCP servers remain preserved and operational across workspace environment deletions, pruning, and modifications.
+  - **Architectural Invariant**: Standalone MCP servers remain preserved and operational across workspace environment deletions, pruning, and modifications. Ordinary library rows with a selected workspace environment additionally keep layered env refresh via `LibraryRuntimeResolver` (see [Ordinary library lifecycle](mcp_server_registry.md#ordinary-library-lifecycle-pypost-1347)).
 - **Server Startup & Supervision**:
   - `start(instance_id)`: logs `mcp_registry_start_requested` with `environment_id` and `standalone=True/False`.
   - `_runtime_inputs(configuration)`: delegates to `LibraryRuntimeResolver.resolve` with `configuration.environment_id` (`None` for standalone servers). Returns `None` only if a workspace collection server is missing its required `collection_id` or `environment_id`.

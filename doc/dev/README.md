@@ -126,7 +126,7 @@ conventions.
 1. [Shared empty-row Key/Value table (PYPOST-1186)](empty_row_key_value_table.md)
 1. [MCP Reverse Proxy (PYPOST-1092)](mcp_proxy.md)
 1. [MCP Server Custom Headers Editor (PYPOST-1104)](mcp_server_headers_editor.md)
-1. [Multiple independent MCP servers (PYPOST-1044)](mcp_server_registry.md)
+1. [Multiple independent MCP servers (PYPOST-1044) — includes ordinary library lifecycle (PYPOST-1347)](mcp_server_registry.md)
 1. [Standalone MCP Server Configuration and Execution (PYPOST-1410)](collection_scoped_variables.md#standalone-mcp-server-configuration-and-execution-pypost-1410)
 1. [Standalone MCP Server Live Wire IPC & Stdio Transport Stress Testing (PYPOST-1416)](mcp_standalone_wire_ipc_stress.md)
 1. [Concurrent Multi-Server Lifecycle Execution and Port Contention (PYPOST-1418)](mcp_concurrent_multiserver.md)

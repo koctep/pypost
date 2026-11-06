@@ -736,7 +736,9 @@ while retaining the workspace copy. Copies no longer receive shipped updates.
 
 There is no migration of existing workspace or Library servers. Missing marker fields will
 default to `False`, and `library_id` precedence over a stale `collection_id` will remain intact.
-Ordinary-library lifecycle repairs belong to independent Debt PYPOST-1347.
+Ordinary-library lifecycle repairs (reconcile collection resolve, reconfigure validation, and
+`LibraryRuntimeResolver` env refresh) are documented under
+[Ordinary library lifecycle (PYPOST-1347)](mcp_server_registry.md#ordinary-library-lifecycle-pypost-1347).
 
 ### Packaging Implementation and Verification (PYPOST-1348)
 

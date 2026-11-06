@@ -86,6 +86,25 @@ partially installed row. Normal workspace rows and upstream proxy rows retain
 their existing save and runtime paths; library-only identity and overlay logic
 is not applied to them.
 
+#### Ordinary library lifecycle (PYPOST-1347)
+
+Ordinary (non-Built-in) library rows persist `library_id` / `manifest_id` /
+`library_collection_path` with `collection_id=None` and `bundled_library=False`.
+Debt [PYPOST-1347](https://pypost.atlassian.net/browse/PYPOST-1347) widens the
+library-sourced branches delivered for Built-in rows (PYPOST-1352) so ordinary
+library endpoints share the same lifecycle seams:
+
+| Operation | Ordinary library behavior |
+| --- | --- |
+| `reconcile_references` | Ignores workspace `valid_collection_ids`. Stays running when the library connection exists, the selected library collection still resolves (manifest membership + readable file via `_ordinary_library_collection_resolves`), and the selected environment remains valid. Stops with `missing library`, `missing library collection`, or `missing environment` only when those inputs are gone. |
+| `_validate_replacement_references` / `reconfigure` | Requires a connected library **and** a resolvable library collection (not a workspace `collection_id`). |
+| `refresh_environment` | Re-enters `LibraryRuntimeResolver` with `library_service` and `candidate_overlay=None` (same shape as `_runtime_inputs` / fresh `start`), so manifest defaults, presets, and overlay layers survive workspace env edits. Workspace-only rows still use raw `environment.variables`. |
+
+Built-in rows keep the curated `BuiltinCollectionView` + `_BundledLibraryAdapter` +
+empty-overlay path. Workspace rows keep collection-id membership and raw env refresh.
+Focused coverage: `tests/test_mcp_library_lifecycle.py` (and Built-in
+`tests/test_mcp_builtin_lifecycle.py` must stay green).
+
 #### Planned Variable Setup Wizard (PYPOST-1284)
 
 Epic [PYPOST-1284](https://pypost.atlassian.net/browse/PYPOST-1284) enhances library variable
@@ -407,9 +426,13 @@ probe-bindable before starting again, retaining the worker thread ref if stop’
 join times out (PYPOST-1178 / PYPOST-1196; see
 [MCP Integration](mcp_integration.md)). `refresh_environment()` replaces the
 variables and hidden-key suppliers only for servers that selected that
-environment.
-`reconcile_references()` stops and marks only rows whose persisted collection
-or environment was deleted.
+environment. Library-sourced rows (`configuration.library_id` set) rebuild the
+snapshot through `LibraryRuntimeResolver` (Built-in adapter vs ordinary
+`library_service`); workspace rows keep raw environment variables.
+`reconcile_references()` stops and marks only rows whose persisted inputs were
+removed — workspace collection/environment membership for workspace rows;
+library connection + library collection resolve + environment for ordinary
+library rows; curated Built-in path + environment for Built-in rows.
 
 ## Legacy migration
 
@@ -427,7 +450,12 @@ Registry lifecycle logs include only stable operational context:
 `instance_id`, `port`, lifecycle state, and whether a message exists. They do
 not log collection names, environment values, hidden keys, credentials, or
 request payloads. Failed transactional replacements emit a warning with the
-attempted port and reason.
+attempted port and reason. Ordinary-library lifecycle (PYPOST-1347) adds
+`mcp_registry_ordinary_library_collection_unresolved` (DEBUG) before a
+collection-miss stop, `mcp_registry_refresh_library_environment` (DEBUG) after
+a successful library refresh resolve (`variable_count` only), and
+`mcp_registry_refresh_library_environment_failed` (WARNING) when resolve raises
+during refresh.
 
 The registry covers the endpoint **runtime**; `McpServerSettingsController`
 covers **persistence** — `mcp_persisted_servers_loaded` at startup,
@@ -465,12 +493,14 @@ for the metric contract.
 | A library selection is rejected | Reopen the editor and refresh connected libraries. Check that the connection, manifest ID, collection path, and selected workspace Environment ID still exist. The editor intentionally does not substitute a different collection or profile. |
 | A library discovery result is missing | Check whether the dialog was cancelled or the source/library changed while the worker was running. Cancelled or stale results are discarded; start discovery again. |
 | Library variables are unavailable at runtime | Supply required values through the selected profile, local override, or local secret field. Secret values are masked in the UI and stored only in the local overlay. |
+| Ordinary library row stops after Environment Manager / collection sync | Check the row message: `missing library collection` means the library file or manifest path no longer resolves; `missing library` means the connection is gone; `missing environment` means the selected workspace environment was deleted. Workspace collection-id changes alone must not stop ordinary library rows. |
+| Ordinary library env refresh drops manifest defaults (e.g. `base_url`) | Confirm the row has `library_id` set. Refresh must re-resolve via `LibraryRuntimeResolver`; raw workspace variables alone are only for workspace rows. See `tests/test_mcp_library_lifecycle.py`. |
 
 For comprehensive multi-server concurrency, variable isolation, hot reload, and port contention contracts, see [Concurrent Multi-Server Lifecycle Execution and Port Contention](mcp_concurrent_multiserver.md).
 
 Run the focused checks after changing this subsystem:
 
 ```bash
-make test PYTEST_ARGS='tests/test_server_bind_errno.py tests/test_mcp_server_registry.py tests/test_mcp_servers_dialog.py tests/test_mcp_servers_dialog_variable_wizard_repro.py tests/test_mcp_standalone_wire_ipc_repro.py tests/test_mcp_concurrent_multiserver_repro.py tests/test_mcp_concurrent_teardown.py'
+make test PYTEST_ARGS='tests/test_server_bind_errno.py tests/test_mcp_server_registry.py tests/test_mcp_library_lifecycle.py tests/test_mcp_builtin_lifecycle.py tests/test_mcp_servers_dialog.py tests/test_mcp_servers_dialog_variable_wizard_repro.py tests/test_mcp_standalone_wire_ipc_repro.py tests/test_mcp_concurrent_multiserver_repro.py tests/test_mcp_concurrent_teardown.py'
 ```
 
