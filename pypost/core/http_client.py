@@ -49,6 +49,25 @@ def _headers_accept_event_stream(headers: Dict[str, str]) -> bool:
     return "text/event-stream" in accept.lower()
 
 
+def _assert_no_dot_path_segments(url: str) -> None:
+    """Raise ExecutionError if any rendered URL path segment is '.' or '..'.
+
+    Empty path segments (from a leading slash or '//') are ignored here; blank
+    segment rejection is owned by PYPOST-1332. Percent-encoded lookalikes such
+    as '%2e' are out of scope for PYPOST-1346.
+    """
+    path = urlsplit(url).path
+    for segment in path.split("/"):
+        if not segment:
+            continue
+        if segment in (".", ".."):
+            raise ExecutionError(
+                category=ErrorCategory.TEMPLATE,
+                message="Rejected request URL path segment.",
+                detail=f"Path segment {segment!r} is not allowed.",
+            )
+
+
 @dataclass(frozen=True)
 class HTTPRequestResult:
     """HTTP transport outcome plus resolved request fields for history reuse."""
@@ -119,6 +138,15 @@ class HTTPClient:
             if rendered_url is not None
             else self._render_request_field(request_data.url, variables)
         )
+        try:
+            _assert_no_dot_path_segments(url)
+        except ExecutionError:
+            logger.error(
+                "dot_path_segment_rejected method=%s url=%r",
+                request_data.method,
+                self._template_error_log_url(url, variables),
+            )
+            raise
 
         headers = {}
         for k, v in request_data.headers.items():

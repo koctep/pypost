@@ -120,7 +120,7 @@ python scripts/verify_test_log_guardrails.py pytest.log
    - **Prefix-Only Rule**: Matches if `rule.logger` is omitted and `entry.message` contains or
      starts with `rule.message_prefix` regardless of logger name.
 4. **Count Budget Enforcement**: Verifies that total error count does not exceed
-   `baseline_error_count + error_margin` (e.g., 146 + 5 = 151).
+   `baseline_error_count + error_margin` (e.g., 164 + 5 = 169).
 5. **Exit Status**:
    - `0`: PASS — all error records match allowlist rules and total count is within budget.
    - `1`: FAIL — unlisted error lines detected or total error count exceeds maximum allowed.
@@ -130,7 +130,7 @@ python scripts/verify_test_log_guardrails.py pytest.log
 ### Structure
 
 ```yaml
-baseline_error_count: 146
+baseline_error_count: 164
 error_margin: 5
 
 rules:
@@ -153,7 +153,8 @@ rules:
 - `pypost.core.encryption_migration`: `encryption_migration_*` (migration error paths)
 - `pypost.core.mcp_client_service`: `mcp_operation_failed`, `mcp_operation_timeout`
 - `pypost.core.mcp_proxy_server_impl`: `mcp_proxy_*` (reverse proxy error handling)
-- `pypost.core.http_client`: `http_*`, `yaml_to_json_*`, `template_integer_*`
+- `pypost.core.http_client`: `http_*`, `yaml_to_json_*`, `template_integer_*`,
+  `dot_path_segment_*`
 - `pypost.core.key_provider`: `encryption_key_*` (missing key scenarios)
 - `pypost.core.environment_secrets_codec`: `env_value_decrypt_failed`
 - `pypost.core.qt.*_worker`: `*_worker_failed` (background worker failure paths)

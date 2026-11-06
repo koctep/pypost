@@ -875,5 +875,120 @@ class TestHTTPClientResponseBodyCap(unittest.TestCase):
         self.metrics.track_response_body_truncated.assert_not_called()
 
 
+class TestHTTPClientDotPathSegmentRejection(unittest.TestCase):
+    """PYPOST-1346: refuse `.` / `..` path segments before dispatch."""
+
+    def setUp(self):
+        self.client = HTTPClient(
+            metrics=MagicMock(), template_service=TemplateService()
+        )
+        self.mock_session = MagicMock()
+        self.client.session = self.mock_session
+
+    def _assert_dot_segment_rejected(self, exc: ExecutionError, segment: str) -> None:
+        self.assertEqual(ErrorCategory.TEMPLATE, exc.category)
+        combined = f"{exc.message} {exc.detail or ''}".lower()
+        self.assertIn(segment, combined)
+        self.assertTrue(
+            "path" in combined or "segment" in combined,
+            f"expected path-segment rejection wording, got {exc!r}",
+        )
+
+    def test_prepare_rejects_literal_dot_segments_in_url(self):
+        for segment in (".", ".."):
+            with self.subTest(segment=segment):
+                req = RequestData(
+                    method="GET",
+                    url=f"http://example.test/api/repos/{segment}/user",
+                )
+                with self.assertRaises(ExecutionError) as ctx:
+                    self.client._prepare_request_kwargs(req, {})
+                self._assert_dot_segment_rejected(ctx.exception, segment)
+
+    def test_send_request_rejects_urlencode_dot_owner_and_never_dispatches(self):
+        for segment in (".", ".."):
+            with self.subTest(segment=segment):
+                self.mock_session.request.reset_mock()
+                req = RequestData(
+                    method="GET",
+                    url=(
+                        "http://example.test/repos/"
+                        "{{ urlencode(owner) }}/x"
+                    ),
+                )
+                with self.assertRaises(ExecutionError) as ctx:
+                    self.client.send_request(
+                        req, variables={"owner": segment}
+                    )
+                self._assert_dot_segment_rejected(ctx.exception, segment)
+                self.mock_session.request.assert_not_called()
+
+    def test_dot_path_rejection_logs_safe_http_context(self):
+        request = RequestData(
+            method="GET",
+            url="http://example.test/repos/{{ urlencode(owner) }}/x",
+        )
+
+        with self.assertLogs("pypost.core.http_client", level="ERROR") as logs:
+            with self.assertRaises(ExecutionError) as ctx:
+                self.client.send_request(request, variables={"owner": ".."})
+
+        self._assert_dot_segment_rejected(ctx.exception, "..")
+        joined = "\n".join(logs.output)
+        self.assertIn("dot_path_segment_rejected method=GET", joined)
+        self.assertIn("http://example.test", joined)
+        self.assertNotIn("/repos/", joined)
+        self.assertNotIn("..", joined.split("url=", 1)[-1])
+        self.mock_session.request.assert_not_called()
+
+    def test_dot_path_rejection_log_omits_sensitive_url_parts_and_bounds_origin(self):
+        long_host = "a" * (ERROR_LOG_URL_MAX_LENGTH + 100) + ".test"
+        request = RequestData(
+            method="GET",
+            url=(
+                f"https://username:password@{long_host}/account-owner-123/"
+                "{{ urlencode(owner) }}"
+                "?email=person@example.test&tracking=private-value"
+                "#session-private"
+            ),
+        )
+
+        with self.assertLogs("pypost.core.http_client", level="ERROR") as logs:
+            with self.assertRaises(ExecutionError):
+                self.client.send_request(request, variables={"owner": "."})
+
+        joined = "\n".join(logs.output)
+        self.assertIn("dot_path_segment_rejected", joined)
+        self.assertNotIn("username:password", joined)
+        self.assertNotIn("account-owner-123", joined)
+        self.assertNotIn("person@example.test", joined)
+        self.assertNotIn("private-value", joined)
+        self.assertNotIn("session-private", joined)
+        self.assertNotIn("?email=", joined)
+        self.assertLessEqual(
+            len(HTTPClient._template_error_log_url(request.url, {})),
+            ERROR_LOG_URL_MAX_LENGTH,
+        )
+        self.mock_session.request.assert_not_called()
+
+    def test_legitimate_dotted_segment_still_prepares(self):
+        req = RequestData(
+            method="GET",
+            url=(
+                "http://example.test/repos/"
+                "{{ urlencode(owner) }}/actions/workflows/"
+                "{{ urlencode(workflow_id) }}"
+            ),
+        )
+        kwargs, resolved = self.client._prepare_request_kwargs(
+            req, {"owner": "octocat", "workflow_id": "ci.yml"}
+        )
+        self.assertEqual(
+            "http://example.test/repos/octocat/actions/workflows/ci.yml",
+            kwargs["url"],
+        )
+        self.assertEqual(kwargs["url"], resolved.url)
+
+
 if __name__ == "__main__":
     unittest.main()

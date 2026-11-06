@@ -211,6 +211,8 @@ product-dialog companion directly locks DEBUG `ui_wait_timeout` on logger
 | `http_request_timed_out` | ERROR | `method`, `url` | `http_client` |
 | `http_request_failed` | ERROR | `method`, `url`, `detail` | `http_client` |
 | `yaml_to_json_conversion_failed` | ERROR | `method`, `url`, `detail` | `http_client` |
+| `template_integer_conversion_failed` | ERROR | `method`, `url` (origin-only) | `http_client` |
+| `dot_path_segment_rejected` | ERROR | `method`, `url` (origin-only) | `http_client` |
 | `worker_run_started` | DEBUG | `method`, `url`, `request_id` | `qt/worker` |
 | `worker_run_completed` | DEBUG | `method`, `url`, `stopped` | `qt/worker` |
 | `worker_run_cancelled` | DEBUG | `method`, `url` | `qt/worker` |
@@ -623,6 +625,7 @@ Update this document when adding new domains or stable public events operators r
 
 | Document | Topic |
 | --- | --- |
+| [http_path_segment_rejection.md](http_path_segment_rejection.md) | `.` / `..` path reject + `dot_path_segment_rejected` (PYPOST-1346) |
 | [observability_audit.md](observability_audit.md) | Audit summary, metrics, MCP activity, gaps |
 | [agent_lifecycle.md](agent_lifecycle.md) | Agent launch → ready → shutdown (PYPOST-833) |
 | [agent_e2e_seed.md](agent_e2e_seed.md) | Agent e2e seeded workspace (PYPOST-857) |

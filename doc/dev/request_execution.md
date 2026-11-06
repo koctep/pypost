@@ -12,6 +12,11 @@ URL templates are rendered **once per HTTP request** inside `HTTPClient.send_req
 1. `render_string(request.url, variables)` resolves the URL once per send.
 2. `_prepare_request_kwargs(..., rendered_url=url)` reuses that value for the actual request.
 
+**Path segment rejection (PYPOST-1346):** Before headers, params, or body are prepared,
+`_prepare_request_kwargs` rejects a rendered URL whose path contains a whole segment
+exactly equal to `.` or `..` (`ExecutionError` / `ErrorCategory.TEMPLATE`). No network
+dispatch occurs. See [HTTP Path Segment Rejection](http_path_segment_rejection.md).
+
 **SSE stream handling (PYPOST-430):** After the response arrives, GET requests with
 `Content-Type: text/event-stream` are routed to SSE probe parsing (`_handle_sse_response`).
 URL path is not used for detection. When the request already includes
@@ -188,13 +193,16 @@ request_data)` use the captured tab directly. `_find_tab_for_sender` was removed
 |------|------|
 | `pypost/core/worker.py` | Background thread; calls `RequestService.execute()` |
 | `pypost/core/request_service.py` | Orchestrates MCP/HTTP, scripts, history |
-| `pypost/core/http_client.py` | HTTP transport; single URL render per send |
+| `pypost/core/http_client.py` | HTTP transport; single URL render per send; `.` / `..` path reject (PYPOST-1346) |
 | `pypost/core/mcp_client_service.py` | MCP transport; typed httpx error mapping |
 | `pypost/core/template_service.py` | Jinja2 rendering and validation |
 
 ## Tests
 
 - `tests/test_request_service.py` — `test_execute_http_does_not_pre_render_url`
-- `tests/test_http_client.py` — `test_url_template_rendered_once_per_request`
+- `tests/test_http_client.py` — `test_url_template_rendered_once_per_request`;
+  `TestHTTPClientDotPathSegmentRejection` (PYPOST-1346)
 - `tests/test_mcp_client_service.py` — httpx exception category mapping
 - `tests/test_worker_race.py` — worker stop flag and tab worker lifecycle guards
+
+See also: [HTTP Path Segment Rejection](http_path_segment_rejection.md).

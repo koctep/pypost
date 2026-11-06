@@ -225,9 +225,10 @@ in the secret `gitlab_token` variable.
   path segment (`src/app/main.py` → `src%2Fapp%2Fmain.py`, `feature/x` → `feature%2Fx`).
   Query values such as `ref` and `search` are sent as raw values and encoded once by
   the HTTP client.
-- Limitation: a file path, branch or SHA that is exactly `.` or `..` is not supported,
-  because dots are not encoded and such a dot segment may be normalised away. Git does
-  not allow these names, so valid input does not reach this case.
+- A file path, branch, SHA, or project path segment that is exactly `.` or `..` is
+  rejected before any HTTP request is sent (fail-closed). Legitimate names that merely
+  contain dots (for example `a.md` or `../x` rendered as `..%2Fx`) are unchanged. Git
+  does not allow `.` / `..` as names, so valid input does not hit this case.
 
 ## GitLab coverage vs gaps
 
@@ -338,8 +339,9 @@ in the secret `github_token` variable.
   values and encoded once by the HTTP client. `labels` is a comma-separated string when
   listing issues, but a JSON array of strings when creating or updating an issue (an
   empty array clears all labels).
-- Limitation: an owner, repository or workflow file name that is exactly `.` or `..` is
-  not supported, because dots are not encoded. GitHub does not allow these names.
+- An owner, repository, or workflow file name that is exactly `.` or `..` is rejected
+  before any HTTP request is sent (fail-closed). Legitimate names that merely contain
+  dots (for example `ci.yml`) are unchanged. GitHub does not allow `.` / `..` as names.
 
 ## GitHub coverage vs gaps
 
