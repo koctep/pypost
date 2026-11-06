@@ -2,9 +2,11 @@
 
 The stub accepts every request, records its raw (still percent-encoded) path,
 its parsed query, the ``Authorization``, ``Accept``, ``X-GitHub-Api-Version`` and
-``Content-Type`` headers and the decoded JSON body, and answers ``200`` with a
-small JSON document. Assertions live in the test, so a wrong path or query shows
-up as a precise diff instead of a stub-side 404.
+``Content-Type`` headers and the decoded JSON body. Most paths answer ``200`` with
+a small JSON document. Actions write suffixes that GitHub documents as empty-body
+successes answer without a body: ``/rerun`` → 201, ``/cancel`` → 202,
+``/dispatches`` → 204 (PYPOST-1345). Assertions live in the test, so a wrong path
+or query shows up as a precise diff instead of a stub-side 404.
 """
 
 from __future__ import annotations
@@ -22,6 +24,13 @@ from urllib.parse import parse_qs, urlsplit
 _HOST = "127.0.0.1"
 _SERVER_THREAD_JOIN_TIMEOUT_SECONDS = 2.0
 _MAX_BODY_BYTES = 64 * 1024
+
+# Documented empty-body success statuses for GitHub Actions write path suffixes.
+_EMPTY_BODY_SUCCESS_BY_SUFFIX: tuple[tuple[str, int], ...] = (
+    ("/rerun", 201),
+    ("/cancel", 202),
+    ("/dispatches", 204),
+)
 
 
 @dataclass(frozen=True)
@@ -56,6 +65,14 @@ def _json_bytes(payload: Any) -> bytes:
     return json.dumps(payload, separators=(",", ":")).encode("utf-8")
 
 
+def _empty_body_success_status(path: str) -> int | None:
+    """Return the documented empty-body success status for an Actions write path."""
+    for suffix, status in _EMPTY_BODY_SUCCESS_BY_SUFFIX:
+        if path.endswith(suffix):
+            return status
+    return None
+
+
 @contextmanager
 def stub_github_mcp_collection_http() -> Iterator[GitHubMcpCollectionHttpStub]:
     """Run a capture-everything GitHub stand-in on a loopback ephemeral port."""
@@ -88,6 +105,12 @@ def stub_github_mcp_collection_http() -> Iterator[GitHubMcpCollectionHttpStub]:
             )
             with capture_lock:
                 captured_requests.append(captured)
+            empty_status = _empty_body_success_status(parsed.path)
+            if empty_status is not None:
+                self.send_response(empty_status)
+                self.send_header("Content-Length", "0")
+                self.end_headers()
+                return
             content = _json_bytes({"id": 1, "offline": True})
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
