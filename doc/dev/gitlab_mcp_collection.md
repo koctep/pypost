@@ -217,9 +217,10 @@ method-labelled MCP metrics. The tool name appears in the MCP activity log only.
 - The token travels only in `Authorization`. The sanitizer masks that header and
   `Bearer` values, and hidden-key value redaction covers MCP tool output.
 - Rendered URLs carry project paths, file paths and search terms, but no secrets.
-  Some generic log events print the rendered URL without sanitizing it:
-  `response_body_truncated` ([PYPOST-1122](https://pypost.atlassian.net/browse/PYPOST-1122)),
-  `sse_stream_detected`, `retryable_error` and `retry_exhausted`
+  `response_body_truncated` sanitizes its URL field
+  ([PYPOST-1122](https://pypost.atlassian.net/browse/PYPOST-1122)). Some other generic log
+  events still print the rendered URL without sanitizing it: `sse_stream_detected`,
+  `retryable_error` and `retry_exhausted`
   ([PYPOST-1333](https://pypost.atlassian.net/browse/PYPOST-1333)).
 - `gitlab_get_file` returns raw file content as decoded text. Large responses are cut by
   the generic `max_response_bytes` cap and logged as `response_body_truncated`.
@@ -257,8 +258,9 @@ imported environment or through the `gitlab_com` preset.
   for blank path-segment variables.
 - [PYPOST-1333](https://pypost.atlassian.net/browse/PYPOST-1333) — sanitize rendered URLs
   in `sse_stream_detected`, `retryable_error` and `retry_exhausted`.
-- [PYPOST-1122](https://pypost.atlassian.net/browse/PYPOST-1122) — `response_body_truncated`
-  logs the resolved URL.
+- [PYPOST-1122](https://pypost.atlassian.net/browse/PYPOST-1122) — **resolved**:
+  `response_body_truncated` WARNING URL uses `_error_log_url` (see
+  [Logging](logging.md)).
 - [PYPOST-1303](https://pypost.atlassian.net/browse/PYPOST-1303) — `make lint` does not run
   flake8 on `tests/`.
 

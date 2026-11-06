@@ -205,7 +205,7 @@ product-dialog companion directly locks DEBUG `ui_wait_timeout` on logger
 | `retry_exhausted` | WARNING | `method`, `url`, `request_name`, `retries` | `request_service` |
 | `retry_loop_invariant_failed` | ERROR | `method`, `url`, `max_retries` | `request_service` |
 | `request_complete` | DEBUG | `method`, `status`, `elapsed_ms`, `size` | `http_client` |
-| `response_body_truncated` | WARNING | `method`, `url`, `max_bytes` | `http_client` |
+| `response_body_truncated` | WARNING | `method`, `url` (sanitized), `max_bytes` | `http_client` |
 | `sse_stream_detected` | DEBUG | `method`, `url`, `content_type` | `http_client` |
 | `http_connection_failed` | ERROR | `method`, `url` | `http_client` |
 | `http_request_timed_out` | ERROR | `method`, `url` | `http_client` |
@@ -527,8 +527,9 @@ logger.error(
 
 Same for `Connection failed:` → `http_connection_failed`, `Request failed:` →
 `http_request_failed`. Use `_error_log_url()` for ERROR-level URLs (sanitized per
-[PYPOST-741](https://pypost.atlassian.net/browse/PYPOST-741)). Migrated in
-[PYPOST-751](https://pypost.atlassian.net/browse/PYPOST-751).
+[PYPOST-741](https://pypost.atlassian.net/browse/PYPOST-741)) and for the WARNING
+`response_body_truncated` URL field ([PYPOST-1122](https://pypost.atlassian.net/browse/PYPOST-1122)).
+Migrated in [PYPOST-751](https://pypost.atlassian.net/browse/PYPOST-751).
 
 ### Pattern B — ClassName: diagnostic prefix
 
