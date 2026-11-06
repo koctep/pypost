@@ -102,11 +102,15 @@ class Arg:
     type: str
     required: bool
     default: Any = None
+    enum: tuple[Any, ...] | None = None
+    items: Mapping[str, Any] | None = None
 
 
 S_REQ = Arg("string", True)
 S_OPT = Arg("string", False)
 ID_REQ = Arg("integer_or_string", True)
+_ENUM_BOOL_STRING = Arg("string", False, enum=("true", "false"))
+_ENUM_STATE_EVENT = Arg("string", False, enum=("close", "reopen"))
 _PAGINATION = {
     "page": Arg("integer_or_string", False, 1),
     "per_page": Arg("integer_or_string", False, 20),
@@ -157,7 +161,7 @@ GITLAB_TOOL_SPECS: tuple[ToolSpec, ...] = (
     ToolSpec("gitlab_get_current_user", "Identity", "GET", "/api/v4/user"),
     ToolSpec(
         "gitlab_list_projects", "Projects: search/list", "GET", "/api/v4/projects",
-        {**_opt("search", "membership"), **_PAGINATION},
+        {"search": S_OPT, "membership": _ENUM_BOOL_STRING, **_PAGINATION},
         ("search", "membership", *_PAGINATION_KEYS),
     ),
     ToolSpec("gitlab_get_project", "Projects: get by ID/path", "GET", _P),
@@ -177,7 +181,9 @@ GITLAB_TOOL_SPECS: tuple[ToolSpec, ...] = (
     ),
     ToolSpec(
         "gitlab_list_repository_tree", "Files: tree at ref", "GET", _P + "/repository/tree",
-        {**_opt("path", "ref", "recursive"), **_PAGINATION},
+        {
+            **_opt("path", "ref"), "recursive": _ENUM_BOOL_STRING, **_PAGINATION,
+        },
         ("path", "ref", "recursive", *_PAGINATION_KEYS),
     ),
     ToolSpec(
@@ -204,7 +210,10 @@ GITLAB_TOOL_SPECS: tuple[ToolSpec, ...] = (
     ),
     ToolSpec(
         "gitlab_update_issue", "Issues: update/close/reopen", "PUT", _ISSUE,
-        {"issue_iid": ID_REQ, **_opt("title", "description", "labels", "state_event")},
+        {
+            "issue_iid": ID_REQ, **_opt("title", "description", "labels"),
+            "state_event": _ENUM_STATE_EVENT,
+        },
         body_optional=("title", "description", "labels", "state_event"),
     ),
     ToolSpec(
@@ -228,7 +237,8 @@ GITLAB_TOOL_SPECS: tuple[ToolSpec, ...] = (
         "gitlab_update_merge_request", "MRs: update/close/reopen", "PUT", _MR,
         {
             "merge_request_iid": ID_REQ,
-            **_opt("title", "description", "labels", "target_branch", "state_event"),
+            **_opt("title", "description", "labels", "target_branch"),
+            "state_event": _ENUM_STATE_EVENT,
         },
         body_optional=("title", "description", "labels", "target_branch", "state_event"),
     ),
@@ -517,7 +527,12 @@ def _synthetic_request(spec: ToolSpec) -> RequestData:
         mcp_description=f"Synthetic {spec.tool}",
         mcp_params={
             name: McpToolParam(
-                type=arg.type, description=name, required=arg.required, default=arg.default
+                type=arg.type,
+                description=name,
+                required=arg.required,
+                default=arg.default,
+                enum=list(arg.enum) if arg.enum is not None else None,
+                items=dict(arg.items) if arg.items is not None else None,
             )
             for name, arg in spec.args.items()
         },
@@ -591,6 +606,10 @@ def _expected_schema(spec: ToolSpec) -> dict[str, Any]:
         )
         if arg.default is not None:
             prop["default"] = arg.default
+        if arg.enum is not None:
+            prop["enum"] = list(arg.enum)
+        if arg.items is not None:
+            prop["items"] = dict(arg.items)
         properties[name] = prop
     if spec.project_scoped:
         properties["gitlab_project"] = dict(_OVERRIDE_PROPERTY)

@@ -79,7 +79,11 @@
         "membership": {
           "type": "string",
           "description": "Optional: true limits results to projects the user is a member of; false (default) lists all visible projects.",
-          "required": false
+          "required": false,
+          "enum": [
+            "true",
+            "false"
+          ]
         },
         "page": {
           "type": "integer_or_string",
@@ -249,7 +253,11 @@
         "recursive": {
           "type": "string",
           "description": "Optional: true lists the tree recursively; false (default) lists one level.",
-          "required": false
+          "required": false,
+          "enum": [
+            "true",
+            "false"
+          ]
         },
         "page": {
           "type": "integer_or_string",
@@ -505,7 +513,11 @@
         "state_event": {
           "type": "string",
           "description": "Optional state change: close or reopen.",
-          "required": false
+          "required": false,
+          "enum": [
+            "close",
+            "reopen"
+          ]
         }
       },
       "retry_policy": null
@@ -686,7 +698,11 @@
         "state_event": {
           "type": "string",
           "description": "Optional state change: close or reopen.",
-          "required": false
+          "required": false,
+          "enum": [
+            "close",
+            "reopen"
+          ]
         }
       },
       "retry_policy": null

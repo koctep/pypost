@@ -67,6 +67,24 @@ class TestMcpParamsTable(unittest.TestCase):
         self.table.set_data(params)
         self.assertEqual(self.table.get_data(), params)
 
+    def test_round_trip_preserves_enum_and_items(self):
+        params = {
+            "event": McpToolParam(
+                type="string",
+                description="Review action",
+                required=True,
+                enum=["APPROVE", "COMMENT"],
+            ),
+            "labels": McpToolParam(
+                type="array",
+                description="Labels",
+                required=False,
+                items={"type": "string"},
+            ),
+        }
+        self.table.set_data(params)
+        self.assertEqual(self.table.get_data(), params)
+
 
 @pytest.mark.usefixtures("qapp")
 class TestRequestWidgetMcpParamSync(unittest.TestCase):
@@ -152,13 +170,13 @@ class TestRequestWidgetMcpParamSync(unittest.TestCase):
 
 
 # ---------------------------------------------------------------------------
-# PYPOST-1089 — Step 3: Failing repro tests for McpParamsTable 5-column UI
+# PYPOST-1089 / PYPOST-1342 — McpParamsTable column contract
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.usefixtures("qapp")
 class TestMcpParamsTableFiveColumns(unittest.TestCase):
-    """Failing repro for PYPOST-1089: Default column must exist at index 4."""
+    """Column layout: Default at index 4; Enum/Items at 5/6 (PYPOST-1342)."""
 
     def setUp(self):
         self.table = McpParamsTable()
@@ -168,14 +186,13 @@ class TestMcpParamsTableFiveColumns(unittest.TestCase):
         self.table.deleteLater()
 
     def test_mcp_params_table_has_five_columns(self):
-        """McpParamsTable must have 5 columns with 'Default' as the 5th header.
-
-        Currently fails because __init__ creates 4 columns only.
-        """
-        self.assertEqual(self.table.columnCount(), 5)
+        """McpParamsTable must expose Default plus Enum/Items columns."""
+        self.assertEqual(self.table.columnCount(), 7)
         header_item = self.table.horizontalHeaderItem(4)
         self.assertIsNotNone(header_item, "Column 4 header item must exist")
         self.assertEqual(header_item.text(), "Default")
+        self.assertEqual(self.table.horizontalHeaderItem(5).text(), "Enum")
+        self.assertEqual(self.table.horizontalHeaderItem(6).text(), "Items")
 
     def test_default_column_survives_rename(self):
         """Default value must survive a param rename (Name cell text change).

@@ -37,6 +37,13 @@ gitlab_mcp.json --> MCPServerImpl --> TemplateService --> HTTPClient --> request
 gitlab_mcp_rest_paths.json  <-- make check-gitlab-mcp-path-freshness (offline compare)
 ```
 
+### Closed MCP param enums (PYPOST-1342)
+
+`membership`, `recursive`, and `state_event` publish JSON Schema `enum` values
+(`true`/`false` or `close`/`reopen` as documented). Invalid caller values fail closed in
+`validate_mcp_argument_values` before HTTP. See
+[mcp_integration.md](mcp_integration.md#enum-and-array-items-pypost-1342).
+
 ### Request conventions
 
 - Request `id` is the kebab form of the tool name (`gitlab-get-file` →

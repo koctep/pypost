@@ -97,7 +97,9 @@ This class contains the actual business logic of the MCP server.
 *   **Tool metadata (PYPOST-553)**: `RequestData.mcp_description` is the agent-visible
     description (falls back to `name`). `RequestData.mcp_params` holds per-parameter
     `McpToolParam` records (`type`, `description`, `required`, `default` — PYPOST-1054, see
-    [Optional MCP parameter defaults](#optional-mcp-parameter-defaults-pypost-1054) below).
+    [Optional MCP parameter defaults](#optional-mcp-parameter-defaults-pypost-1054);
+    optional `enum` / `items` — PYPOST-1342, see
+    [Enum and array items](#enum-and-array-items-pypost-1342) below).
 *   **Schema Generation (PYPOST-1052)**: Discovers `mcp.request.VAR_NAME` placeholders
     across URL, headers, params, and body—supporting both bare (e.g. `{{ mcp.request.x }}`)
     and function-wrapped expressions (e.g. `{{ to_int(mcp.request.id) }}`)—via regex in
@@ -582,6 +584,52 @@ for the test coverage.
 
 See `ai-tasks/PYPOST-1054/60-tech-debt.md` for the full analysis.
 
+### Enum and array items (PYPOST-1342)
+
+Follow-up from [PYPOST-1334](https://pypost.atlassian.net/browse/PYPOST-1334) TD-5: published
+MCP schemas previously carried only `type`, so closed choices lived in free-text descriptions
+and arrays lacked `items` (some MCP clients reject that). PYPOST-1342 adds optional
+`enum` and `items` on `McpToolParam`.
+
+#### Model fields
+
+*   `enum: Optional[List[Any]] = None` — when set, must be a non-empty list. A declared
+    `default` must be a member of `enum`.
+*   `items: Optional[Dict[str, Any]] = None` — JSON Schema fragment for array elements
+    (typically `{"type": "string"}`). Allowed only when `type == "array"`.
+
+Omitted fields mean no extra constraint (backward compatible with existing collections).
+
+#### Schema publication
+
+`build_tool_input_schema` copies `enum` and `items` onto each property when present, so
+`list_tools` advertises standard JSON Schema keywords that strict clients expect.
+
+#### Runtime validation
+
+`validate_mcp_argument_values` still checks runtime type compatibility first. Then:
+
+*   if `spec.enum` is set, the value must be a member (`value in spec.enum`);
+*   if `type` is `array` and `spec.items` has a string `"type"`, each element must satisfy
+    `is_mcp_runtime_value_compatible(item_type, element)`.
+
+Failures raise `McpArgumentValidationError` with the parameter name and an expected-type
+label (`enum[...]` or `array items <type>`) and never embed the raw argument value.
+
+#### UI and persistence
+
+`McpParamsTable` columns **Enum** and **Items** store compact JSON. Empty cells mean
+`None`. Collection import/export uses Pydantic `model_dump` / reconstruction, so the
+fields round-trip in collection format v2 when present.
+
+#### Curated examples
+
+GitHub closed sets (`event`, `state`, `side`, `start_side`, `subject_type`, `filter`,
+`state_reason`) and string arrays (`labels`, `assignees` on create/update issue) declare
+`enum` / `items` in `examples/collections/github_mcp.json`. GitLab `state_event`,
+`membership`, and `recursive` declare `enum` in `examples/collections/gitlab_mcp.json`.
+Open-ended filters (for example workflow-run `event` names) stay free-form strings.
+
 ### Default value type validation (PYPOST-1089)
 
 `McpToolParam` validates that `default` (when not `None`) is a Python value compatible
@@ -599,6 +647,8 @@ not go looking for a `@model_validator` decorator on `McpToolParam`; there isn't
 def model_post_init(self, __context) -> None:
     if self.type not in _MCP_PARAM_TYPES:
         raise ValueError(f"Unsupported MCP param type: {self.type}")
+    self._validate_enum()
+    self._validate_items()
     self._validate_default_type()
 ```
 
@@ -907,7 +957,9 @@ Legacy SSE clients may use `http://127.0.0.1:<port>/sse/` until reconfigured.
 `McpToolParam`: `type` (`string`, `integer`, `number`, `boolean`, `array`, `object`,
 `integer_or_string`), `description`, `required` (default `True`), `default`
 (`Optional[Any]`, default `None` — PYPOST-1054; see
-[Optional MCP parameter defaults](#optional-mcp-parameter-defaults-pypost-1054)).
+[Optional MCP parameter defaults](#optional-mcp-parameter-defaults-pypost-1054)),
+optional `enum` (`Optional[List[Any]]`) and `items` (`Optional[Dict[str, Any]]`) —
+PYPOST-1342; see [Enum and array items](#enum-and-array-items-pypost-1342).
 `default` is validated against `type` at construction time — see
 [Default value type validation](#default-value-type-validation-pypost-1089) below.
 
@@ -924,20 +976,21 @@ McpSecretsPolicy.filter_agent_param_specs(...)  ← drops env-only / hidden keys
         │
         ▼
 build_tool_input_schema(specs)  → Tool.inputSchema
-                                   (publishes "default": spec.default when set, PYPOST-1054)
+                                   (publishes "default" / "enum" / "items" when set)
 ```
 
 #### UI
 
 `RequestWidget` **MCP** tab: tool description (`QPlainTextEdit`) and `McpParamsTable`
-(name, type, description, required, default). Persisted via `_PERSISTED_FIELD_NAMES` in
-`request_persisted_fields.py`.
+(name, type, description, required, default, enum, items). Persisted via
+`_PERSISTED_FIELD_NAMES` in `request_persisted_fields.py`.
 
-`McpParamsTable` (`pypost/ui/widgets/request_editor.py`) is a 5-column `QTableWidget`:
+`McpParamsTable` (`pypost/ui/widgets/request_editor.py`) is a 7-column `QTableWidget`:
 **Name**, **Type** (a `QComboBox` per row, one of `McpParamsTable._TYPE_OPTIONS` — the
 same seven types `_MCP_PARAM_TYPES` accepts in `models.py`), **Description**,
-**Required** (checkbox item), and **Default** (PYPOST-1089) — a plain-text cell holding
-the default's editable string representation.
+**Required** (checkbox item), **Default** (PYPOST-1089) — a plain-text cell holding
+the default's editable string representation — plus **Enum** and **Items**
+(PYPOST-1342) as JSON text cells (empty → `None`).
 
 ##### Default column: rename-safe by construction
 
