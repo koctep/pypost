@@ -1084,6 +1084,39 @@ def test_gitlab_prepare_allows_legitimate_file_path() -> None:
     assert "/repository/files/src%2Fapp%2Fmain.py/raw" in kwargs["url"]
 
 
+# ---------------------------------------------------------------------------
+# 6c. Blank path segments (PYPOST-1332) — fail closed before dispatch
+# ---------------------------------------------------------------------------
+
+
+def _assert_blank_path_segment_rejected(exc: ExecutionError) -> None:
+    assert exc.category == ErrorCategory.TEMPLATE
+    combined = f"{exc.message} {exc.detail or ''}".lower()
+    assert "blank" in combined or "empty" in combined, (
+        f"expected blank/empty path-segment wording, got {exc!r}"
+    )
+    assert "path" in combined or "segment" in combined, (
+        f"expected path-segment rejection wording, got {exc!r}"
+    )
+
+
+@pytest.mark.parametrize(
+    ("tool", "arg"),
+    (
+        pytest.param("gitlab_get_project", "gitlab_project", id="get-project-blank"),
+        pytest.param("gitlab_get_file", "gitlab_project", id="get-file-blank-project"),
+    ),
+)
+def test_gitlab_prepare_rejects_blank_path_segments(tool: str, arg: str) -> None:
+    collection = _load_gitlab_collection()
+    request = _request_for(collection, tool)
+    args = {**_required_args(SPECS_BY_TOOL[tool]), arg: ""}
+    variables = _execution_variables(request, args)
+    with pytest.raises(ExecutionError) as ctx:
+        _prepare(request, variables)
+    _assert_blank_path_segment_rejected(ctx.value)
+
+
 _INVALID_NUMERIC_CASES = tuple(
     pytest.param(tool, arg, value, id=f"{tool}-{arg}-{value or 'empty'}")
     for tool, arg in sorted(GITLAB_NUMERIC_PATH_IDS)

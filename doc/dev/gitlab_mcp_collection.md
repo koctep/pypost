@@ -98,12 +98,13 @@ the marker check no longer forces a scalar-last workaround.
 - Numeric path IDs use the MCP type `integer_or_string`. Their descriptions say
   "decimal string or integer". `to_int` raises `IntegerConversionError` for anything
   else, and `HTTPClient` reports it before sending.
-- Path segments that are exactly `.` or `..` (for example `file_path`, `branch`, `sha`,
-  or `gitlab_project`) are rejected in `HTTPClient._prepare_request_kwargs` before
-  dispatch (`ExecutionError` / `ErrorCategory.TEMPLATE`). Values such as `a.md` or
-  `../x` (rendered `..%2Fx`) are unchanged. See
-  [HTTP Path Segment Rejection](http_path_segment_rejection.md)
-  ([PYPOST-1346](https://pypost.atlassian.net/browse/PYPOST-1346)).
+- Path segments that are exactly `.` or `..`, or blank (for example empty
+  `gitlab_project`, `file_path`, `branch`, or `sha`), are rejected in
+  `HTTPClient._prepare_request_kwargs` before dispatch (`ExecutionError` /
+  `ErrorCategory.TEMPLATE`). Values such as `a.md` or `../x` (rendered `..%2Fx`) are
+  unchanged. See [HTTP Path Segment Rejection](http_path_segment_rejection.md)
+  ([PYPOST-1346](https://pypost.atlassian.net/browse/PYPOST-1346),
+  [PYPOST-1332](https://pypost.atlassian.net/browse/PYPOST-1332)).
 
 ## Authentication and secrets
 
@@ -125,15 +126,15 @@ the marker check no longer forces a scalar-last workaround.
   project-scoped tool publishes an optional `gitlab_project` string argument. It is a soft
   default, not a security boundary (the same model as `jira_project_key`, see
   [Jira MCP Example Project Default](jira_mcp_project_default.md)).
-- URLs stay declarative: there is no `{% if %}` fallback. A blank value with no override
-  renders `/projects//…` (GitLab answers 404). For `gitlab_get_project` it renders
-  `/api/v4/projects/`, which GitLab may treat as "list projects" (risk R2).
-- Mitigation: the non-empty placeholder `your-group/your-project` is set in the
-  environment, in the `gitlab_com` preset and as the manifest default, and tests enforce
-  that all three match. Each project-scoped `mcp_description` tells the agent to pass
-  `gitlab_project` when no default is configured.
-- A runtime fail-closed check for blank path segments is tracked in
-  [PYPOST-1332](https://pypost.atlassian.net/browse/PYPOST-1332).
+- URLs stay declarative: there is no `{% if %}` fallback. Soft defaults still use the
+  non-empty placeholder `your-group/your-project` in the environment, the `gitlab_com`
+  preset, and the manifest default (tests enforce that all three match). Each
+  project-scoped `mcp_description` tells the agent to pass `gitlab_project` when no
+  default is configured.
+- Runtime fail-closed: a blank rendered path segment (including empty `gitlab_project`)
+  is rejected in `HTTPClient._prepare_request_kwargs` before dispatch
+  ([PYPOST-1332](https://pypost.atlassian.net/browse/PYPOST-1332); see
+  [HTTP Path Segment Rejection](http_path_segment_rejection.md)).
 
 ## Locked path catalog and freshness workflow
 
@@ -239,7 +240,7 @@ imported environment or through the `gitlab_com` preset.
 | `gitlab_mcp_rest_paths.json drifted from design` | Catalog changed without the test spec table | Update `GITLAB_TOOL_SPECS` to the reviewed path |
 | `<tool> [full]` / `[minimal]` left `'}}'` (or other marker) after render | Real leftover Jinja in URL/headers/query/body, **or** a sample string value that contains a marker substring | Fix the template; do not switch the body scan back to `json.dumps(parsed)`. Nested final objects alone are not a failure (PYPOST-1339) |
 | README coverage tools differ from catalog | Tool added or renamed without the README table | Update the "GitLab coverage vs gaps" table |
-| GitLab answers 404 with `/projects//` in the URL | Blank `gitlab_project` and no override | Set a default or pass `gitlab_project` (see PYPOST-1332) |
+| MCP / prepare fails with "Blank path segment is not allowed" | Empty `gitlab_project` (or other path arg) after render | Pass a non-empty `gitlab_project` or keep the soft default |
 | "Could not render integer template expression" | Non-decimal IID, pipeline or job ID | Pass a native integer or a decimal string |
 | GitLab answers 401 | Missing or wrong token, or a proxy strips `Authorization` | Check `gitlab_token`; use `PRIVATE-TOKEN` in your imported copy if needed |
 
@@ -254,8 +255,9 @@ imported environment or through the `gitlab_com` preset.
 - [PYPOST-1346](https://pypost.atlassian.net/browse/PYPOST-1346) — **resolved**: reject
   `.`/`..` as rendered path segments in `HTTPClient` before dispatch (see
   [HTTP Path Segment Rejection](http_path_segment_rejection.md)).
-- [PYPOST-1332](https://pypost.atlassian.net/browse/PYPOST-1332) — fail-closed rendering
-  for blank path-segment variables.
+- [PYPOST-1332](https://pypost.atlassian.net/browse/PYPOST-1332) — **resolved**: fail-closed
+  blank path-segment rejection in `HTTPClient` before dispatch (see
+  [HTTP Path Segment Rejection](http_path_segment_rejection.md)).
 - [PYPOST-1333](https://pypost.atlassian.net/browse/PYPOST-1333) — sanitize rendered URLs
   in `sse_stream_detected`, `retryable_error` and `retry_exhausted`.
 - [PYPOST-1122](https://pypost.atlassian.net/browse/PYPOST-1122) — **resolved**:

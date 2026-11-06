@@ -50,16 +50,23 @@ def _headers_accept_event_stream(headers: Dict[str, str]) -> bool:
 
 
 def _assert_no_dot_path_segments(url: str) -> None:
-    """Raise ExecutionError if any rendered URL path segment is '.' or '..'.
+    """Raise ExecutionError for blank, '.', or '..' rendered URL path segments.
 
-    Empty path segments (from a leading slash or '//') are ignored here; blank
-    segment rejection is owned by PYPOST-1332. Percent-encoded lookalikes such
-    as '%2e' are out of scope for PYPOST-1346.
+    The synthetic empty piece from an absolute path's leading ``/`` is ignored.
+    Any other empty segment (mid-path ``//`` or a trailing blank) is rejected
+    (PYPOST-1332). Whole-segment ``.`` / ``..`` remain rejected (PYPOST-1346).
+    Percent-encoded lookalikes such as ``%2e`` stay out of scope.
     """
     path = urlsplit(url).path
-    for segment in path.split("/"):
-        if not segment:
-            continue
+    for index, segment in enumerate(path.split("/")):
+        if segment == "":
+            if index == 0 and path.startswith("/"):
+                continue
+            raise ExecutionError(
+                category=ErrorCategory.TEMPLATE,
+                message="Rejected request URL path segment.",
+                detail="Blank path segment is not allowed.",
+            )
         if segment in (".", ".."):
             raise ExecutionError(
                 category=ErrorCategory.TEMPLATE,
@@ -140,9 +147,15 @@ class HTTPClient:
         )
         try:
             _assert_no_dot_path_segments(url)
-        except ExecutionError:
+        except ExecutionError as exc:
+            event = (
+                "blank_path_segment_rejected"
+                if (exc.detail or "").startswith("Blank path segment")
+                else "dot_path_segment_rejected"
+            )
             logger.error(
-                "dot_path_segment_rejected method=%s url=%r",
+                "%s method=%s url=%r",
+                event,
                 request_data.method,
                 self._template_error_log_url(url, variables),
             )

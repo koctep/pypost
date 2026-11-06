@@ -1,17 +1,26 @@
-# HTTP Path Segment Rejection (`.`, `..`) — PYPOST-1346
+# HTTP Path Segment Rejection (`.`, `..`, blank) — PYPOST-1346 / PYPOST-1332
 
 ## Overview
 
 After URL templates are rendered (including `urlencode` / `to_int` and other expression
-functions), `HTTPClient` rejects any request whose path contains a segment that is exactly
-`.` or exactly `..`. The failure is fail-closed: no `session.request` call is made, and
-callers (GUI, inbound MCP tools, collection offline `_prepare` helpers) receive an
-`ExecutionError` with `ErrorCategory.TEMPLATE`.
+functions), `HTTPClient` rejects any request whose path contains:
 
-Without this guard, a value such as `..` survives `urllib.parse.quote(..., safe="")` as a
+- a segment that is exactly `.` or exactly `..` ([PYPOST-1346](https://pypost.atlassian.net/browse/PYPOST-1346)), or
+- a **blank** segment other than the synthetic empty piece from an absolute path’s leading
+  `/` ([PYPOST-1332](https://pypost.atlassian.net/browse/PYPOST-1332)).
+
+The failure is fail-closed: no `session.request` call is made, and callers (GUI, inbound MCP
+tools, collection offline `_prepare` helpers) receive an `ExecutionError` with
+`ErrorCategory.TEMPLATE`.
+
+Without the dot guard, a value such as `..` survives `urllib.parse.quote(..., safe="")` as a
 literal path segment. Downstream `requests` / urllib3 then apply RFC 3986 remove-dot-segments
 normalisation, so a curated MCP URL like `/repos/../user` can become a different same-host
 path while still using the collection method and token.
+
+Without the blank guard, an empty path variable can render `/projects//…` or a trailing
+`/projects/` that some hosts treat as a different endpoint (for example GitLab list-projects)
+instead of failing locally.
 
 This protection lives in the shared HTTP stack, so every collection that renders path
 placeholders benefits—not only GitHub and GitLab.
@@ -24,7 +33,7 @@ TemplateService.render_string(url)
         ▼
 HTTPClient._prepare_request_kwargs
         │
-        ├─ _assert_no_dot_path_segments(url)   ← PYPOST-1346
+        ├─ _assert_no_dot_path_segments(url)   ← PYPOST-1346 + PYPOST-1332
         │         │
         │         └─ on reject: ERROR log + re-raise ExecutionError(TEMPLATE)
         │
@@ -32,22 +41,22 @@ HTTPClient._prepare_request_kwargs
 ```
 
 - **`_assert_no_dot_path_segments(url)`** (`pypost/core/http_client.py`): module-level helper.
-  Splits `urlsplit(url).path` on `/`, skips empty pieces (leading slash / `//`), and raises
-  when a non-empty segment is `.` or `..`.
+  Splits `urlsplit(url).path` on `/`. Skips only the synthetic empty at index `0` when the
+  path starts with `/`. Raises for any other empty segment, and for non-empty segments that
+  are exactly `.` or `..`.
 - **`HTTPClient._prepare_request_kwargs`**: calls the helper on the final rendered URL
   before headers, params, or body work. Catches `ExecutionError`, emits
-  `dot_path_segment_rejected`, then re-raises.
+  `blank_path_segment_rejected` or `dot_path_segment_rejected`, then re-raises.
 - **`_urlencode`** (`pypost/core/function_registry.py`): unchanged. Dot characters remain
   unencoded per `quote` rules; rejection is post-assembly, not inside the template function.
-- **Extension seam**: empty / blank path segments are intentionally ignored here and owned by
-  [PYPOST-1332](https://pypost.atlassian.net/browse/PYPOST-1332). Prefer extending this helper
-  (or a thin shared path-safety function at the same checkpoint) rather than a second guard.
 
 ```mermaid
 flowchart LR
   A[Rendered URL] --> B{_assert_no_dot_path_segments}
-  B -->|segment . or ..| C[ExecutionError TEMPLATE]
-  C --> D[dot_path_segment_rejected ERROR]
+  B -->|blank segment| C1[ExecutionError TEMPLATE]
+  B -->|segment . or ..| C2[ExecutionError TEMPLATE]
+  C1 --> D1[blank_path_segment_rejected ERROR]
+  C2 --> D2[dot_path_segment_rejected ERROR]
   B -->|OK| E[session.request]
 ```
 
@@ -56,13 +65,14 @@ flowchart LR
 ### `_assert_no_dot_path_segments(url: str) -> None`
 
 Private helper used by `HTTPClient`. Not part of the public package API; documented for
-maintainers and offline tests that exercise `_prepare_request_kwargs`.
+maintainers and offline tests that exercise `_prepare_request_kwargs`. Name retained from
+PYPOST-1346; behaviour now also covers blank segments (PYPOST-1332).
 
 - **url**: Fully rendered request URL (scheme/host/path already substituted).
-- **Returns**: `None` when every non-empty path segment is allowed.
+- **Returns**: `None` when every inspected path segment is allowed.
 - **Raises**: `ExecutionError` with `category=ErrorCategory.TEMPLATE`,
-  `message="Rejected request URL path segment."`, and
-  `detail` naming the offending segment (for example `Path segment '..' is not allowed.`).
+  `message="Rejected request URL path segment."`, and `detail` either
+  `Blank path segment is not allowed.` or naming the offending `.` / `..` segment.
 
 ### Call sites
 
@@ -78,15 +88,16 @@ maintainers and offline tests that exercise `_prepare_request_kwargs`.
 | --- | --- |
 | `.` | Rejected |
 | `..` | Rejected |
+| Mid-path empty (`//`) or trailing blank (`/projects/`) | Rejected |
+| Synthetic leading empty from absolute `/…` | Ignored (not a missing variable) |
 | `ci.yml`, `foo.bar`, `.github` | Allowed (not whole-segment `.` / `..`) |
 | `../x` after `urlencode` → `..%2Fx` | Allowed (segment is `..%2Fx`, not `..`) |
 | `%2e` / `%2E` as a segment | Allowed under current policy (out of scope) |
-| Empty pieces from `/` or `//` | Ignored here (PYPOST-1332) |
 
 ## Configuration
 
 No configuration knobs or environment variables. The guard always runs for every prepared
-HTTP request URL.
+HTTP request URL (always-on fail-closed; not opt-in).
 
 Logging URL safety reuses the existing template-error helper:
 
@@ -98,9 +109,10 @@ Logging URL safety reuses the existing template-error helper:
 
 | Signal | Details |
 | --- | --- |
-| ERROR log | `dot_path_segment_rejected method=<METHOD> url=<origin-only>` on logger `pypost.core.http_client` |
+| ERROR log (dots) | `dot_path_segment_rejected method=<METHOD> url=<origin-only>` on logger `pypost.core.http_client` |
+| ERROR log (blank) | `blank_path_segment_rejected method=<METHOD> url=<origin-only>` on the same logger |
 | Metrics | No new series; RequestService path reuses `track_request_error(TEMPLATE)` |
-| CI allowlist | Prefix registered under `pypost.core.http_client` in `tests/expected_log_allowlist.yaml` |
+| CI allowlist | Both prefixes registered under `pypost.core.http_client` in `tests/expected_log_allowlist.yaml` |
 
 See [Logging Event Naming](logging.md) and [Test Log Guardrails](test_log_guardrails.md).
 
@@ -108,26 +120,27 @@ See [Logging Event Naming](logging.md) and [Test Log Guardrails](test_log_guardr
 
 Offline coverage (no network, no credentials):
 
-- `tests/test_http_client.py` — `TestHTTPClientDotPathSegmentRejection` (core prepare /
-  send paths, log assertions).
-- `tests/test_github_mcp_collection.py` — representative owner / repo / workflow rejects;
-  `ci.yml` allow control.
-- `tests/test_gitlab_mcp_collection.py` — representative project / file path / branch /
-  SHA-style rejects; legitimate file-path allow control.
+- `tests/test_http_client.py` — `TestHTTPClientDotPathSegmentRejection`,
+  `TestHTTPClientBlankPathSegmentRejection` (core prepare / send paths, log assertions).
+- `tests/test_github_mcp_collection.py` — representative owner / repo / workflow dot rejects;
+  blank owner/repo rejects; `ci.yml` allow control.
+- `tests/test_gitlab_mcp_collection.py` — representative project / file / branch / sha-style
+  dot rejects; blank `gitlab_project` rejects; legitimate file-path allow control.
 
 ```bash
 make test PYTEST_ARGS='tests/test_http_client.py::TestHTTPClientDotPathSegmentRejection \
-  tests/test_github_mcp_collection.py -k "dot_path or dotted_workflow" \
-  tests/test_gitlab_mcp_collection.py -k "dot_path or legitimate_file_path"'
+  tests/test_http_client.py::TestHTTPClientBlankPathSegmentRejection \
+  tests/test_github_mcp_collection.py -k "dot_path or blank_path or dotted_workflow" \
+  tests/test_gitlab_mcp_collection.py -k "dot_path or blank_path or legitimate_file_path"'
 ```
 
 ## Troubleshooting
 
 | Symptom | Cause | Resolution |
 | --- | --- | --- |
-| MCP / send fails with "Rejected request URL path segment" | A path placeholder rendered to `.` or `..` | Pass a real segment value (owner, repo, file path, …); Git hosts disallow `.` / `..` as names |
-| Expected reject but request went out | Guard only sees **whole** segments after render | Confirm the URL path (not query) and that encoding did not turn `..` into `..%2F…` |
-| Blank path still dispatched (`//` in URL) | Empty segments are out of scope | Tracked in [PYPOST-1332](https://pypost.atlassian.net/browse/PYPOST-1332) |
+| MCP / send fails with "Rejected request URL path segment" and `.` / `..` detail | A path placeholder rendered to `.` or `..` | Pass a real segment value (owner, repo, file path, …) |
+| MCP / send fails with "Blank path segment is not allowed" | A path placeholder rendered empty (`//` or trailing blank) | Set a non-empty default or pass the path argument |
+| Expected reject but request went out | Guard only sees **whole** segments after render | Confirm the URL path (not query) and encoding |
 | `%2e` segment not rejected | Percent-encoded lookalikes intentionally allowed | Documented debt; see `ai-tasks/PYPOST-1346/60-tech-debt.md` |
 
 ## Related documentation
@@ -136,5 +149,5 @@ make test PYTEST_ARGS='tests/test_http_client.py::TestHTTPClientDotPathSegmentRe
 - [GitHub MCP Example Collection](github_mcp_collection.md) — collection notes and offline proof
 - [GitLab MCP Example Collection](gitlab_mcp_collection.md) — collection notes and offline proof
 - [Template Expression Functions](template_expression_functions.md) — `urlencode` / `to_int`
-- [Logging Event Naming](logging.md) — `dot_path_segment_rejected`
-- Task artifacts: `ai-tasks/PYPOST-1346/` (requirements, architecture, observability, tech debt)
+- [Logging Event Naming](logging.md) — `dot_path_segment_rejected`, `blank_path_segment_rejected`
+- Task artifacts: `ai-tasks/PYPOST-1346/`, `ai-tasks/PYPOST-1332/`

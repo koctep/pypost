@@ -2,7 +2,7 @@
 # CI verifier fails on unlisted ERROR lines or count > baseline + margin.
 # PYPOST-1346: +18 for intentional dot-path rejection ERROR tests (http_client 4,
 # GitHub 6, GitLab 8).
-baseline_error_count: 164
+baseline_error_count: 165
 error_margin: 5
 
 rules:
@@ -96,6 +96,8 @@ rules:
     message_prefix: template_integer_conversion_failed
   - logger: pypost.core.http_client
     message_prefix: dot_path_segment_rejected
+  - logger: pypost.core.http_client
+    message_prefix: blank_path_segment_rejected
 
   # Encryption / environment storage / migration workers (error-path tests)
   - logger: pypost.core.key_provider

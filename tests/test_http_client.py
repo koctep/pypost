@@ -1008,5 +1008,82 @@ class TestHTTPClientDotPathSegmentRejection(unittest.TestCase):
         self.assertEqual(kwargs["url"], resolved.url)
 
 
+class TestHTTPClientBlankPathSegmentRejection(unittest.TestCase):
+    """PYPOST-1332: refuse blank path segments before dispatch."""
+
+    def setUp(self):
+        self.client = HTTPClient(
+            metrics=MagicMock(), template_service=TemplateService()
+        )
+        self.mock_session = MagicMock()
+        self.client.session = self.mock_session
+
+    def _assert_blank_segment_rejected(self, exc: ExecutionError) -> None:
+        self.assertEqual(ErrorCategory.TEMPLATE, exc.category)
+        combined = f"{exc.message} {exc.detail or ''}".lower()
+        self.assertTrue(
+            "blank" in combined or "empty" in combined,
+            f"expected blank/empty path-segment wording, got {exc!r}",
+        )
+        self.assertTrue(
+            "path" in combined or "segment" in combined,
+            f"expected path-segment rejection wording, got {exc!r}",
+        )
+
+    def test_prepare_rejects_mid_path_and_trailing_blank_segments(self):
+        cases = (
+            "http://example.test/api/projects//issues",
+            "http://example.test/api/v4/projects/",
+        )
+        for url in cases:
+            with self.subTest(url=url):
+                req = RequestData(method="GET", url=url)
+                with self.assertRaises(ExecutionError) as ctx:
+                    self.client._prepare_request_kwargs(req, {})
+                self._assert_blank_segment_rejected(ctx.exception)
+
+    def test_send_request_rejects_urlencode_blank_project_and_never_dispatches(self):
+        self.mock_session.request.reset_mock()
+        req = RequestData(
+            method="GET",
+            url="http://example.test/projects/{{ urlencode(project) }}",
+        )
+        with self.assertRaises(ExecutionError) as ctx:
+            self.client.send_request(req, variables={"project": ""})
+        self._assert_blank_segment_rejected(ctx.exception)
+        self.mock_session.request.assert_not_called()
+
+    def test_blank_path_rejection_logs_safe_http_context(self):
+        request = RequestData(
+            method="GET",
+            url="http://example.test/projects/{{ urlencode(project) }}/x",
+        )
+
+        with self.assertLogs("pypost.core.http_client", level="ERROR") as logs:
+            with self.assertRaises(ExecutionError) as ctx:
+                self.client.send_request(request, variables={"project": ""})
+
+        self._assert_blank_segment_rejected(ctx.exception)
+        joined = "\n".join(logs.output)
+        self.assertIn("blank_path_segment_rejected method=GET", joined)
+        self.assertIn("http://example.test", joined)
+        self.assertNotIn("/projects/", joined)
+        self.mock_session.request.assert_not_called()
+
+    def test_non_blank_path_still_prepares(self):
+        req = RequestData(
+            method="GET",
+            url="http://example.test/projects/{{ urlencode(project) }}/issues",
+        )
+        kwargs, resolved = self.client._prepare_request_kwargs(
+            req, {"project": "group/my-project"}
+        )
+        self.assertEqual(
+            "http://example.test/projects/group%2Fmy-project/issues",
+            kwargs["url"],
+        )
+        self.assertEqual(kwargs["url"], resolved.url)
+
+
 if __name__ == "__main__":
     unittest.main()
