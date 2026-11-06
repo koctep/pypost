@@ -577,15 +577,31 @@ class MCPServerRegistry(QObject):
                     env_valid = not configuration.environment_id or env is not None
 
                 lib_valid = False
+                coll_valid = False
                 if self.library_service is not None:
                     get_connection = getattr(self.library_service, "get_connection", None)
                     if callable(get_connection):
                         lib_valid = get_connection(configuration.library_id) is not None
+                    if lib_valid:
+                        coll_valid = self._ordinary_library_collection_resolves(
+                            configuration
+                        )
 
-                if lib_valid and env_valid:
+                if lib_valid and coll_valid and env_valid:
                     continue
+                if not lib_valid:
+                    missing = "library"
+                elif not coll_valid:
+                    missing = "library collection"
+                    logger.debug(
+                        "mcp_registry_ordinary_library_collection_unresolved "
+                        "instance_id=%s library_id=%s",
+                        instance_id,
+                        configuration.library_id,
+                    )
+                else:
+                    missing = "environment"
                 self.stop(instance_id)
-                missing = "library" if not lib_valid else "environment"
                 self._set_status(
                     instance_id,
                     "failed",
@@ -653,23 +669,46 @@ class MCPServerRegistry(QObject):
 
         for instance_id in instance_ids:
             configuration = self._configuration(instance_id)
-            if configuration.bundled_library:
+            if configuration.library_id:
                 selection = configuration.library_selection
                 if selection is None:
                     continue
+                if configuration.bundled_library:
+                    service = self._bundled_adapter
+                    candidate_overlay = LocalLibraryOverlay(
+                        library_id=PredefinedLibraryService.DEFAULT_LIBRARY_ID
+                    )
+                else:
+                    service = self.library_service
+                    candidate_overlay = None
                 try:
                     resolved = LibraryRuntimeResolver(
-                        library_service=self._bundled_adapter,
+                        library_service=service,
                         environment_lookup=self._environment_lookup,
                     ).resolve(
                         selection,
                         environment_id=environment_id,
-                        candidate_overlay=LocalLibraryOverlay(
-                            library_id=PredefinedLibraryService.DEFAULT_LIBRARY_ID
-                        ),
+                        candidate_overlay=candidate_overlay,
                     )
-                except ValueError:
+                except ValueError as exc:
+                    logger.warning(
+                        "mcp_registry_refresh_library_environment_failed "
+                        "instance_id=%s library_id=%s bundled_library=%s error=%s",
+                        instance_id,
+                        configuration.library_id,
+                        configuration.bundled_library,
+                        exc,
+                    )
                     continue
+                logger.debug(
+                    "mcp_registry_refresh_library_environment "
+                    "instance_id=%s library_id=%s bundled_library=%s "
+                    "variable_count=%d",
+                    instance_id,
+                    configuration.library_id,
+                    configuration.bundled_library,
+                    len(resolved.environment),
+                )
                 vars_dict = dict(resolved.environment)
                 hidden_set = set(resolved.hidden_keys)
                 overridable_set = set(resolved.overridable_keys)
@@ -864,6 +903,55 @@ class MCPServerRegistry(QObject):
             set(environment.mcp_overridable_keys),
         )
 
+    def _ordinary_library_collection_resolves(
+        self, configuration: McpServerConfiguration
+    ) -> bool:
+        """Return True when the ordinary library collection still resolves.
+
+        Mirrors ``LibraryRuntimeResolver`` collection-readability checks
+        (connected library, manifest path membership, readable file) without
+        running variable-layer resolution.
+        """
+        from pypost.core.collection_serializer import read_collection_file
+        from pypost.core.library_manifest import (
+            find_and_read_manifest,
+            validate_manifest_collections,
+        )
+
+        selection = configuration.library_selection
+        if selection is None or self.library_service is None:
+            return False
+        get_connection = getattr(self.library_service, "get_connection", None)
+        if not callable(get_connection):
+            return False
+        record = get_connection(configuration.library_id)
+        if record is None:
+            return False
+        path_method = getattr(self.library_service, "resolve_path", None)
+        if callable(path_method):
+            root = path_method(record)
+        else:
+            root = getattr(record, "local_path", None)
+        if root is None:
+            return False
+        root_path = Path(root)
+        try:
+            manifest, _ = find_and_read_manifest(root_path)
+        except Exception:
+            return False
+        if manifest.id != selection.get("manifest_id"):
+            return False
+        if validate_manifest_collections(manifest, manifest_dir=root_path):
+            return False
+        relative = str(selection.get("path") or "")
+        if relative not in manifest.collections:
+            return False
+        try:
+            read_collection_file(root_path / relative)
+        except Exception:
+            return False
+        return True
+
     def _missing_reference(self, configuration: McpServerConfiguration) -> str:
         if configuration.server_type == "proxy":
             return "environment"
@@ -1018,6 +1106,10 @@ class MCPServerRegistry(QObject):
                         get_connection(configuration.library_id) is None
                     ):
                         raise ValueError(f"MCP server {instance_id} references a missing library")
+                    if not self._ordinary_library_collection_resolves(configuration):
+                        raise ValueError(
+                            f"MCP server {instance_id} references a missing library collection"
+                        )
             elif (
                 not configuration.collection_id
                 or self._collection_lookup(configuration.collection_id) is None

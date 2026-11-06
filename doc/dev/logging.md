@@ -342,7 +342,12 @@ commands. Its events answer *what changed on disk*; the runtime half is covered 
 `qt/mcp_server` above and by `MCPServerRegistry`'s own `mcp_registry_*` events
 (`mcp_registry_start_requested`, `mcp_registry_stop_requested`,
 `mcp_registry_reconfigure_rolled_back`, `mcp_registry_status` — all keyed by `instance_id`,
-and all but `mcp_registry_status` also by `port`).
+and all but `mcp_registry_status` also by `port`). Ordinary library lifecycle
+(PYPOST-1347) also emits registry logger events
+`mcp_registry_ordinary_library_collection_unresolved` (DEBUG),
+`mcp_registry_refresh_library_environment` (DEBUG; `library_id`, `bundled_library`,
+`variable_count`), and `mcp_registry_refresh_library_environment_failed` (WARNING;
+`error`). Never log resolved variable maps or secret values.
 
 Every event below is emitted by the `ui/mcp_server_controller` logger.
 
