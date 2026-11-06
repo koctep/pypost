@@ -23,6 +23,20 @@ from tests.test_mcp_server_integration import _mcp_call_tool, _mcp_list_tools
 pytestmark = pytest.mark.timeout(120)
 
 
+def _wait_until_not_running(
+    registry: MCPServerRegistry, instance_id: str, timeout: float = 2.0
+) -> None:
+    """Bounded poll until the instance reports not running after a failed start."""
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        if not registry.is_running(instance_id):
+            return
+        time.sleep(0.02)
+    assert not registry.is_running(instance_id), (
+        f"{instance_id} still running after {timeout}s settle wait"
+    )
+
+
 def _tool(name: str, tool_id: str) -> RequestData:
     return RequestData(
         id=tool_id,
@@ -230,12 +244,75 @@ def test_failed_bind_is_reported_for_only_the_requested_instance():
         registry.start("beta-server")
 
         assert registry.wait_for_state("beta-server", "failed", timeout=10)
+        _wait_until_not_running(registry, "beta-server")
         assert registry.is_running("alpha-server")
         assert not registry.is_running("beta-server")
         assert anyio.run(_mcp_list_tools, _mcp_url(alpha_port)) == ["alpha"]
         failure_message = registry.status("beta-server").message
         assert "beta-server" in failure_message
         assert str(busy_port) in failure_message
+    finally:
+        registry.stop_all()
+        occupied.close()
+
+
+def test_failed_bind_clears_server_thread_after_worker_exits():
+    """After start failure the worker must drop its thread ref once it exits (PYPOST-1362).
+
+    Failure is signaled before ``_run_uvicorn`` returns; retaining ``_server_thread``
+    after exit leaves bookkeeping out of sync with settled ``is_running() == False``.
+    """
+    alpha = Collection(id="alpha-collection", requests=[_tool("Alpha", "alpha")])
+    beta = Collection(id="beta-collection", requests=[_tool("Beta", "beta")])
+    alpha_env = Environment(id="alpha-env", variables={"base_url": "alpha.example"})
+    beta_env = Environment(id="beta-env", variables={"base_url": "beta.example"})
+    alpha_port, busy_port = free_port(), free_port()
+    registry = _registry([alpha, beta], [alpha_env, beta_env])
+    registry.upsert(
+        _configuration(
+            "alpha-server",
+            port=alpha_port,
+            collection_id=alpha.id,
+            environment_id=alpha_env.id,
+        )
+    )
+    registry.upsert(
+        _configuration(
+            "beta-server",
+            port=busy_port,
+            collection_id=beta.id,
+            environment_id=beta_env.id,
+        )
+    )
+
+    occupied = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    occupied.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    occupied.bind(("127.0.0.1", busy_port))
+    occupied.listen()
+    try:
+        registry.start("alpha-server")
+        wait_for_port("127.0.0.1", alpha_port)
+        registry.start("beta-server")
+
+        assert registry.wait_for_state("beta-server", "failed", timeout=10)
+        _wait_until_not_running(registry, "beta-server")
+        manager = registry.manager_for("beta-server")
+
+        deadline = time.monotonic() + 2.0
+        while time.monotonic() < deadline:
+            thread = manager._server_thread
+            if thread is None or not thread.is_alive():
+                break
+            time.sleep(0.02)
+
+        # Desired: worker clears its own ref on exit (asserts worker cleared _server_thread after failed bind).
+        assert manager._server_thread is None
+        assert not manager.is_running()
+        assert registry.is_running("alpha-server")
+        status = registry.status("beta-server")
+        assert status.state == "failed"
+        assert "beta-server" in status.message
+        assert str(busy_port) in status.message
     finally:
         registry.stop_all()
         occupied.close()

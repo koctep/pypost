@@ -743,7 +743,7 @@ When distinct collections share identical variable keys (e.g. `base_url`, `api_t
 ### 5. Port Collision Handling & Graceful Recovery
 
 - **Preflight & Runtime Detection**: In-registry port duplicates are rejected synchronously by `_validate_available_port()`. If an external socket holds the configured port, the uvicorn bind attempt raises `OSError(errno.EADDRINUSE)`.
-- **Graceful Failure State**: [`MCPServerManager._run_uvicorn`](file:///home/src/pypost/core/qt/mcp_server.py) intercepts `OSError`, logs `mcp_server_start_failed` at `ERROR` level, and notifies the registry to set `state="failed"`. Peer servers continue serving requests unaffected.
+- **Graceful Failure State**: [`MCPServerManager._run_uvicorn`](file:///home/src/pypost/core/qt/mcp_server.py) intercepts `OSError`, logs `mcp_server_start_failed` at `ERROR` level, and notifies the registry to set `state="failed"`. Peer servers continue serving requests unaffected. After the worker exits it clears `_server_thread` so settled `is_running()` matches thread cleanup (PYPOST-1362); callers/tests should use a bounded wait after `failed` before hard not-running asserts.
 - **Clean Recovery**: Validated in `test_port_collision_detection_and_graceful_recovery`. Updating the configuration with a free port allows the failed server to restart and transition to `state="running"` smoothly.
 
 ### 6. Concurrent Multi-Server Teardown & Socket Hygiene
