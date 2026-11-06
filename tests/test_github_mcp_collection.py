@@ -106,6 +106,8 @@ class Arg:
     type: str
     required: bool
     default: Any = None
+    enum: tuple[Any, ...] | None = None
+    items: Mapping[str, Any] | None = None
 
 
 S_REQ = Arg("string", True)
@@ -114,7 +116,19 @@ ID_REQ = Arg("integer_or_string", True)
 INT_OPT = Arg("integer_or_string", False)
 BOOL_OPT = Arg("boolean", False)
 ARRAY_OPT = Arg("array", False)
+ARRAY_STRING_OPT = Arg("array", False, items={"type": "string"})
 OBJECT_OPT = Arg("object", False)
+_ENUM_SIDE = Arg("string", False, enum=("LEFT", "RIGHT"))
+_ENUM_SUBJECT = Arg("string", False, enum=("line", "file"))
+_ENUM_FILTER = Arg("string", False, enum=("latest", "all"))
+_ENUM_STATE_LIST = Arg("string", False, enum=("open", "closed", "all"))
+_ENUM_STATE_UPDATE = Arg("string", False, enum=("open", "closed"))
+_ENUM_STATE_REASON = Arg(
+    "string", False, enum=("completed", "not_planned", "reopened")
+)
+_ENUM_REVIEW_EVENT = Arg(
+    "string", True, enum=("APPROVE", "REQUEST_CHANGES", "COMMENT")
+)
 _PAGINATION = {
     "page": Arg("integer_or_string", False, 1),
     "per_page": Arg("integer_or_string", False, 30),
@@ -200,7 +214,8 @@ GITHUB_TOOL_SPECS: tuple[ToolSpec, ...] = (
     ),
     ToolSpec(
         "github_list_workflow_run_jobs", "Actions: list jobs", "GET", _RUN + "/jobs",
-        {"run_id": ID_REQ, **_opt("filter"), **_PAGINATION}, ("filter", *_PAGINATION_KEYS),
+        {"run_id": ID_REQ, "filter": _ENUM_FILTER, **_PAGINATION},
+        ("filter", *_PAGINATION_KEYS),
     ),
     ToolSpec(
         "github_get_workflow_job", "Actions: get job", "GET",
@@ -213,7 +228,7 @@ GITHUB_TOOL_SPECS: tuple[ToolSpec, ...] = (
     ),
     ToolSpec(
         "github_list_pull_requests", "PRs: list", "GET", _R + "/pulls",
-        {**_opt("state", "head", "base"), **_PAGINATION},
+        {"state": _ENUM_STATE_LIST, **_opt("head", "base"), **_PAGINATION},
         ("state", "head", "base", *_PAGINATION_KEYS),
     ),
     ToolSpec("github_get_pull_request", "PRs: get", "GET", _PULL, {"pull_number": ID_REQ}),
@@ -224,7 +239,10 @@ GITHUB_TOOL_SPECS: tuple[ToolSpec, ...] = (
     ),
     ToolSpec(
         "github_update_pull_request", "PRs: update/close/reopen", "PATCH", _PULL,
-        {"pull_number": ID_REQ, **_opt("title", "body", "state", "base")},
+        {
+            "pull_number": ID_REQ, **_opt("title", "body", "base"),
+            "state": _ENUM_STATE_UPDATE,
+        },
         body_optional=("title", "body", "state", "base"),
     ),
     ToolSpec(
@@ -245,8 +263,8 @@ GITHUB_TOOL_SPECS: tuple[ToolSpec, ...] = (
         "POST", _PULL + "/comments",
         {
             "pull_number": ID_REQ, "body": S_REQ, "commit_id": S_REQ, "path": S_REQ,
-            "line": INT_OPT, "side": S_OPT, "start_line": INT_OPT, "start_side": S_OPT,
-            "subject_type": S_OPT,
+            "line": INT_OPT, "side": _ENUM_SIDE, "start_line": INT_OPT,
+            "start_side": _ENUM_SIDE, "subject_type": _ENUM_SUBJECT,
         },
         body_required=("body", "commit_id", "path"),
         body_optional=("line", "side", "start_line", "start_side", "subject_type"),
@@ -275,25 +293,35 @@ GITHUB_TOOL_SPECS: tuple[ToolSpec, ...] = (
     ToolSpec(
         "github_create_pull_request_review", "PR reviews: create (submitted only)", "POST",
         _PULL + "/reviews",
-        {"pull_number": ID_REQ, "event": S_REQ, "body": S_OPT, "commit_id": S_OPT},
+        {
+            "pull_number": ID_REQ, "event": _ENUM_REVIEW_EVENT,
+            "body": S_OPT, "commit_id": S_OPT,
+        },
         body_required=("event",), body_optional=("body", "commit_id"),
     ),
     ToolSpec(
         "github_list_issues", "Issues: list", "GET", _R + "/issues",
-        {**_opt("state", "labels", "assignee", "creator"), **_PAGINATION},
+        {
+            "state": _ENUM_STATE_LIST, **_opt("labels", "assignee", "creator"),
+            **_PAGINATION,
+        },
         ("state", "labels", "assignee", "creator", *_PAGINATION_KEYS),
     ),
     ToolSpec("github_get_issue", "Issues: get", "GET", _ISSUE, {"issue_number": ID_REQ}),
     ToolSpec(
         "github_create_issue", "Issues: create", "POST", _R + "/issues",
-        {"title": S_REQ, "body": S_OPT, "labels": ARRAY_OPT, "assignees": ARRAY_OPT},
+        {
+            "title": S_REQ, "body": S_OPT,
+            "labels": ARRAY_STRING_OPT, "assignees": ARRAY_STRING_OPT,
+        },
         body_required=("title",), body_optional=("body", "labels", "assignees"),
     ),
     ToolSpec(
         "github_update_issue", "Issues: update/close/reopen", "PATCH", _ISSUE,
         {
-            "issue_number": ID_REQ, **_opt("title", "body", "state", "state_reason"),
-            "labels": ARRAY_OPT, "assignees": ARRAY_OPT,
+            "issue_number": ID_REQ, **_opt("title", "body"),
+            "state": _ENUM_STATE_UPDATE, "state_reason": _ENUM_STATE_REASON,
+            "labels": ARRAY_STRING_OPT, "assignees": ARRAY_STRING_OPT,
         },
         body_optional=("title", "body", "state", "state_reason", "labels", "assignees"),
     ),
@@ -653,7 +681,12 @@ def _synthetic_request(spec: ToolSpec) -> RequestData:
         mcp_description=f"Synthetic {spec.tool}",
         mcp_params={
             name: McpToolParam(
-                type=arg.type, description=name, required=arg.required, default=arg.default
+                type=arg.type,
+                description=name,
+                required=arg.required,
+                default=arg.default,
+                enum=list(arg.enum) if arg.enum is not None else None,
+                items=dict(arg.items) if arg.items is not None else None,
             )
             for name, arg in spec.args.items()
         },
@@ -729,6 +762,10 @@ def _expected_schema(spec: ToolSpec) -> dict[str, Any]:
         )
         if arg.default is not None:
             prop["default"] = arg.default
+        if arg.enum is not None:
+            prop["enum"] = list(arg.enum)
+        if arg.items is not None:
+            prop["items"] = dict(arg.items)
         properties[name] = prop
     if spec.repository_scoped:
         for key in sorted(GITHUB_OVERRIDABLE_KEYS):

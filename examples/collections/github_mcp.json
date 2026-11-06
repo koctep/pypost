@@ -342,7 +342,11 @@
         "filter": {
           "type": "string",
           "description": "Optional: latest (default) returns jobs of the latest attempt; all returns every attempt.",
-          "required": false
+          "required": false,
+          "enum": [
+            "latest",
+            "all"
+          ]
         },
         "page": {
           "type": "integer_or_string",
@@ -449,7 +453,12 @@
         "state": {
           "type": "string",
           "description": "Optional state filter: open (default), closed or all.",
-          "required": false
+          "required": false,
+          "enum": [
+            "open",
+            "closed",
+            "all"
+          ]
         },
         "head": {
           "type": "string",
@@ -586,7 +595,11 @@
         "state": {
           "type": "string",
           "description": "Optional new state: open (reopen) or closed (close).",
-          "required": false
+          "required": false,
+          "enum": [
+            "open",
+            "closed"
+          ]
         },
         "base": {
           "type": "string",
@@ -766,7 +779,11 @@
         "side": {
           "type": "string",
           "description": "Optional diff side: LEFT or RIGHT.",
-          "required": false
+          "required": false,
+          "enum": [
+            "LEFT",
+            "RIGHT"
+          ]
         },
         "start_line": {
           "type": "integer_or_string",
@@ -776,12 +793,20 @@
         "start_side": {
           "type": "string",
           "description": "Optional side of start_line: LEFT or RIGHT.",
-          "required": false
+          "required": false,
+          "enum": [
+            "LEFT",
+            "RIGHT"
+          ]
         },
         "subject_type": {
           "type": "string",
           "description": "Optional: line (default) or file.",
-          "required": false
+          "required": false,
+          "enum": [
+            "line",
+            "file"
+          ]
         }
       },
       "retry_policy": null
@@ -964,7 +989,12 @@
         "event": {
           "type": "string",
           "description": "Required review action: one of APPROVE, REQUEST_CHANGES, COMMENT (other values are rejected by GitHub with 422).",
-          "required": true
+          "required": true,
+          "enum": [
+            "APPROVE",
+            "REQUEST_CHANGES",
+            "COMMENT"
+          ]
         },
         "body": {
           "type": "string",
@@ -1007,7 +1037,12 @@
         "state": {
           "type": "string",
           "description": "Optional state filter: open (default), closed or all.",
-          "required": false
+          "required": false,
+          "enum": [
+            "open",
+            "closed",
+            "all"
+          ]
         },
         "labels": {
           "type": "string",
@@ -1097,12 +1132,18 @@
         "labels": {
           "type": "array",
           "description": "Optional JSON array of strings; an empty array clears all labels. Example: [\"bug\"].",
-          "required": false
+          "required": false,
+          "items": {
+            "type": "string"
+          }
         },
         "assignees": {
           "type": "array",
           "description": "Optional JSON array of strings; an empty array clears all assignees. Example: [\"octocat\"].",
-          "required": false
+          "required": false,
+          "items": {
+            "type": "string"
+          }
         }
       },
       "retry_policy": null
@@ -1144,22 +1185,37 @@
         "state": {
           "type": "string",
           "description": "Optional new state: open (reopen) or closed (close).",
-          "required": false
+          "required": false,
+          "enum": [
+            "open",
+            "closed"
+          ]
         },
         "state_reason": {
           "type": "string",
           "description": "Optional reason: completed, not_planned or reopened.",
-          "required": false
+          "required": false,
+          "enum": [
+            "completed",
+            "not_planned",
+            "reopened"
+          ]
         },
         "labels": {
           "type": "array",
           "description": "Optional JSON array of strings; an empty array clears all labels. Replaces the existing labels.",
-          "required": false
+          "required": false,
+          "items": {
+            "type": "string"
+          }
         },
         "assignees": {
           "type": "array",
           "description": "Optional JSON array of strings; an empty array clears all assignees. Replaces the existing assignees.",
-          "required": false
+          "required": false,
+          "items": {
+            "type": "string"
+          }
         }
       },
       "retry_policy": null

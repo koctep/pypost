@@ -215,9 +215,10 @@ only one pending review per pull request (a later create may fail with `422`).
 
 - Presence: `event` is in the published `required` list, so PyPost rejects a call without
   it before any HTTP request.
-- Value: PyPost MCP params cannot publish `enum`, so the allowed values are listed in the
-  tool and argument descriptions. GitHub rejects any other value with `422`. Schema `enum`
-  support is [PYPOST-1342](https://pypost.atlassian.net/browse/PYPOST-1342).
+- Value: `event` publishes
+  `enum: ["APPROVE", "REQUEST_CHANGES", "COMMENT"]` (PYPOST-1342). Invalid values fail
+  closed in `validate_mcp_argument_values` before any HTTP request; descriptions still
+  document the same set for agents that only skim text.
 
 ### No merge tool
 
@@ -435,9 +436,10 @@ imported environment or through the `github_com` preset.
   `2026-03-10` before 2028-03-10; expose dispatch run details (`return_run_details`).
   Today `github_dispatch_workflow` returns no run ID, so the agent must find the run with
   `github_list_workflow_runs_for_workflow`.
-- [PYPOST-1342](https://pypost.atlassian.net/browse/PYPOST-1342) — `enum` and array
-  `items` in MCP param schemas (`event`, `state`, `side`, `filter`, `state_reason`,
-  `labels`, `assignees`).
+- [PYPOST-1342](https://pypost.atlassian.net/browse/PYPOST-1342) — **resolved**: `enum` and
+  array `items` on MCP params (`event`, `state`, `side`, `filter`, `state_reason`,
+  `labels`, `assignees`, plus `start_side` / `subject_type`); see
+  [doc/dev/mcp_integration.md](mcp_integration.md#enum-and-array-items-pypost-1342).
 - [PYPOST-1343](https://pypost.atlassian.net/browse/PYPOST-1343) — type-preserving JSON
   helper to replace hand-written arrays, objects and booleans.
 - [PYPOST-1344](https://pypost.atlassian.net/browse/PYPOST-1344) — merge pull request and

@@ -22,11 +22,49 @@ class McpToolParam(BaseModel):
     description: str = ""
     required: bool = True
     default: Optional[Any] = None
+    enum: Optional[List[Any]] = None
+    items: Optional[Dict[str, Any]] = None
 
     def model_post_init(self, __context) -> None:
         if self.type not in _MCP_PARAM_TYPES:
             raise ValueError(f"Unsupported MCP param type: {self.type}")
+        self._validate_enum()
+        self._validate_items()
         self._validate_default_type()
+
+    def _validate_enum(self) -> None:
+        """Require a non-empty list when ``enum`` is declared."""
+        if self.enum is None:
+            return
+        if not isinstance(self.enum, list) or len(self.enum) == 0:
+            raise ValueError("enum must be a non-empty list when set")
+
+    def _validate_items(self) -> None:
+        """Allow ``items`` only on array params; require a mapping when set."""
+        if self.items is None:
+            return
+        if self.type != "array":
+            raise ValueError("items is only valid when type is 'array'")
+        if not isinstance(self.items, dict):
+            raise ValueError("items must be a JSON Schema object (dict) when set")
+
+    def _value_matches_declared_type(self, value: Any, param_type: str) -> bool:
+        """Return whether ``value`` is compatible with an MCP param type name."""
+        if param_type == "string":
+            return isinstance(value, str)
+        if param_type == "integer":
+            return isinstance(value, int) and not isinstance(value, bool)
+        if param_type == "integer_or_string":
+            return isinstance(value, (int, str)) and not isinstance(value, bool)
+        if param_type == "number":
+            return isinstance(value, (int, float)) and not isinstance(value, bool)
+        if param_type == "boolean":
+            return isinstance(value, bool)
+        if param_type == "array":
+            return isinstance(value, list)
+        if param_type == "object":
+            return isinstance(value, dict)
+        return True
 
     def _validate_default_type(self) -> None:
         """Validate that ``self.default`` is compatible with ``self.type``.
@@ -40,29 +78,12 @@ class McpToolParam(BaseModel):
         value = self.default
         param_type = self.type
 
-        type_ok: bool
-        if param_type == "string":
-            type_ok = isinstance(value, str)
-        elif param_type == "integer":
-            type_ok = isinstance(value, int) and not isinstance(value, bool)
-        elif param_type == "integer_or_string":
-            type_ok = isinstance(value, (int, str)) and not isinstance(value, bool)
-        elif param_type == "number":
-            type_ok = isinstance(value, (int, float)) and not isinstance(value, bool)
-        elif param_type == "boolean":
-            type_ok = isinstance(value, bool)
-        elif param_type == "array":
-            type_ok = isinstance(value, list)
-        elif param_type == "object":
-            type_ok = isinstance(value, dict)
-        else:
-            # Unknown type — whitelist check above already rejected it; be safe.
-            type_ok = True
-
-        if not type_ok:
+        if not self._value_matches_declared_type(value, param_type):
             raise ValueError(
                 f"default value {value!r} is not valid for param type {param_type!r}"
             )
+        if self.enum is not None and value not in self.enum:
+            raise ValueError("default value is not a member of enum")
 
 
 class RequestData(BaseModel):

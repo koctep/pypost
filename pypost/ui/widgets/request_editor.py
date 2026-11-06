@@ -559,8 +559,10 @@ class McpParamsTable(QTableWidget):
     }
 
     def __init__(self):
-        super().__init__(0, 5)
-        self.setHorizontalHeaderLabels(["Name", "Type", "Description", "Required", "Default"])
+        super().__init__(0, 7)
+        self.setHorizontalHeaderLabels(
+            ["Name", "Type", "Description", "Required", "Default", "Enum", "Items"]
+        )
         self.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         self.itemChanged.connect(self._on_item_changed)
 
@@ -606,6 +608,8 @@ class McpParamsTable(QTableWidget):
         # Column 4: serialise default value as a human-readable string
         default_text = self._serialise_default(spec.default)
         self.setItem(row, 4, QTableWidgetItem(default_text))
+        self.setItem(row, 5, QTableWidgetItem(self._serialise_json_field(spec.enum)))
+        self.setItem(row, 6, QTableWidgetItem(self._serialise_json_field(spec.items)))
 
     @staticmethod
     def _serialise_default(value: Any) -> str:
@@ -617,6 +621,13 @@ class McpParamsTable(QTableWidget):
         if isinstance(value, (list, dict)):
             return json.dumps(value, separators=(",", ":"))
         return str(value)
+
+    @staticmethod
+    def _serialise_json_field(value: Any) -> str:
+        """Serialize optional enum/items metadata for an editable cell."""
+        if value is None:
+            return ""
+        return json.dumps(value, separators=(",", ":"))
 
     def _parse_default(self, raw: str, param_type: str) -> Any:
         """Parse the raw string from the Default cell into a typed Python value.
@@ -643,6 +654,26 @@ class McpParamsTable(QTableWidget):
             )
             return None
 
+    @staticmethod
+    def _parse_json_field(raw: str, *, expect: type) -> Any:
+        """Parse Enum/Items cell text; empty or invalid input becomes ``None``."""
+        stripped = raw.strip()
+        if not stripped:
+            return None
+        try:
+            parsed = json.loads(stripped)
+        except json.JSONDecodeError:
+            logger.debug("mcp_param_json_field_coerce_failed value=%r", stripped)
+            return None
+        if not isinstance(parsed, expect):
+            logger.debug(
+                "mcp_param_json_field_type_mismatch value=%r expect=%s",
+                stripped,
+                expect.__name__,
+            )
+            return None
+        return parsed
+
     def get_data(self) -> dict[str, McpToolParam]:
         params: dict[str, McpToolParam] = {}
         for row in range(self.rowCount()):
@@ -667,11 +698,19 @@ class McpParamsTable(QTableWidget):
             default_item = self.item(row, 4)
             raw_default = default_item.text() if default_item else ""
             default = self._parse_default(raw_default, param_type)
+            enum_item = self.item(row, 5)
+            raw_enum = enum_item.text() if enum_item else ""
+            enum_values = self._parse_json_field(raw_enum, expect=list)
+            items_item = self.item(row, 6)
+            raw_items = items_item.text() if items_item else ""
+            items = self._parse_json_field(raw_items, expect=dict)
             params[name] = McpToolParam(
                 type=param_type,
                 description=description,
                 required=required,
                 default=default,
+                enum=enum_values,
+                items=items,
             )
         return params
 

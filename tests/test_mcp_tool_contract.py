@@ -415,3 +415,81 @@ class TestValidateEnvironmentOverrides(unittest.TestCase):
         self.assertIn("reason=not_overridable", rejected_lines[0])
         self.assertNotIn("https://attacker.example", rejected_lines[0])
         self.assertNotIn("https://example.test", rejected_lines[0])
+
+
+# ---------------------------------------------------------------------------
+# PYPOST-1342 — Step 3: Failing repro for enum / array items on MCP params
+# ---------------------------------------------------------------------------
+
+
+def test_schema_emits_enum_and_array_items():
+    """Published schema must include enum and items when declared on McpToolParam.
+
+    Currently fails because McpToolParam rejects enum/items or the schema builder
+    omits them.
+    """
+    schema = build_tool_input_schema(
+        {
+            "event": McpToolParam(
+                type="string",
+                description="Review action.",
+                required=True,
+                enum=["APPROVE", "REQUEST_CHANGES", "COMMENT"],
+            ),
+            "labels": McpToolParam(
+                type="array",
+                description="Label names.",
+                required=False,
+                items={"type": "string"},
+            ),
+        }
+    )
+
+    assert schema["properties"]["event"]["enum"] == [
+        "APPROVE",
+        "REQUEST_CHANGES",
+        "COMMENT",
+    ]
+    assert schema["properties"]["labels"]["type"] == "array"
+    assert schema["properties"]["labels"]["items"] == {"type": "string"}
+    assert "enum" not in schema["properties"]["labels"]
+    assert "items" not in schema["properties"]["event"]
+
+
+def test_validate_rejects_value_outside_enum():
+    """Values outside a declared enum must raise a value-safe validation error."""
+    raw_value = "MERGE_ILLEGAL"
+    arguments = {"event": raw_value}
+    specs = {
+        "event": McpToolParam(
+            type="string",
+            required=True,
+            enum=["APPROVE", "REQUEST_CHANGES", "COMMENT"],
+        ),
+    }
+
+    with pytest.raises(McpArgumentValidationError) as raised:
+        mcp_tool_contract.validate_mcp_argument_values(arguments, specs)
+
+    message = str(raised.value)
+    assert "event" in message
+    assert raw_value not in message
+
+
+def test_validate_rejects_array_item_type_mismatch():
+    """Array elements that do not match items.type must raise safely."""
+    arguments = {"labels": [1, 2]}
+    specs = {
+        "labels": McpToolParam(
+            type="array",
+            required=False,
+            items={"type": "string"},
+        ),
+    }
+
+    with pytest.raises(McpArgumentValidationError) as raised:
+        mcp_tool_contract.validate_mcp_argument_values(arguments, specs)
+
+    message = str(raised.value)
+    assert "labels" in message
+    assert "[1, 2]" not in message

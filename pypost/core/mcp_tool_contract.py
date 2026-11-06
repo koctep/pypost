@@ -75,16 +75,50 @@ def validate_mcp_required_arguments(
             raise McpArgumentValidationError(name, spec.type, "missing")
 
 
+def _enum_expected_type(enum_values: list[Any]) -> str:
+    """Build a value-safe expected-type label for an enum constraint."""
+    return "enum[" + ", ".join(str(item) for item in enum_values) + "]"
+
+
+def _items_expected_type(items: Mapping[str, Any]) -> str:
+    """Build a value-safe expected-type label for array items."""
+    item_type = items.get("type")
+    if isinstance(item_type, str) and item_type:
+        return f"array items {item_type}"
+    return "array items"
+
+
 def validate_mcp_argument_values(
     arguments: Mapping[str, Any], specs: Mapping[str, McpToolParam]
 ) -> None:
-    """Reject declared caller values whose runtime types do not match exactly."""
+    """Reject declared caller values whose runtime types do not match exactly.
+
+    When a parameter declares ``enum``, the value must be a member of that list.
+    When an array parameter declares ``items`` with a ``type``, each element must
+    be compatible with that item type.
+    """
     for name, value in arguments.items():
         spec = specs.get(name)
         if spec is None or value is None:
             continue
         if not is_mcp_runtime_value_compatible(spec.type, value):
             raise McpArgumentValidationError(name, spec.type, "invalid")
+        if spec.enum is not None and value not in spec.enum:
+            raise McpArgumentValidationError(
+                name, _enum_expected_type(spec.enum), "invalid"
+            )
+        if (
+            spec.type == "array"
+            and isinstance(value, list)
+            and isinstance(spec.items, Mapping)
+        ):
+            item_type = spec.items.get("type")
+            if isinstance(item_type, str) and item_type:
+                for element in value:
+                    if not is_mcp_runtime_value_compatible(item_type, element):
+                        raise McpArgumentValidationError(
+                            name, _items_expected_type(spec.items), "invalid"
+                        )
 
 
 def normalize_mcp_tool_name(name: str) -> str:
@@ -182,6 +216,10 @@ def build_tool_input_schema(specs: dict[str, McpToolParam]) -> dict:
             prop["description"] = spec.description
         if spec.default is not None:
             prop["default"] = spec.default
+        if spec.enum is not None:
+            prop["enum"] = list(spec.enum)
+        if spec.items is not None:
+            prop["items"] = dict(spec.items)
         properties[name] = prop
         if spec.required:
             required.append(name)
