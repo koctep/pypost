@@ -884,9 +884,10 @@ def test_gitlab_mcp_full_render_leaves_no_template_markers():
     for spec in GITLAB_TOOL_SPECS:
         request = _request_for(collection, spec.tool)
         for label, args in (("full", _full_args(spec)), ("minimal", _required_args(spec))):
-            kwargs = _prepare(request, _execution_variables(request, args))
+            variables = _execution_variables(request, args)
+            kwargs = _prepare(request, variables)
             rendered = [kwargs["url"], *kwargs["headers"].values(), *kwargs["params"].values()]
-            rendered.append(json.dumps(kwargs.get("json", kwargs.get("data", ""))))
+            rendered.append(_render(request.body, variables))
             for content in rendered:
                 for marker in _TEMPLATE_MARKERS:
                     assert marker not in str(content), (

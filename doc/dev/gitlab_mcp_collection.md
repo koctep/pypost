@@ -60,6 +60,27 @@ gitlab_mcp_rest_paths.json  <-- make check-gitlab-mcp-path-freshness (offline co
 - Body templates start with `{ ` (brace and a space) before the first `{% if %}`.
   Without the space, `{{%` would be read as the start of a Jinja expression.
 
+## Surviving template-marker checks (PYPOST-1339)
+
+After a full or minimal render, offline tests assert that URL, header values, query values,
+and the **raw rendered body template** contain none of `_TEMPLATE_MARKERS`
+(`{{`, `}}`, `{%`, `%}`). Body scanning uses `_render(request.body, variables)` — not
+`json.dumps` of the parsed `kwargs["json"]` payload.
+
+Re-serializing a parsed body can invent structural `}}` when the last field is a nested
+object, even though Jinja produced no leftover markers. The GitLab suite had the same latent
+bug as GitHub; both now share the raw-body surface. GitLab has no nested-object-final tool
+today, so the nested-object twin lives only on GitHub
+([GitHub MCP Example Collection](github_mcp_collection.md#surviving-template-marker-checks-pypost-1339)).
+
+Coverage: `test_gitlab_mcp_full_render_leaves_no_template_markers` (every tool, full and
+minimal args). Shared helpers stay deferred to
+[PYPOST-1340](https://pypost.atlassian.net/browse/PYPOST-1340). Substring matches inside
+legitimate JSON **string values** can still trip the check; that residual risk is accepted.
+
+When adding a GitLab body whose last field is a nested object, keep field order natural —
+the marker check no longer forces a scalar-last workaround.
+
 ## Encoding rules
 
 | Input | Template | Example |
@@ -163,9 +184,11 @@ assertions inside each test, never at import time.
 - **Offline contract tests:** native import of the collection and environment, exact
   published tool set and input schemas, query keys, headers, body fields, Bearer auth,
   declared vs used `mcp_params`, companion-env coverage, argument names that must not
-  shadow `dict` attributes, no surviving `{{`/`{%` after a full render, encoding
-  (`test_gitlab_template_encoding`), numeric-ID rejection, project-scoped descriptions,
-  manifest entries and README parity
+  shadow `dict` attributes, no surviving template markers after a full or minimal render
+  (raw body via `_render`; see
+  [Surviving template-marker checks](#surviving-template-marker-checks-pypost-1339)),
+  encoding (`test_gitlab_template_encoding`), numeric-ID rejection, project-scoped
+  descriptions, manifest entries and README parity
   (`test_gitlab_readme_documents_inventory_and_tool_parity`).
 - **Loopback e2e:** `test_gitlab_mcp_loopback_e2e_wire_contract`
   (`@pytest.mark.timeout(60)`, `anyio.fail_after(10)` per call) drives a live MCP server
@@ -212,6 +235,7 @@ imported environment or through the `gitlab_com` preset.
 | ------- | ------------ | --- |
 | `<tool> path drifted: expected …, got …` | Collection URL changed without the catalog | Restore the URL, or update collection, catalog and `GITLAB_TOOL_SPECS` together after a doc review |
 | `gitlab_mcp_rest_paths.json drifted from design` | Catalog changed without the test spec table | Update `GITLAB_TOOL_SPECS` to the reviewed path |
+| `<tool> [full]` / `[minimal]` left `'}}'` (or other marker) after render | Real leftover Jinja in URL/headers/query/body, **or** a sample string value that contains a marker substring | Fix the template; do not switch the body scan back to `json.dumps(parsed)`. Nested final objects alone are not a failure (PYPOST-1339) |
 | README coverage tools differ from catalog | Tool added or renamed without the README table | Update the "GitLab coverage vs gaps" table |
 | GitLab answers 404 with `/projects//` in the URL | Blank `gitlab_project` and no override | Set a default or pass `gitlab_project` (see PYPOST-1332) |
 | "Could not render integer template expression" | Non-decimal IID, pipeline or job ID | Pass a native integer or a decimal string |
@@ -219,6 +243,12 @@ imported environment or through the `gitlab_com` preset.
 
 ## Follow-ups
 
+- [PYPOST-1339](https://pypost.atlassian.net/browse/PYPOST-1339) — **resolved**: marker
+  checks scan raw `_render` body text (same rule as GitHub; see
+  [Surviving template-marker checks](#surviving-template-marker-checks-pypost-1339)).
+- [PYPOST-1340](https://pypost.atlassian.net/browse/PYPOST-1340) — shared loopback stub
+  and contract helpers for the Jira, GitLab and GitHub collections (includes eventual
+  shared marker-scan helper).
 - [PYPOST-1332](https://pypost.atlassian.net/browse/PYPOST-1332) — fail-closed rendering
   for blank path-segment variables.
 - [PYPOST-1333](https://pypost.atlassian.net/browse/PYPOST-1333) — sanitize rendered URLs
@@ -230,6 +260,7 @@ imported environment or through the `gitlab_com` preset.
 
 ## See also
 
+- [GitHub MCP Example Collection](github_mcp_collection.md)
 - [Examples Collection Library & Legacy Fixtures](examples_library_format.md)
 - [Jira MCP critical REST path freshness](jira_mcp_path_freshness.md)
 - [CI-safe Jira MCP collection e2e](jira_mcp_collection_e2e.md)
