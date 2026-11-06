@@ -364,6 +364,66 @@ class TestBodyErrorNonRetryable(unittest.TestCase):
         metrics.track_retry_attempt.assert_not_called()
 
 
+class TestRetryLogSanitization(unittest.TestCase):
+    """PYPOST-1333: retry WARNING / alert must not embed unsanitized rendered URLs."""
+
+    def setUp(self):
+        import requests as requests_lib
+
+        from pypost.core.http_client import HTTPClient
+        from pypost.core.template_service import TemplateService
+
+        self.requests_lib = requests_lib
+        self.metrics = MagicMock()
+        self.alert_manager = MagicMock(spec=AlertManager)
+        self.http = HTTPClient(
+            metrics=self.metrics, template_service=TemplateService()
+        )
+        self.http.session = MagicMock()
+        self.svc = RequestService(
+            metrics=self.metrics,
+            alert_manager=self.alert_manager,
+            http_client=self.http,
+        )
+        self.variables = {"host": "secret.example.com", "token": "abc"}
+        self.req = RequestData(
+            method="GET",
+            url="http://{{host}}/api?token={{token}}",
+            retry_policy=RetryPolicy(
+                max_retries=1,
+                retry_delay_seconds=0.0,
+                retry_backoff_multiplier=1.0,
+                retryable_status_codes=[429, 500, 502, 503, 504],
+            ),
+        )
+
+    def test_retryable_error_log_redacts_url_in_error_message(self):
+        self.http.session.request.side_effect = [
+            self.requests_lib.Timeout("timed out"),
+            self.requests_lib.Timeout("timed out"),
+        ]
+        with self.assertLogs("pypost.core.request_service", level="WARNING") as logs:
+            self.svc.execute(self.req, variables=self.variables)
+        joined = "\n".join(logs.output)
+        self.assertIn("retryable_error", joined)
+        self.assertIn("secret.example.com", joined)
+        self.assertNotIn("abc", joined)
+        self.assertIn("token=***", joined)
+
+    def test_exhaustion_alert_message_redacts_url(self):
+        self.http.session.request.side_effect = [
+            self.requests_lib.Timeout("timed out"),
+            self.requests_lib.Timeout("timed out"),
+        ]
+        self.svc.execute(self.req, variables=self.variables)
+        self.alert_manager.emit.assert_called_once()
+        payload = self.alert_manager.emit.call_args[0][0]
+        message = payload.final_error_message
+        self.assertIn("secret.example.com", message)
+        self.assertNotIn("abc", message)
+        self.assertIn("token=***", message)
+
+
 class TestRetryPolicyModel(unittest.TestCase):
     """RetryPolicy Pydantic model validation."""
 

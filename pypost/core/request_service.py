@@ -14,6 +14,7 @@ from pypost.core.http_client_protocol import HTTPClientProtocol
 from pypost.core.metrics_protocol import MetricsTrackerProtocol, resolve_metrics
 from pypost.core.script_executor import ScriptExecutor
 from pypost.core.sensitive_data_masking_policy import SensitiveDataMaskingPolicy
+from pypost.core.sensitive_text_sanitizer import sanitize_text
 from pypost.core.template_service import TemplateService
 from pypost.models.errors import ErrorCategory, ExecutionError
 from pypost.models.models import HistoryEntry, RequestData
@@ -21,6 +22,11 @@ from pypost.models.response import ResponseData
 from pypost.models.retry import RetryPolicy
 
 logger = logging.getLogger(__name__)
+
+
+def _log_safe_error_message(message: str) -> str:
+    """Redact query-token heuristics in error text for retry logs and alerts."""
+    return sanitize_text(message)
 
 
 @dataclass
@@ -165,7 +171,7 @@ class RequestService:
                     exc.category,
                     attempt,
                     max_retries,
-                    exc.message,
+                    _log_safe_error_message(exc.message),
                 )
             else:
                 # Response path — raises here are not caught by the handler above
@@ -329,6 +335,7 @@ class RequestService:
         retries_attempted: int,
         error: ExecutionError,
     ) -> None:
+        safe_message = _log_safe_error_message(error.message)
         logger.warning(
             "retry_exhausted method=%s url=%r request_name=%r retries=%d"
             " error_category=%s error=%s detail=%s",
@@ -337,7 +344,7 @@ class RequestService:
             request_name,
             retries_attempted,
             error.category,
-            error.message,
+            safe_message,
             error.detail,
         )
         self._metrics.track_request_retry_exhaustion(request.url)
@@ -348,7 +355,7 @@ class RequestService:
                     endpoint=request.url,
                     retries_attempted=retries_attempted,
                     final_error_category=error.category.value,
-                    final_error_message=error.message,
+                    final_error_message=safe_message,
                 )
             )
 

@@ -333,25 +333,27 @@ class HTTPClient:
                 detail=str(exc),
             ) from exc
         except requests.Timeout as exc:
+            safe_url = self._error_log_url(url, variables)
             logger.error(
                 "http_request_timed_out method=%s url=%r",
                 request_data.method,
-                self._error_log_url(url, variables),
+                safe_url,
             )
             raise ExecutionError(
                 category=ErrorCategory.TIMEOUT,
-                message=f"Request to {url} timed out.",
+                message=f"Request to {safe_url} timed out.",
                 detail=str(exc),
             ) from exc
         except requests.ConnectionError as exc:
+            safe_url = self._error_log_url(url, variables)
             logger.error(
                 "http_connection_failed method=%s url=%r",
                 request_data.method,
-                self._error_log_url(url, variables),
+                safe_url,
             )
             raise ExecutionError(
                 category=ErrorCategory.NETWORK,
-                message=f"Could not connect to {url}.",
+                message=f"Could not connect to {safe_url}.",
                 detail=str(exc),
             ) from exc
         except requests.RequestException as exc:
@@ -375,7 +377,7 @@ class HTTPClient:
             logger.debug(
                 "sse_stream_detected method=%s url=%s content_type=%s",
                 request_data.method,
-                url,
+                self._error_log_url(url, variables),
                 content_type,
             )
             return HTTPRequestResult(

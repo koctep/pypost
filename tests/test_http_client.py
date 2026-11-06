@@ -841,6 +841,55 @@ class TestHTTPClientErrorLogging(unittest.TestCase):
         self.assertNotIn("supersecret", joined)
         self.assertIn("token=***", joined)
 
+    def test_timeout_execution_error_message_redacts_resolved_url(self):
+        """PYPOST-1333: timeout ExecutionError.message must redact resolved URL secrets."""
+        self.client.session.request.side_effect = requests_lib.Timeout("timed out")
+        with self.assertRaises(ExecutionError) as ctx:
+            self.client.send_request(self.req, variables=self.variables)
+        message = ctx.exception.message
+        self.assertIn("timed out", message.lower())
+        self.assertIn("secret.example.com", message)
+        self.assertNotIn("abc", message)
+        self.assertIn("token=***", message)
+
+    def test_connection_execution_error_message_redacts_resolved_url(self):
+        """PYPOST-1333: connection ExecutionError.message must redact resolved URL secrets."""
+        self.client.session.request.side_effect = requests_lib.ConnectionError("refused")
+        with self.assertRaises(ExecutionError) as ctx:
+            self.client.send_request(self.req, variables=self.variables)
+        message = ctx.exception.message
+        self.assertIn("connect", message.lower())
+        self.assertIn("secret.example.com", message)
+        self.assertNotIn("abc", message)
+        self.assertIn("token=***", message)
+
+
+class TestHTTPClientSSEStreamLogging(unittest.TestCase):
+    """PYPOST-1333: sse_stream_detected DEBUG must redact resolved URL secrets."""
+
+    def setUp(self):
+        self.client = HTTPClient(metrics=MagicMock(), template_service=TemplateService())
+        self.client.session = MagicMock()
+
+    def test_sse_stream_detected_logs_redacted_resolved_url(self):
+        resp = MagicMock()
+        resp.status_code = 200
+        resp.headers = {"Content-Type": "text/event-stream"}
+        resp.close = MagicMock()
+        resp.__iter__ = lambda self: iter([])
+        self.client.session.request.return_value = resp
+        variables = {"host": "secret.example.com", "token": "abc"}
+        req = RequestData(
+            method="GET", url="http://{{host}}/sse?token={{token}}"
+        )
+        with self.assertLogs("pypost.core.http_client", level="DEBUG") as logs:
+            self.client.send_request(req, variables=variables)
+        joined = "\n".join(logs.output)
+        self.assertIn("sse_stream_detected", joined)
+        self.assertIn("secret.example.com", joined)
+        self.assertNotIn("abc", joined)
+        self.assertIn("token=***", joined)
+
 
 class TestHTTPClientResponseBodyCap(unittest.TestCase):
     def setUp(self):

@@ -111,6 +111,7 @@ for local vs CI rationale.
 | --- | --- | --- |
 | http_client ERROR URLs | **Remediated** ([PYPOST-741](https://pypost.atlassian.net/browse/PYPOST-741)) | Sanitized resolved URL in ERROR logs |
 | http_client truncation WARNING URLs | **Remediated** ([PYPOST-1122](https://pypost.atlassian.net/browse/PYPOST-1122)) | `response_body_truncated` uses `_error_log_url` |
+| http_client SSE / retry URL sinks | **Remediated** ([PYPOST-1333](https://pypost.atlassian.net/browse/PYPOST-1333)) | `sse_stream_detected`, timeout/connection messages, retry WARNINGs, exhaustion alert message |
 | MCP activity | PASS | Counts only |
 | Key sources | PASS | key_id logged, not key material |
 | Alert endpoint in WARNING | P2 | Full URL in log line |

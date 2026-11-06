@@ -201,12 +201,12 @@ product-dialog companion directly locks DEBUG `ui_wait_timeout` on logger
 | `retry_backoff` | DEBUG | `method`, `url`, `attempt`, `wait_seconds` | `request_service` |
 | `retry_cancelled_during_backoff` | DEBUG | `method`, `url`, `attempt` | `request_service` |
 | `retryable_status` | WARNING | `method`, `url`, `status`, `attempt`, `max_retries` | `request_service` |
-| `retryable_error` | WARNING | `method`, `url`, `category`, `attempt`, `max_retries` | `request_service` |
-| `retry_exhausted` | WARNING | `method`, `url`, `request_name`, `retries` | `request_service` |
+| `retryable_error` | WARNING | `method`, `url` (template), `category`, `attempt`, `max_retries`, `error` (sanitized) | `request_service` |
+| `retry_exhausted` | WARNING | `method`, `url` (template), `request_name`, `retries`, `error` (sanitized) | `request_service` |
 | `retry_loop_invariant_failed` | ERROR | `method`, `url`, `max_retries` | `request_service` |
 | `request_complete` | DEBUG | `method`, `status`, `elapsed_ms`, `size` | `http_client` |
 | `response_body_truncated` | WARNING | `method`, `url` (sanitized), `max_bytes` | `http_client` |
-| `sse_stream_detected` | DEBUG | `method`, `url`, `content_type` | `http_client` |
+| `sse_stream_detected` | DEBUG | `method`, `url` (sanitized), `content_type` | `http_client` |
 | `http_connection_failed` | ERROR | `method`, `url` | `http_client` |
 | `http_request_timed_out` | ERROR | `method`, `url` | `http_client` |
 | `http_request_failed` | ERROR | `method`, `url`, `detail` | `http_client` |
@@ -528,8 +528,12 @@ logger.error(
 
 Same for `Connection failed:` → `http_connection_failed`, `Request failed:` →
 `http_request_failed`. Use `_error_log_url()` for ERROR-level URLs (sanitized per
-[PYPOST-741](https://pypost.atlassian.net/browse/PYPOST-741)) and for the WARNING
-`response_body_truncated` URL field ([PYPOST-1122](https://pypost.atlassian.net/browse/PYPOST-1122)).
+[PYPOST-741](https://pypost.atlassian.net/browse/PYPOST-741)), for the WARNING
+`response_body_truncated` URL field ([PYPOST-1122](https://pypost.atlassian.net/browse/PYPOST-1122)),
+and for DEBUG `sse_stream_detected` ([PYPOST-1333](https://pypost.atlassian.net/browse/PYPOST-1333)).
+Timeout / connection `ExecutionError.message` values embed the same sanitized URL so
+`retryable_error` / `retry_exhausted` / exhaustion alerts cannot re-leak query secrets
+([PYPOST-1333](https://pypost.atlassian.net/browse/PYPOST-1333)).
 Migrated in [PYPOST-751](https://pypost.atlassian.net/browse/PYPOST-751).
 
 ### Pattern B — ClassName: diagnostic prefix
