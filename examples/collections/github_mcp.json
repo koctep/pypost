@@ -397,7 +397,7 @@
         "Authorization": "Bearer {{ github_token }}"
       },
       "params": {},
-      "body": "{% set ns = namespace(sep=\"\") %}{ {% if mcp is defined and mcp.request is defined and mcp.request.inputs is defined and mcp.request.inputs is not none %}{{ ns.sep }}\"inputs\": { {% for k, v in mcp.request.inputs.items() %}{% if not loop.first %}, {% endif %}{{ to_json_string(k) }}: {% if v is sameas true %}\"true\"{% elif v is sameas false %}\"false\"{% else %}{{ to_json_string(v) }}{% endif %}{% endfor %} }{% set ns.sep = \", \" %}{% endif %}{% if mcp is defined and mcp.request is defined and mcp.request.ref is defined and mcp.request.ref is not none %}{{ ns.sep }}\"ref\": {{ to_json_string(mcp.request.ref) }}{% set ns.sep = \", \" %}{% endif %} }",
+      "body": "{% set ns = namespace(sep=\"\") %}{ {% if mcp is defined and mcp.request is defined and mcp.request.ref is defined and mcp.request.ref is not none %}{{ ns.sep }}\"ref\": {{ to_json_string(mcp.request.ref) }}{% set ns.sep = \", \" %}{% endif %}{% if mcp is defined and mcp.request is defined and mcp.request.inputs is defined and mcp.request.inputs is not none %}{{ ns.sep }}\"inputs\": { {% for k, v in mcp.request.inputs.items() %}{% if not loop.first %}, {% endif %}{{ to_json_string(k) }}: {% if v is sameas true %}\"true\"{% elif v is sameas false %}\"false\"{% else %}{{ to_json_string(v) }}{% endif %}{% endfor %} }{% set ns.sep = \", \" %}{% endif %} }",
       "body_type": "json",
       "yaml_as_json": false,
       "post_script": "",

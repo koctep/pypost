@@ -91,11 +91,37 @@ template:
 - Dispatch `inputs` values are always sent as JSON strings (booleans become
   `"true"`/`"false"`), which is the documented GitHub form. Nested values would be sent as
   Python `str()` text, so descriptions say "scalar values only, at most 25 keys".
-- `github_dispatch_workflow` renders `inputs` before `ref`. Field order does not matter to
-  GitHub; the order only avoids a false positive in the template-marker test
-  ([PYPOST-1339](https://pypost.atlassian.net/browse/PYPOST-1339)).
+- `github_dispatch_workflow` renders `ref` then `inputs` (natural GitHub docs order). Field
+  order does not matter to GitHub; the surviving-marker check scans raw rendered body text
+  (see [Surviving template-marker checks](#surviving-template-marker-checks-pypost-1339)).
 - `github_cancel_workflow_run` sends a static `{}`. `github_rerun_workflow_run` with no
   arguments renders `{ }`. Both are sent as `json={}`.
+
+## Surviving template-marker checks (PYPOST-1339)
+
+After a full or minimal render, offline tests assert that URL, header values, query values,
+and the **raw rendered body template** contain none of `_TEMPLATE_MARKERS`
+(`{{`, `}}`, `{%`, `%}`). Body scanning uses `_render(request.body, variables)`, the same
+surface Jinja produced — not `json.dumps` of the parsed `kwargs["json"]` payload.
+
+| Why raw body | Why not re-serialize |
+| ------------ | -------------------- |
+| An unrendered marker appears in the template output string | `json.dumps` of a nested final object ends with `}}` and false-positives even when render succeeded |
+| Matches how `_render_body_json` already renders before `json.loads` | Field order workarounds (for example `inputs` before `ref`) become unnecessary |
+
+Coverage:
+
+- `test_github_mcp_full_render_leaves_no_template_markers` — every tool, full and minimal
+  args.
+- `test_github_mcp_nested_object_final_body_field_does_not_false_positive_markers` — twin:
+  `github_dispatch_workflow` with full args must end with nested `inputs` and still pass the
+  same raw-body scan.
+
+The GitLab suite uses the same body-surface rule
+([GitLab MCP Example Collection](gitlab_mcp_collection.md#surviving-template-marker-checks-pypost-1339)).
+Shared helpers stay deferred to
+[PYPOST-1340](https://pypost.atlassian.net/browse/PYPOST-1340). Substring matches inside
+legitimate JSON **string values** can still trip the check; that residual risk is accepted.
 
 ## Design decisions
 
@@ -278,8 +304,10 @@ groups as the GitLab module.
   `test_github_create_pull_request_review_body_always_carries_event` proves no body without
   `event` can render.
 - **Placeholder integrity:** declared vs used `mcp_params`, companion-env coverage,
-  argument names that must not shadow `dict` attributes, no surviving `{{`/`{%` after a
-  full render.
+  argument names that must not shadow `dict` attributes, no surviving template markers after
+  a full or minimal render (raw body via `_render`; see
+  [Surviving template-marker checks](#surviving-template-marker-checks-pypost-1339)), and the
+  nested-object-final twin for `github_dispatch_workflow`.
 - **Encoding:** `test_github_template_encoding`, `test_github_body_value_encoding`,
   `test_github_numeric_path_ids_reject_non_decimal`,
   `test_github_body_integers_reject_non_decimal` (MCP boundary and `to_int` layer).
@@ -333,6 +361,8 @@ imported environment or through the `github_com` preset.
 | `github_mcp_rest_paths.json drifted from design` | Catalog changed without the test spec table | Update `GITHUB_TOOL_SPECS` to the reviewed path |
 | `<tool> headers drifted` | Header missing or version differs from `api_version` | Restore the three or four exact headers |
 | `<tool> [<subset>] body drifted` or `json.loads` error | Broken guard, separator or loop in a body template | Compare with a working body of the same field type |
+| `<tool> [full]` / `[minimal]` left `'}}'` (or other marker) after render | Real leftover Jinja in URL/headers/query/body, **or** a sample string value that contains a marker substring | Fix the template; do not switch the body scan back to `json.dumps(parsed)`. Nested final objects alone are not a failure (PYPOST-1339) |
+| `dispatch body must end with nested inputs for this twin` | `github_dispatch_workflow` no longer emits `ref` then `inputs` | Restore that emission order, or update the twin if the contract deliberately changes |
 | README coverage tools differ from catalog | Tool added or renamed without the README list | Update "GitHub coverage vs gaps" |
 | GitHub answers 404 with `/repos//` in the URL | Blank `github_owner` or `github_repo` and no override | Set defaults or pass both arguments (see PYPOST-1332) |
 | GitHub answers 422 on review create | Invalid `event`, or `REQUEST_CHANGES`/`COMMENT` without `body` | Pass a valid `event` and a `body` |
@@ -340,10 +370,13 @@ imported environment or through the `github_com` preset.
 
 ## Known limitations and follow-ups
 
-- [PYPOST-1339](https://pypost.atlassian.net/browse/PYPOST-1339) — the template-marker
-  test scans re-serialized JSON and false-positives on a body that ends with an object.
+- [PYPOST-1339](https://pypost.atlassian.net/browse/PYPOST-1339) — **resolved**: marker
+  checks scan raw `_render` body text; dispatch emits `ref` then `inputs`; nested-object
+  twin guards the former false positive (see
+  [Surviving template-marker checks](#surviving-template-marker-checks-pypost-1339)).
 - [PYPOST-1340](https://pypost.atlassian.net/browse/PYPOST-1340) — shared loopback stub
-  and contract helpers for the Jira, GitLab and GitHub collections.
+  and contract helpers for the Jira, GitLab and GitHub collections (includes eventual
+  shared marker-scan helper).
 - [PYPOST-1341](https://pypost.atlassian.net/browse/PYPOST-1341) — migrate to API version
   `2026-03-10` before 2028-03-10; expose dispatch run details (`return_run_details`).
   Today `github_dispatch_workflow` returns no run ID, so the agent must find the run with

@@ -1103,9 +1103,10 @@ def test_github_mcp_full_render_leaves_no_template_markers():
     for spec in GITHUB_TOOL_SPECS:
         request = _request_for(collection, spec.tool)
         for label, args in (("full", _full_args(spec)), ("minimal", _required_args(spec))):
-            kwargs = _prepare(request, _execution_variables(request, args))
+            variables = _execution_variables(request, args)
+            kwargs = _prepare(request, variables)
             rendered = [kwargs["url"], *kwargs["headers"].values(), *kwargs["params"].values()]
-            rendered.append(json.dumps(kwargs.get("json", kwargs.get("data", ""))))
+            rendered.append(_render(request.body, variables))
             for content in rendered:
                 for marker in _TEMPLATE_MARKERS:
                     assert marker not in str(content), (
@@ -1119,6 +1120,36 @@ def test_github_mcp_full_render_leaves_no_template_markers():
             expected_keys = {name for name in spec.query if name in args or name in _PAGINATION}
             assert set(kwargs["params"]) == expected_keys, (
                 f"{spec.tool} [{label}] query keys {sorted(kwargs['params'])}"
+            )
+
+
+def test_github_mcp_nested_object_final_body_field_does_not_false_positive_markers():
+    """Nested final JSON object must not trip surviving-marker checks (PYPOST-1339).
+
+    ``github_dispatch_workflow`` emits ``ref`` then ``inputs`` so the last body field
+    is a nested object. The scan must match
+    ``test_github_mcp_full_render_leaves_no_template_markers`` (raw rendered body
+    text via ``_render``, not ``json.dumps`` of the parsed payload).
+    """
+    collection = _load_github_collection()
+    spec = SPECS_BY_TOOL["github_dispatch_workflow"]
+    request = _request_for(collection, spec.tool)
+    args = _full_args(spec)
+    variables = _execution_variables(request, args)
+    kwargs = _prepare(request, variables)
+    body_obj = kwargs.get("json")
+    assert isinstance(body_obj, dict), f"expected JSON body object, got {body_obj!r}"
+    assert list(body_obj)[-1] == "inputs", (
+        f"dispatch body must end with nested inputs for this twin: {list(body_obj)!r}"
+    )
+    assert isinstance(body_obj["inputs"], dict), body_obj["inputs"]
+    rendered = [kwargs["url"], *kwargs["headers"].values(), *kwargs["params"].values()]
+    rendered.append(_render(request.body, variables))
+    for content in rendered:
+        for marker in _TEMPLATE_MARKERS:
+            assert marker not in str(content), (
+                f"github_dispatch_workflow [nested-object-final] left {marker!r} "
+                f"after render: {content!r}"
             )
 
 
