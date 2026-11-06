@@ -1335,6 +1335,39 @@ def test_github_prepare_allows_legitimate_dotted_workflow_id() -> None:
     assert kwargs["url"].endswith("/actions/workflows/ci.yml/runs")
 
 
+# ---------------------------------------------------------------------------
+# 6c. Blank path segments (PYPOST-1332) — fail closed before dispatch
+# ---------------------------------------------------------------------------
+
+
+def _assert_blank_path_segment_rejected(exc: ExecutionError) -> None:
+    assert exc.category == ErrorCategory.TEMPLATE
+    combined = f"{exc.message} {exc.detail or ''}".lower()
+    assert "blank" in combined or "empty" in combined, (
+        f"expected blank/empty path-segment wording, got {exc!r}"
+    )
+    assert "path" in combined or "segment" in combined, (
+        f"expected path-segment rejection wording, got {exc!r}"
+    )
+
+
+@pytest.mark.parametrize(
+    ("tool", "arg"),
+    (
+        pytest.param("github_get_repository", "github_owner", id="owner-blank"),
+        pytest.param("github_get_repository", "github_repo", id="repo-blank"),
+    ),
+)
+def test_github_prepare_rejects_blank_path_segments(tool: str, arg: str) -> None:
+    collection = _load_github_collection()
+    request = _request_for(collection, tool)
+    args = {**_required_args(SPECS_BY_TOOL[tool]), arg: ""}
+    variables = _execution_variables(request, args)
+    with pytest.raises(ExecutionError) as ctx:
+        _prepare(request, variables)
+    _assert_blank_path_segment_rejected(ctx.value)
+
+
 _BODY_ENCODING_CASES = (
     pytest.param(
         "github_dispatch_workflow", {"workflow_id": "ci.yml", "ref": 'feature/x"y'},

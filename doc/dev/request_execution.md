@@ -12,10 +12,11 @@ URL templates are rendered **once per HTTP request** inside `HTTPClient.send_req
 1. `render_string(request.url, variables)` resolves the URL once per send.
 2. `_prepare_request_kwargs(..., rendered_url=url)` reuses that value for the actual request.
 
-**Path segment rejection (PYPOST-1346):** Before headers, params, or body are prepared,
-`_prepare_request_kwargs` rejects a rendered URL whose path contains a whole segment
-exactly equal to `.` or `..` (`ExecutionError` / `ErrorCategory.TEMPLATE`). No network
-dispatch occurs. See [HTTP Path Segment Rejection](http_path_segment_rejection.md).
+**Path segment rejection (PYPOST-1346 / PYPOST-1332):** Before headers, params, or body are
+prepared, `_prepare_request_kwargs` rejects a rendered URL whose path contains a whole
+segment exactly equal to `.` or `..`, or a blank segment other than the synthetic empty
+from an absolute path’s leading `/` (`ExecutionError` / `ErrorCategory.TEMPLATE`). No
+network dispatch occurs. See [HTTP Path Segment Rejection](http_path_segment_rejection.md).
 
 **SSE stream handling (PYPOST-430):** After the response arrives, GET requests with
 `Content-Type: text/event-stream` are routed to SSE probe parsing (`_handle_sse_response`).

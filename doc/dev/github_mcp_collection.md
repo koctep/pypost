@@ -197,11 +197,13 @@ single `owner/repo` variable would either need string splitting in the template 
   `github_owner` and `github_repo` string arguments. It is a soft default, not a security
   boundary (the same model as GitLab and
   [Jira MCP Example Project Default](jira_mcp_project_default.md)).
-- URLs stay declarative: there is no `{% if %}` fallback. A blank value with no override
-  renders `/repos//…` and GitHub answers 404. Mitigation: the non-empty placeholders
-  `your-org` / `your-repo` are set in the environment, the `github_com` preset and the
-  manifest defaults, and tests enforce that all three match. The runtime fail-closed check
-  is [PYPOST-1332](https://pypost.atlassian.net/browse/PYPOST-1332).
+- URLs stay declarative: there is no `{% if %}` fallback. Soft defaults still use the
+  non-empty placeholders `your-org` / `your-repo` in the environment, the `github_com`
+  preset, and the manifest defaults (tests enforce that all three match). Runtime
+  fail-closed: a blank rendered path segment (including empty `github_owner` /
+  `github_repo`) is rejected in `HTTPClient._prepare_request_kwargs` before dispatch
+  ([PYPOST-1332](https://pypost.atlassian.net/browse/PYPOST-1332); see
+  [HTTP Path Segment Rejection](http_path_segment_rejection.md)).
 - `github_api_url` and `github_token` are never published in a tool schema.
 
 ### Review `event` is required
@@ -248,12 +250,13 @@ their imported copy. Merge and pending-review submission are a product decision 
   descriptions say "decimal string or integer". A non-decimal value is rejected at the MCP
   boundary (`McpArgumentValidationError`) and, if it reaches the template, by `to_int`
   (`IntegerConversionError`).
-- Path segments that are exactly `.` or `..` (for example `github_owner`, `github_repo`,
-  or `workflow_id`) are rejected in `HTTPClient._prepare_request_kwargs` before dispatch
-  (`ExecutionError` / `ErrorCategory.TEMPLATE`). Legitimate dotted names such as
-  `ci.yml` are unchanged. See
+- Path segments that are exactly `.` or `..`, or blank (for example empty `github_owner`,
+  `github_repo`, or `workflow_id`), are rejected in `HTTPClient._prepare_request_kwargs`
+  before dispatch (`ExecutionError` / `ErrorCategory.TEMPLATE`). Legitimate dotted names
+  such as `ci.yml` are unchanged. See
   [HTTP Path Segment Rejection](http_path_segment_rejection.md)
-  ([PYPOST-1346](https://pypost.atlassian.net/browse/PYPOST-1346)).
+  ([PYPOST-1346](https://pypost.atlassian.net/browse/PYPOST-1346),
+  [PYPOST-1332](https://pypost.atlassian.net/browse/PYPOST-1332)).
 
 ## Secrets
 
@@ -413,7 +416,7 @@ imported environment or through the `github_com` preset.
 | `<tool> [full]` / `[minimal]` left `'}}'` (or other marker) after render | Real leftover Jinja in URL/headers/query/body, **or** a sample string value that contains a marker substring | Fix the template; do not switch the body scan back to `json.dumps(parsed)`. Nested final objects alone are not a failure (PYPOST-1339) |
 | `dispatch body must end with nested inputs for this twin` | `github_dispatch_workflow` no longer emits `ref` then `inputs` | Restore that emission order, or update the twin if the contract deliberately changes |
 | README coverage tools differ from catalog | Tool added or renamed without the README list | Update "GitHub coverage vs gaps" |
-| GitHub answers 404 with `/repos//` in the URL | Blank `github_owner` or `github_repo` and no override | Set defaults or pass both arguments (see PYPOST-1332) |
+| MCP / prepare fails with "Blank path segment is not allowed" | Empty `github_owner` / `github_repo` (or other path arg) after render | Pass non-empty owner/repo or keep the soft defaults |
 | GitHub answers 422 on review create | Invalid `event`, or `REQUEST_CHANGES`/`COMMENT` without `body` | Pass a valid `event` and a `body` |
 | GitHub answers 401 or 403 | Missing token, or missing permission or scope | Check `github_token` and the permissions in `examples/README.md` |
 | Empty-body write test expects `201`/`202`/`204` but got `200` + JSON | Stub no longer maps `/rerun`, `/cancel`, or `/dispatches` to empty-body replies | Restore `_EMPTY_BODY_SUCCESS_BY_SUFFIX` in `github_mcp_collection_http.py` (see [Empty-body write success](#empty-body-write-success-pypost-1345)) |
@@ -446,8 +449,9 @@ imported environment or through the `github_com` preset.
 - [PYPOST-1346](https://pypost.atlassian.net/browse/PYPOST-1346) — **resolved**: reject
   `.`/`..` as rendered path segments in `HTTPClient` before dispatch (see
   [HTTP Path Segment Rejection](http_path_segment_rejection.md)).
-- [PYPOST-1332](https://pypost.atlassian.net/browse/PYPOST-1332) — fail-closed rendering
-  for blank path-segment variables.
+- [PYPOST-1332](https://pypost.atlassian.net/browse/PYPOST-1332) — **resolved**: fail-closed
+  blank path-segment rejection in `HTTPClient` before dispatch (see
+  [HTTP Path Segment Rejection](http_path_segment_rejection.md)).
 - [PYPOST-1333](https://pypost.atlassian.net/browse/PYPOST-1333) — sanitize rendered URLs
   in `sse_stream_detected`, `retryable_error` and `retry_exhausted`.
 - [PYPOST-1122](https://pypost.atlassian.net/browse/PYPOST-1122) — **resolved**:
