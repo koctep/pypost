@@ -15,7 +15,7 @@ from urllib.parse import quote
 from jinja2 import Environment
 
 from pypost.core.adf import to_adf
-from pypost.core.json_string import to_json_string
+from pypost.core.json_string import to_json, to_json_string
 from pypost.core.template_expression_types import IntegerConversionError
 
 
@@ -62,6 +62,7 @@ _DEFAULT_CATALOG: MappingProxyType[str, Callable[..., Any]] = MappingProxyType({
     "env": _env,
     "to_adf": to_adf,
     "to_json_string": to_json_string,
+    "to_json": to_json,
 })
 
 

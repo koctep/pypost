@@ -93,7 +93,16 @@ class TestFunctionRegistry(unittest.TestCase):
         self.assertEqual(
             reg.allowed_names(),
             frozenset(
-                {"urlencode", "md5", "base64", "to_int", "env", "to_adf", "to_json_string"}
+                {
+                    "urlencode",
+                    "md5",
+                    "base64",
+                    "to_int",
+                    "env",
+                    "to_adf",
+                    "to_json_string",
+                    "to_json",
+                }
             ),
         )
 

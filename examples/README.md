@@ -340,6 +340,8 @@ in the secret `github_token` variable.
   values and encoded once by the HTTP client. `labels` is a comma-separated string when
   listing issues, but a JSON array of strings when creating or updating an issue (an
   empty array clears all labels).
+- `github_dispatch_workflow` `inputs` keep JSON types from the caller (booleans, numbers,
+  strings, nested objects/arrays). They are not force-stringified by the template layer.
 - An owner, repository, or workflow file name that is exactly `.` or `..`, or that renders
   blank, is rejected before any HTTP request is sent (fail-closed). Legitimate names that
   merely contain dots (for example `ci.yml`) are unchanged. GitHub does not allow `.` /

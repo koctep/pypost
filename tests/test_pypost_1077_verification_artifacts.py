@@ -448,6 +448,7 @@ def test_function_catalog_expectation_is_the_exact_catalog_frozenset() -> None:
         "env",
         "to_adf",
         "to_json_string",
+        "to_json",
     }
 
 
