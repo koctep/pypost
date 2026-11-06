@@ -99,7 +99,7 @@ class HTTPClient:
 
     @staticmethod
     def _error_log_url(url: str, variables: Dict[str, str]) -> str:
-        """Return a URL safe for ordinary ERROR logs."""
+        """Return a URL safe for ERROR/WARNING application logs."""
         env_vars = {key: str(value) for key, value in variables.items()}
         return sanitize_text(url, env_vars=env_vars)
 
@@ -381,7 +381,7 @@ class HTTPClient:
             logger.warning(
                 "response_body_truncated method=%s url=%s max_bytes=%d",
                 request_data.method,
-                url,
+                self._error_log_url(url, variables),
                 self._max_response_bytes,
             )
             content = f"{content}{TRUNCATION_NOTICE}"

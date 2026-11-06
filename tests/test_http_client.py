@@ -874,6 +874,24 @@ class TestHTTPClientResponseBodyCap(unittest.TestCase):
         self.assertEqual("small", result.response.body)
         self.metrics.track_response_body_truncated.assert_not_called()
 
+    def test_truncation_warning_logs_redacted_resolved_url(self):
+        """PYPOST-1122: truncation WARNING must redact resolved URL secrets."""
+        self.mock_session.request.return_value = _make_response(
+            status=200,
+            chunks=[b"0123456789", b"extra-bytes"],
+        )
+        variables = {"host": "secret.example.com", "token": "abc"}
+        req = RequestData(
+            method="GET", url="http://{{host}}/api?token={{token}}"
+        )
+        with self.assertLogs("pypost.core.http_client", level="WARNING") as logs:
+            self.client.send_request(req, variables=variables)
+        joined = "\n".join(logs.output)
+        self.assertIn("response_body_truncated", joined)
+        self.assertIn("secret.example.com", joined)
+        self.assertNotIn("abc", joined)
+        self.assertIn("token=***", joined)
+
 
 class TestHTTPClientDotPathSegmentRejection(unittest.TestCase):
     """PYPOST-1346: refuse `.` / `..` path segments before dispatch."""

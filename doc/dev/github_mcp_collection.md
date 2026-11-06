@@ -389,8 +389,10 @@ again.
 No new logs or metrics. GitHub calls use the existing MCP and HTTP events and the
 method-labelled MCP metrics; the tool name appears in the MCP activity log only. The token
 travels only in `Authorization`, which the sanitizer masks. Rendered URLs carry owner,
-repository, branch and search values, but no secrets. Some generic log events print the
-rendered URL without sanitizing it (PYPOST-1122, PYPOST-1333). Details:
+repository, branch and search values, but no secrets. `response_body_truncated` sanitizes its
+URL field ([PYPOST-1122](https://pypost.atlassian.net/browse/PYPOST-1122)). Some other generic
+log events still print the rendered URL without sanitizing it
+([PYPOST-1333](https://pypost.atlassian.net/browse/PYPOST-1333)). Details:
 `ai-tasks/PYPOST-1334/50-observability.md`.
 
 ## Configuration
@@ -448,8 +450,9 @@ imported environment or through the `github_com` preset.
   for blank path-segment variables.
 - [PYPOST-1333](https://pypost.atlassian.net/browse/PYPOST-1333) — sanitize rendered URLs
   in `sse_stream_detected`, `retryable_error` and `retry_exhausted`.
-- [PYPOST-1122](https://pypost.atlassian.net/browse/PYPOST-1122) —
-  `response_body_truncated` logs the resolved URL.
+- [PYPOST-1122](https://pypost.atlassian.net/browse/PYPOST-1122) — **resolved**:
+  `response_body_truncated` WARNING URL uses `_error_log_url` (see
+  [Logging](logging.md)).
 - [PYPOST-1303](https://pypost.atlassian.net/browse/PYPOST-1303) — `make lint` does not run
   flake8 on `tests/`.
 
