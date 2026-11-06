@@ -248,11 +248,12 @@ their imported copy. Merge and pending-review submission are a product decision 
   descriptions say "decimal string or integer". A non-decimal value is rejected at the MCP
   boundary (`McpArgumentValidationError`) and, if it reaches the template, by `to_int`
   (`IntegerConversionError`).
-- **Limitation:** `urlencode` leaves `.` unencoded and `requests` resolves dot segments, so
-  `..` as `github_owner`, `github_repo` or `workflow_id` can reach another path on the same
-  host with the same method and token. GitHub does not allow these names, so valid input
-  never hits this case. The fail-closed fix is
-  [PYPOST-1346](https://pypost.atlassian.net/browse/PYPOST-1346).
+- Path segments that are exactly `.` or `..` (for example `github_owner`, `github_repo`,
+  or `workflow_id`) are rejected in `HTTPClient._prepare_request_kwargs` before dispatch
+  (`ExecutionError` / `ErrorCategory.TEMPLATE`). Legitimate dotted names such as
+  `ci.yml` are unchanged. See
+  [HTTP Path Segment Rejection](http_path_segment_rejection.md)
+  ([PYPOST-1346](https://pypost.atlassian.net/browse/PYPOST-1346)).
 
 ## Secrets
 
@@ -440,8 +441,9 @@ imported environment or through the `github_com` preset.
   loopback empty-body replies (`/rerun`→201, `/cancel`→202, `/dispatches`→204) and
   `test_github_mcp_empty_body_write_success` (see
   [Empty-body write success](#empty-body-write-success-pypost-1345)).
-- [PYPOST-1346](https://pypost.atlassian.net/browse/PYPOST-1346) — reject `.`/`..` as
-  rendered path segments.
+- [PYPOST-1346](https://pypost.atlassian.net/browse/PYPOST-1346) — **resolved**: reject
+  `.`/`..` as rendered path segments in `HTTPClient` before dispatch (see
+  [HTTP Path Segment Rejection](http_path_segment_rejection.md)).
 - [PYPOST-1332](https://pypost.atlassian.net/browse/PYPOST-1332) — fail-closed rendering
   for blank path-segment variables.
 - [PYPOST-1333](https://pypost.atlassian.net/browse/PYPOST-1333) — sanitize rendered URLs
@@ -457,6 +459,7 @@ There is no live GitHub test. Catalog accuracy depends on a person re-reviewing
 
 ## See also
 
+- [HTTP Path Segment Rejection](http_path_segment_rejection.md)
 - [GitLab MCP Example Collection](gitlab_mcp_collection.md)
 - [Examples Collection Library & Legacy Fixtures](examples_library_format.md)
 - [Jira MCP critical REST path freshness](jira_mcp_path_freshness.md)

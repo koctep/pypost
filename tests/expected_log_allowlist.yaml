@@ -1,6 +1,8 @@
 # ERROR allowlist derived from PYPOST-567 inventory and PYPOST-1081 restored capture.
 # CI verifier fails on unlisted ERROR lines or count > baseline + margin.
-baseline_error_count: 146
+# PYPOST-1346: +18 for intentional dot-path rejection ERROR tests (http_client 4,
+# GitHub 6, GitLab 8).
+baseline_error_count: 164
 error_margin: 5
 
 rules:
@@ -92,6 +94,8 @@ rules:
     message_prefix: yaml_to_json_conversion_failed
   - logger: pypost.core.http_client
     message_prefix: template_integer_conversion_failed
+  - logger: pypost.core.http_client
+    message_prefix: dot_path_segment_rejected
 
   # Encryption / environment storage / migration workers (error-path tests)
   - logger: pypost.core.key_provider

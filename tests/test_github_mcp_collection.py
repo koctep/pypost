@@ -35,6 +35,7 @@ from pypost.core.mcp_tool_contract import McpArgumentValidationError, normalize_
 from pypost.core.storage import StorageManager
 from pypost.core.template_expression_types import IntegerConversionError
 from pypost.core.template_service import TemplateService
+from pypost.models.errors import ErrorCategory, ExecutionError
 from pypost.models.library_manifest import LibraryManifest
 from pypost.models.models import Collection, Environment, McpToolParam, RequestData
 from tests.helpers.github_mcp_collection_http import stub_github_mcp_collection_http
@@ -1253,6 +1254,85 @@ def test_github_template_encoding(
     env = {**OFFLINE_ENV, **env_overrides}
     rendered = _render(request.url, _execution_variables(request, args, env))
     assert rendered == expected_url
+
+
+# ---------------------------------------------------------------------------
+# 6b. Dot path segments (PYPOST-1346) — fail closed before dispatch
+# ---------------------------------------------------------------------------
+
+_GITHUB_DOT_SEGMENT_CASES = (
+    pytest.param(
+        "github_get_repository",
+        "github_owner",
+        ".",
+        id="owner-dot",
+    ),
+    pytest.param(
+        "github_get_repository",
+        "github_owner",
+        "..",
+        id="owner-dotdot",
+    ),
+    pytest.param(
+        "github_get_repository",
+        "github_repo",
+        ".",
+        id="repo-dot",
+    ),
+    pytest.param(
+        "github_get_repository",
+        "github_repo",
+        "..",
+        id="repo-dotdot",
+    ),
+    pytest.param(
+        "github_list_workflow_runs_for_workflow",
+        "workflow_id",
+        ".",
+        id="workflow-dot",
+    ),
+    pytest.param(
+        "github_list_workflow_runs_for_workflow",
+        "workflow_id",
+        "..",
+        id="workflow-dotdot",
+    ),
+)
+
+
+def _assert_dot_path_segment_rejected(exc: ExecutionError, segment: str) -> None:
+    assert exc.category == ErrorCategory.TEMPLATE
+    combined = f"{exc.message} {exc.detail or ''}".lower()
+    assert segment in combined
+    assert "path" in combined or "segment" in combined, (
+        f"expected path-segment rejection wording, got {exc!r}"
+    )
+
+
+@pytest.mark.parametrize(("tool", "arg", "segment"), _GITHUB_DOT_SEGMENT_CASES)
+def test_github_prepare_rejects_dot_path_segments(
+    tool: str, arg: str, segment: str
+) -> None:
+    collection = _load_github_collection()
+    request = _request_for(collection, tool)
+    args = {**_required_args(SPECS_BY_TOOL[tool]), arg: segment}
+    variables = _execution_variables(request, args)
+    with pytest.raises(ExecutionError) as ctx:
+        _prepare(request, variables)
+    _assert_dot_path_segment_rejected(ctx.value, segment)
+
+
+def test_github_prepare_allows_legitimate_dotted_workflow_id() -> None:
+    collection = _load_github_collection()
+    request = _request_for(
+        collection, "github_list_workflow_runs_for_workflow"
+    )
+    args = {
+        **_required_args(SPECS_BY_TOOL["github_list_workflow_runs_for_workflow"]),
+        "workflow_id": "ci.yml",
+    }
+    kwargs = _prepare(request, _execution_variables(request, args))
+    assert kwargs["url"].endswith("/actions/workflows/ci.yml/runs")
 
 
 _BODY_ENCODING_CASES = (

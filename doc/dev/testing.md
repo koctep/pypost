@@ -2500,7 +2500,8 @@ The verifier reuses `parse_log` from `scripts/parse_test_log_inventory.py`. It:
    - **Prefix only:** `message_prefix` matches any logger (for shared event names).
 3. **Fails** when any ERROR line is unlisted.
 4. **Fails** when total ERROR count exceeds `baseline_error_count + error_margin`
-   (baseline **146**, margin **5** after PYPOST-1081 capture restoration).
+   (baseline **164**, margin **5** after PYPOST-1346 intentional
+   `dot_path_segment_rejected` ERROR tests; was 146 after PYPOST-1081).
 
 Local reproduction:
 

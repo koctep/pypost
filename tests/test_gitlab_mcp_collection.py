@@ -35,6 +35,7 @@ from pypost.core.mcp_tool_contract import normalize_mcp_tool_name
 from pypost.core.storage import StorageManager
 from pypost.core.template_expression_types import IntegerConversionError
 from pypost.core.template_service import TemplateService
+from pypost.models.errors import ErrorCategory, ExecutionError
 from pypost.models.library_manifest import LibraryManifest
 from pypost.models.models import Collection, Environment, McpToolParam, RequestData
 from tests.helpers.gitlab_mcp_collection_http import stub_gitlab_mcp_collection_http
@@ -992,6 +993,95 @@ def test_gitlab_template_encoding(
     env = {**OFFLINE_ENV, **env_overrides}
     rendered = _render(request.url, _execution_variables(request, args, env))
     assert rendered == expected_url
+
+
+# ---------------------------------------------------------------------------
+# 6b. Dot path segments (PYPOST-1346) — fail closed before dispatch
+# ---------------------------------------------------------------------------
+
+_GITLAB_DOT_SEGMENT_CASES = (
+    pytest.param(
+        "gitlab_get_project",
+        "gitlab_project",
+        ".",
+        id="project-dot",
+    ),
+    pytest.param(
+        "gitlab_get_project",
+        "gitlab_project",
+        "..",
+        id="project-dotdot",
+    ),
+    pytest.param(
+        "gitlab_get_file",
+        "file_path",
+        ".",
+        id="file-path-dot",
+    ),
+    pytest.param(
+        "gitlab_get_file",
+        "file_path",
+        "..",
+        id="file-path-dotdot",
+    ),
+    pytest.param(
+        "gitlab_get_branch",
+        "branch",
+        ".",
+        id="branch-dot",
+    ),
+    pytest.param(
+        "gitlab_get_branch",
+        "branch",
+        "..",
+        id="branch-dotdot",
+    ),
+    pytest.param(
+        "gitlab_get_commit",
+        "sha",
+        ".",
+        id="sha-dot",
+    ),
+    pytest.param(
+        "gitlab_get_commit",
+        "sha",
+        "..",
+        id="sha-dotdot",
+    ),
+)
+
+
+def _assert_dot_path_segment_rejected(exc: ExecutionError, segment: str) -> None:
+    assert exc.category == ErrorCategory.TEMPLATE
+    combined = f"{exc.message} {exc.detail or ''}".lower()
+    assert segment in combined
+    assert "path" in combined or "segment" in combined, (
+        f"expected path-segment rejection wording, got {exc!r}"
+    )
+
+
+@pytest.mark.parametrize(("tool", "arg", "segment"), _GITLAB_DOT_SEGMENT_CASES)
+def test_gitlab_prepare_rejects_dot_path_segments(
+    tool: str, arg: str, segment: str
+) -> None:
+    collection = _load_gitlab_collection()
+    request = _request_for(collection, tool)
+    args = {**_required_args(SPECS_BY_TOOL[tool]), arg: segment}
+    variables = _execution_variables(request, args)
+    with pytest.raises(ExecutionError) as ctx:
+        _prepare(request, variables)
+    _assert_dot_path_segment_rejected(ctx.value, segment)
+
+
+def test_gitlab_prepare_allows_legitimate_file_path() -> None:
+    collection = _load_gitlab_collection()
+    request = _request_for(collection, "gitlab_get_file")
+    args = {
+        **_required_args(SPECS_BY_TOOL["gitlab_get_file"]),
+        "file_path": "src/app/main.py",
+    }
+    kwargs = _prepare(request, _execution_variables(request, args))
+    assert "/repository/files/src%2Fapp%2Fmain.py/raw" in kwargs["url"]
 
 
 _INVALID_NUMERIC_CASES = tuple(

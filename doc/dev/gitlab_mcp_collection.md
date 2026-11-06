@@ -98,11 +98,12 @@ the marker check no longer forces a scalar-last workaround.
 - Numeric path IDs use the MCP type `integer_or_string`. Their descriptions say
   "decimal string or integer". `to_int` raises `IntegerConversionError` for anything
   else, and `HTTPClient` reports it before sending.
-- **Limitation:** `urlencode` leaves `.` unencoded. A `file_path`, `branch` or `sha` that
-  is exactly `.` or `..` becomes a dot segment that HTTP stacks may normalise away. Git
-  does not allow these names, so valid input never reaches this case. Values such as
-  `a.md` or `../x` (rendered `..%2Fx`) are not affected. Fixing it would need a core
-  `urlencode` change.
+- Path segments that are exactly `.` or `..` (for example `file_path`, `branch`, `sha`,
+  or `gitlab_project`) are rejected in `HTTPClient._prepare_request_kwargs` before
+  dispatch (`ExecutionError` / `ErrorCategory.TEMPLATE`). Values such as `a.md` or
+  `../x` (rendered `..%2Fx`) are unchanged. See
+  [HTTP Path Segment Rejection](http_path_segment_rejection.md)
+  ([PYPOST-1346](https://pypost.atlassian.net/browse/PYPOST-1346)).
 
 ## Authentication and secrets
 
@@ -249,6 +250,9 @@ imported environment or through the `gitlab_com` preset.
 - [PYPOST-1340](https://pypost.atlassian.net/browse/PYPOST-1340) — shared loopback stub
   and contract helpers for the Jira, GitLab and GitHub collections (includes eventual
   shared marker-scan helper).
+- [PYPOST-1346](https://pypost.atlassian.net/browse/PYPOST-1346) — **resolved**: reject
+  `.`/`..` as rendered path segments in `HTTPClient` before dispatch (see
+  [HTTP Path Segment Rejection](http_path_segment_rejection.md)).
 - [PYPOST-1332](https://pypost.atlassian.net/browse/PYPOST-1332) — fail-closed rendering
   for blank path-segment variables.
 - [PYPOST-1333](https://pypost.atlassian.net/browse/PYPOST-1333) — sanitize rendered URLs
@@ -260,6 +264,7 @@ imported environment or through the `gitlab_com` preset.
 
 ## See also
 
+- [HTTP Path Segment Rejection](http_path_segment_rejection.md)
 - [GitHub MCP Example Collection](github_mcp_collection.md)
 - [Examples Collection Library & Legacy Fixtures](examples_library_format.md)
 - [Jira MCP critical REST path freshness](jira_mcp_path_freshness.md)

@@ -14,7 +14,7 @@
 | Module | Audit era LOC | Baseline LOC | Cap |
 | --- | ---: | ---: | ---: |
 | `pypost/core/collection_item_dispatch.py` | — | 83 | 83 |
-| `pypost/core/http_client.py` | 198 | 381 | 418 |
+| `pypost/core/http_client.py` | 198 | 409 | 418 |
 | `pypost/core/mcp_server_impl.py` | 231 | 396 | 407 |
 | `pypost/core/qt/metrics.py` | 286 | 63 | 70 |
 | `pypost/core/qt/metrics_tracking.py` | — | 166 | 180 |
@@ -29,7 +29,7 @@
 | `pypost/ui/presenters/collections_presenter.py` | — | 534 | 535 |
 | `pypost/ui/presenters/env_presenter.py` | — | 468 | 482 |
 | `pypost/ui/presenters/mcp_controls_presenter.py` | — | 384 | 407 |
-| `pypost/ui/presenters/tabs_presenter.py` | — | 1053 | 1165 |
+| `pypost/ui/presenters/tabs_presenter.py` | — | 1055 | 1165 |
 | `pypost/ui/widgets/mixins.py` | — | 396 | 411 |
 
 Regenerate:
