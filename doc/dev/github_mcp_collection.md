@@ -32,7 +32,7 @@ explained in depth here.
 | `examples/README.md` | User-facing GitHub sections: import order, authentication, github.com vs GHES, default repository and identifiers, coverage vs gaps. |
 | `Makefile` | `check-github-mcp-path-freshness` target. |
 | `tests/test_github_mcp_collection.py` | All offline contracts (see [Test layout](#test-layout)). |
-| `tests/helpers/github_mcp_collection_http.py` | Loopback GitHub stand-in for the wire-level e2e test. |
+| `tests/helpers/github_mcp_collection_http.py` | Loopback GitHub stand-in for wire-level e2e and empty-body write success (PYPOST-1345). |
 
 ```text
 github.json (env) ----------------------------+
@@ -96,6 +96,46 @@ template:
   (see [Surviving template-marker checks](#surviving-template-marker-checks-pypost-1339)).
 - `github_cancel_workflow_run` sends a static `{}`. `github_rerun_workflow_run` with no
   arguments renders `{ }`. Both are sent as `json={}`.
+
+## Empty-body write success (PYPOST-1345)
+
+GitHub documents three Actions writes as success with **no response body**. The MCP runtime
+already reports those as successful tool results (`error: false`, status preserved, `body: ""`);
+PYPOST-1345 locks that path with an offline guard so the suite cannot stay green if empty-body
+success is mis-classified or the stub stops presenting it.
+
+| Tool | Path suffix (stub match) | Documented success | Body |
+| ---- | ------------------------ | ------------------ | ---- |
+| `github_rerun_workflow_run` | `/rerun` | **201** | Empty |
+| `github_cancel_workflow_run` | `/cancel` | **202** | Empty |
+| `github_dispatch_workflow` | `/dispatches` | **204** (default; no `return_run_details`) | Empty |
+
+### Loopback stub replies
+
+`tests/helpers/github_mcp_collection_http.py` remains a capture-everything stand-in. Reply policy:
+
+- Path ends with `/rerun`, `/cancel`, or `/dispatches` → that suffix's status, `Content-Length: 0`,
+  no entity bytes (not JSON `{}`).
+- Every other path → **200** + `{"id":1,"offline":true}` (unchanged default for list/create and
+  other wire coverage).
+
+### MCP assertions
+
+`_successful_envelope(result, operation, *, expected_status=200, expect_empty_body=False)` is the
+shared success contract for loopback calls. When `expect_empty_body` is true it requires
+`body == ""` in addition to `isError is False`, envelope `error is False`, and
+`status == expected_status`.
+
+Coverage:
+
+- `test_github_mcp_empty_body_write_success` — parametrized `rerun-201` / `cancel-202` /
+  `dispatch-204`; full MCP `call_tool` against the stub (`@pytest.mark.timeout(60)`).
+- `test_github_mcp_loopback_e2e_wire_contract` — expects the same statuses for dispatch and
+  cancel via `_LOOPBACK_CALLS` (non-200 ⇒ empty body through the shared helper).
+
+Dispatch with optional `return_run_details` (`200` + JSON run details) is out of scope here; see
+[PYPOST-1341](https://pypost.atlassian.net/browse/PYPOST-1341). Shared stub extraction across
+collections remains [PYPOST-1340](https://pypost.atlassian.net/browse/PYPOST-1340).
 
 ## Surviving template-marker checks (PYPOST-1339)
 
@@ -314,11 +354,17 @@ groups as the GitLab module.
 - **Loopback e2e:** `test_github_mcp_loopback_e2e_wire_contract`
   (`@pytest.mark.timeout(60)`, `anyio.fail_after(10)` per call) drives a live MCP server
   through `github_list_workflow_runs_for_workflow` (owner override and encoded workflow file
-  name), `github_create_issue` (array body), `github_dispatch_workflow` (object body) and
-  `github_cancel_workflow_run` (`{}` body).
+  name), `github_create_issue` (array body), `github_dispatch_workflow` (object body; expects
+  **204** empty) and `github_cancel_workflow_run` (`{}` body; expects **202** empty).
   `tests/helpers/github_mcp_collection_http.py` runs a `ThreadingHTTPServer` on
   `127.0.0.1:0` that records method, raw path, raw query, `Authorization`, `Accept`,
   `X-GitHub-Api-Version`, `Content-Type` and the JSON body, and joins its thread within 2 s.
+  Path-suffix empty-body replies for `/rerun` / `/cancel` / `/dispatches` are documented under
+  [Empty-body write success](#empty-body-write-success-pypost-1345).
+- **Empty-body write success (PYPOST-1345):**
+  `test_github_mcp_empty_body_write_success` parametrizes re-run (**201**), cancel (**202**) and
+  dispatch (**204**) through a full MCP tool call and asserts success with an empty body via
+  `_successful_envelope(..., expect_empty_body=True)`.
 - **Wire-level reserved characters:**
   `test_github_query_reserved_characters_stay_single_key_on_wire` prepares real `requests`
   requests for `branch`, `head` and `labels`.
@@ -367,6 +413,8 @@ imported environment or through the `github_com` preset.
 | GitHub answers 404 with `/repos//` in the URL | Blank `github_owner` or `github_repo` and no override | Set defaults or pass both arguments (see PYPOST-1332) |
 | GitHub answers 422 on review create | Invalid `event`, or `REQUEST_CHANGES`/`COMMENT` without `body` | Pass a valid `event` and a `body` |
 | GitHub answers 401 or 403 | Missing token, or missing permission or scope | Check `github_token` and the permissions in `examples/README.md` |
+| Empty-body write test expects `201`/`202`/`204` but got `200` + JSON | Stub no longer maps `/rerun`, `/cancel`, or `/dispatches` to empty-body replies | Restore `_EMPTY_BODY_SUCCESS_BY_SUFFIX` in `github_mcp_collection_http.py` (see [Empty-body write success](#empty-body-write-success-pypost-1345)) |
+| Empty-body write test fails on non-empty `body` | Stub sent JSON `{}` / entity bytes, or runtime stopped treating empty HTTP bodies as `""` | Reply with `Content-Length: 0` and no entity; do not send `{}` for these three paths |
 
 ## Known limitations and follow-ups
 
@@ -388,8 +436,10 @@ imported environment or through the `github_com` preset.
   helper to replace hand-written arrays, objects and booleans.
 - [PYPOST-1344](https://pypost.atlassian.net/browse/PYPOST-1344) — merge pull request and
   pending-review submit tools (product decision).
-- [PYPOST-1345](https://pypost.atlassian.net/browse/PYPOST-1345) — test empty-body
-  `201`/`202`/`204` success for re-run, cancel and dispatch.
+- [PYPOST-1345](https://pypost.atlassian.net/browse/PYPOST-1345) — **resolved**: path-aware
+  loopback empty-body replies (`/rerun`→201, `/cancel`→202, `/dispatches`→204) and
+  `test_github_mcp_empty_body_write_success` (see
+  [Empty-body write success](#empty-body-write-success-pypost-1345)).
 - [PYPOST-1346](https://pypost.atlassian.net/browse/PYPOST-1346) — reject `.`/`..` as
   rendered path segments.
 - [PYPOST-1332](https://pypost.atlassian.net/browse/PYPOST-1332) — fail-closed rendering

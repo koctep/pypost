@@ -1438,38 +1438,63 @@ def test_github_query_wire_checker_rejects_prejoined_reserved_value():
         )
 
 
-def _successful_envelope(result: Any, operation: str) -> dict[str, Any]:
+def _successful_envelope(
+    result: Any,
+    operation: str,
+    *,
+    expected_status: int = 200,
+    expect_empty_body: bool = False,
+) -> dict[str, Any]:
     try:
         envelope = json.loads(result.content[0].text)
     except (AttributeError, IndexError, TypeError, json.JSONDecodeError) as exc:
         raise AssertionError(f"{operation} did not return a JSON MCP envelope") from exc
     assert result.isError is False, f"{operation} returned an MCP error"
     assert envelope.get("error") is False, f"{operation} returned a request error: {envelope}"
-    assert envelope.get("status") == 200, f"{operation} did not reach the stub: {envelope}"
+    assert envelope.get("status") == expected_status, (
+        f"{operation} expected status {expected_status}, got {envelope.get('status')!r}: "
+        f"{envelope}"
+    )
+    if expect_empty_body:
+        assert envelope.get("body") == "", (
+            f"{operation} expected empty body for status {expected_status}, "
+            f"got {envelope.get('body')!r}: {envelope}"
+        )
     return envelope
 
 
-_LOOPBACK_CALLS: tuple[tuple[str, dict[str, Any]], ...] = (
+_LOOPBACK_CALLS: tuple[tuple[str, dict[str, Any], int], ...] = (
     (
         "github_list_workflow_runs_for_workflow",
         {"github_owner": "my org/x", "workflow_id": "dir/ci.yml", "branch": "feature/x&y=1#z"},
+        200,
     ),
-    ("github_create_issue", {"title": "Bug", "labels": ["bug", 'a"b'], "assignees": ["octocat"]}),
+    (
+        "github_create_issue",
+        {"title": "Bug", "labels": ["bug", 'a"b'], "assignees": ["octocat"]},
+        200,
+    ),
     (
         "github_dispatch_workflow",
         {"workflow_id": "ci.yml", "ref": "main", "inputs": {"env": "prod", "dry": True}},
+        204,
     ),
-    ("github_cancel_workflow_run", {"run_id": "123"}),
+    ("github_cancel_workflow_run", {"run_id": "123"}, 202),
 )
 
 _LOOPBACK_CALL_TIMEOUT_SECONDS = 10
 
 
 async def _run_loopback_calls(mcp_url: str) -> None:
-    for tool, arguments in _LOOPBACK_CALLS:
+    for tool, arguments, expected_status in _LOOPBACK_CALLS:
         with anyio.fail_after(_LOOPBACK_CALL_TIMEOUT_SECONDS):
             result = await _mcp_call_tool_result(mcp_url, tool, arguments)
-        _successful_envelope(result, tool)
+        _successful_envelope(
+            result,
+            tool,
+            expected_status=expected_status,
+            expect_empty_body=expected_status != 200,
+        )
 
 
 @pytest.mark.timeout(60)
@@ -1511,6 +1536,56 @@ def test_github_mcp_loopback_e2e_wire_contract():
     assert all(request.authorization == f"Bearer {token}" for request in captured)
     assert all(request.accept == GITHUB_ACCEPT for request in captured)
     assert all(request.api_version == GITHUB_API_VERSION for request in captured)
+
+
+_EMPTY_BODY_WRITE_CASES: tuple[tuple[str, dict[str, Any], int], ...] = (
+    ("github_rerun_workflow_run", {"run_id": "123"}, 201),
+    ("github_cancel_workflow_run", {"run_id": "123"}, 202),
+    ("github_dispatch_workflow", {"workflow_id": "ci.yml", "ref": "main"}, 204),
+)
+
+
+@pytest.mark.timeout(60)
+@pytest.mark.parametrize(
+    ("tool_name", "arguments", "expected_status"),
+    _EMPTY_BODY_WRITE_CASES,
+    ids=("rerun-201", "cancel-202", "dispatch-204"),
+)
+def test_github_mcp_empty_body_write_success(
+    tool_name: str,
+    arguments: dict[str, Any],
+    expected_status: int,
+) -> None:
+    """Documented GitHub Actions write successes use empty bodies (PYPOST-1345).
+
+    Re-run → 201, cancel → 202, dispatch (default) → 204 via the path-aware stub.
+    """
+    collection = _load_github_collection()
+    token = "offline-only-github-token"
+
+    async def _call_once(mcp_url: str) -> Any:
+        with anyio.fail_after(_LOOPBACK_CALL_TIMEOUT_SECONDS):
+            return await _mcp_call_tool_result(mcp_url, tool_name, arguments)
+
+    with stub_github_mcp_collection_http() as stub:
+        variables = {
+            "github_api_url": stub.base_url,
+            "github_owner": PLACEHOLDER_OWNER,
+            "github_repo": PLACEHOLDER_REPO,
+            "github_token": token,
+        }
+        with live_mcp_server(collection.requests) as server:
+            server.impl.set_variable_supplier(lambda: dict(variables))
+            server.impl.set_hidden_keys_supplier(lambda: set(GITHUB_HIDDEN_KEYS))
+            server.impl.set_overridable_keys_supplier(lambda: set(GITHUB_OVERRIDABLE_KEYS))
+            result = anyio.run(_call_once, server.mcp_url)
+
+    _successful_envelope(
+        result,
+        tool_name,
+        expected_status=expected_status,
+        expect_empty_body=True,
+    )
 
 
 # ---------------------------------------------------------------------------
