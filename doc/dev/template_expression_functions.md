@@ -111,7 +111,8 @@ Main components:
 
 - `pypost/core/function_registry.py` (`FunctionRegistry`)
   - Single source of truth for allow-listed template-callable names and implementations:
-    `urlencode`, `md5`, `base64`, `to_int`, `env`, `to_adf`, `to_json_string` (PYPOST-1283).
+    `urlencode`, `md5`, `base64`, `to_int`, `env`, `to_adf`, `to_json_string`
+    (PYPOST-1283), `to_json` (PYPOST-1343).
   - Exposes `allowed_names()`, `is_allowed()`, `is_strict_conversion()` (PYPOST-1120), `get()`,
     and `register_into_env(env)` to bind those callables onto `jinja2.Environment.globals`.
 - `pypost/core/template_expression_types.py` (`ValidationResult`, `ExpressionFailureProvenance`)
@@ -271,6 +272,11 @@ Supported functions:
   `"summary": {{ to_json_string(text) }}`. See [Dual-Mode Example
   Requests](dual_mode_example_requests.md) for the injection risk this closes and the full
   usage pattern.
+- `to_json(var)` -> JSON fragment with native types preserved (PYPOST-1343); lists/dicts/
+  booleans/numbers/null stay arrays/objects/booleans/numbers/null. Called unquoted, e.g.
+  `"labels": {{ to_json(mcp.request.labels) }}`, `"draft": {{ to_json(mcp.request.draft) }}`.
+  Use this instead of Jinja loops or `true`/`false` literals. Prefer `to_json_string` when
+  the slot must be a JSON **string**.
 
 ### Environment variable resolution (PYPOST-1118)
 

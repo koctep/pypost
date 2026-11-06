@@ -32,7 +32,7 @@ the collection or its tests.
 gitlab.json (env) ----------------------------+
                                               v
 gitlab_mcp.json --> MCPServerImpl --> TemplateService --> HTTPClient --> requests
-      ^                                (urlencode / to_int / to_json_string)
+      ^                                (urlencode / to_int / to_json_string / to_json)
       |
 gitlab_mcp_rest_paths.json  <-- make check-gitlab-mcp-path-freshness (offline compare)
 ```
@@ -62,7 +62,9 @@ gitlab_mcp_rest_paths.json  <-- make check-gitlab-mcp-path-freshness (offline co
 - JSON bodies use typed arguments, not a free-form payload string. Each field is wrapped
   in a `{% if mcp is defined and mcp.request is defined and mcp.request.X is defined and
   mcp.request.X is not none %}` guard with a Jinja `namespace` separator, and its value
-  goes through `to_json_string`. Note-creation tools map the argument `note_body` to the
+  goes through `to_json_string` (labels remain comma-separated strings). `to_json`
+  (PYPOST-1343) is available for typed JSON values if a future body needs arrays,
+  objects, or booleans. Note-creation tools map the argument `note_body` to the
   GitLab field `body`.
 - Body templates start with `{ ` (brace and a space) before the first `{% if %}`.
   Without the space, `{{%` would be read as the start of a Jinja expression.

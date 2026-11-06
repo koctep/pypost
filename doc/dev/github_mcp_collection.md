@@ -38,7 +38,7 @@ explained in depth here.
 github.json (env) ----------------------------+
                                               v
 github_mcp.json --> MCPServerImpl --> TemplateService --> HTTPClient --> requests
-      ^                                (urlencode / to_int / to_json_string / Jinja loops)
+      ^                                (urlencode / to_int / to_json_string / to_json)
       |
 github_mcp_rest_paths.json  <-- make check-github-mcp-path-freshness (offline compare)
 ```
@@ -76,21 +76,21 @@ and mcp.request.X is not none %}` guard with a Jinja `namespace(sep=…)` separa
 starts with `{ ` (brace and a space), because `{{%` would be read as the start of a Jinja
 expression.
 
-`to_json_string` always emits a JSON **string**, so other JSON types are built in the
-template:
+`to_json_string` always emits a JSON **string**. For arrays, objects, booleans, and numbers,
+use `to_json` (PYPOST-1343) so JSON types are preserved without Jinja loops or literals:
 
 | Field type | MCP type | Template | Example fields |
 | ---------- | -------- | -------- | -------------- |
 | String | `string` | `{{ to_json_string(mcp.request.x) }}` | `title`, `body`, `ref`, `commit_id` |
 | Integer | `integer_or_string` | `{{ to_int(mcp.request.x) }}` | `line`, `start_line` |
-| Boolean | `boolean` | `{% if mcp.request.x %}true{% else %}false{% endif %}` | `draft`, `enable_debug_logging` |
-| String array | `array` | `[{% for x in … %}{% if not loop.first %}, {% endif %}{{ to_json_string(x) }}{% endfor %}]` | `labels`, `assignees` |
-| Object | `object` | `{% for k, v in ….items() %}` loop, values stringified | `inputs` (dispatch) |
+| Boolean | `boolean` | `{{ to_json(mcp.request.x) }}` | `draft`, `enable_debug_logging` |
+| String array | `array` | `{{ to_json(mcp.request.x) }}` | `labels`, `assignees` |
+| Object | `object` | `{{ to_json(mcp.request.x) }}` | `inputs` (dispatch) |
 
 - An empty array sends `[]`, which clears all labels or assignees on GitHub.
-- Dispatch `inputs` values are always sent as JSON strings (booleans become
-  `"true"`/`"false"`), which is the documented GitHub form. Nested values would be sent as
-  Python `str()` text, so descriptions say "scalar values only, at most 25 keys".
+- Dispatch `inputs` keep the caller's JSON types (booleans, numbers, strings, and nested
+  values). Official GitHub curl examples often show string forms; the OpenAPI model allows
+  arbitrary JSON values, and PyPost does not force stringification.
 - `github_dispatch_workflow` renders `ref` then `inputs` (natural GitHub docs order). Field
   order does not matter to GitHub; the surviving-marker check scans raw rendered body text
   (see [Surviving template-marker checks](#surviving-template-marker-checks-pypost-1339)).

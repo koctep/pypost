@@ -1,4 +1,4 @@
-"""Plain text -> JSON string literal escaping (PYPOST-1283).
+"""JSON escaping helpers for request-body templates (PYPOST-1283, PYPOST-1343).
 
 Several bundled request-body templates interpolate free-form values (an
 issue summary, a project key, an issue-type name) directly into a JSON
@@ -13,9 +13,14 @@ fields. ``to_adf`` already avoids this for the description field by
 internally calling ``json.dumps``; ``to_json_string`` provides the same
 safety for any other plain string field.
 
-The function is registered as a Jinja global in
-``pypost.core.function_registry`` alongside ``to_adf`` and other pure
-template helpers.
+``to_json`` (PYPOST-1343) serializes lists, dicts, booleans, numbers, and
+strings with their native JSON types so authors do not hand-build arrays
+or objects with Jinja loops. Use ``to_json_string`` when the slot must be
+a JSON string; use ``to_json`` when the value's JSON type must be
+preserved.
+
+Both functions are registered as Jinja globals in
+``pypost.core.function_registry``.
 """
 from __future__ import annotations
 
@@ -44,3 +49,26 @@ def to_json_string(text: object) -> str:
     if text is None:
         text = ""
     return json.dumps(str(text))
+
+
+def to_json(value: object) -> str:
+    """Return JSON text for ``value`` with native JSON types preserved.
+
+    Unlike ``to_json_string``, this does not coerce the value to ``str``
+    first. Lists become JSON arrays, dicts become objects, booleans and
+    numbers keep their JSON types, and ``None`` becomes ``null``. The
+    result is meant to be substituted unquoted into a JSON template,
+    e.g. ``"labels": {{ to_json(mcp.request.labels) }}``.
+
+    Args:
+        value: Value to serialize. Must be JSON-serializable.
+
+    Returns:
+        A JSON fragment (array, object, string, number, boolean, or null)
+        suitable for direct substitution into a JSON request body
+        template.
+
+    Raises:
+        TypeError: If ``value`` is not JSON-serializable.
+    """
+    return json.dumps(value, ensure_ascii=False)

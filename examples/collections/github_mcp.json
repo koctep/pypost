@@ -265,7 +265,7 @@
         "Authorization": "Bearer {{ github_token }}"
       },
       "params": {},
-      "body": "{% set ns = namespace(sep=\"\") %}{ {% if mcp is defined and mcp.request is defined and mcp.request.enable_debug_logging is defined and mcp.request.enable_debug_logging is not none %}{{ ns.sep }}\"enable_debug_logging\": {% if mcp.request.enable_debug_logging %}true{% else %}false{% endif %}{% set ns.sep = \", \" %}{% endif %} }",
+      "body": "{% set ns = namespace(sep=\"\") %}{ {% if mcp is defined and mcp.request is defined and mcp.request.enable_debug_logging is defined and mcp.request.enable_debug_logging is not none %}{{ ns.sep }}\"enable_debug_logging\": {{ to_json(mcp.request.enable_debug_logging) }}{% set ns.sep = \", \" %}{% endif %} }",
       "body_type": "json",
       "yaml_as_json": false,
       "post_script": "",
@@ -401,7 +401,7 @@
         "Authorization": "Bearer {{ github_token }}"
       },
       "params": {},
-      "body": "{% set ns = namespace(sep=\"\") %}{ {% if mcp is defined and mcp.request is defined and mcp.request.ref is defined and mcp.request.ref is not none %}{{ ns.sep }}\"ref\": {{ to_json_string(mcp.request.ref) }}{% set ns.sep = \", \" %}{% endif %}{% if mcp is defined and mcp.request is defined and mcp.request.inputs is defined and mcp.request.inputs is not none %}{{ ns.sep }}\"inputs\": { {% for k, v in mcp.request.inputs.items() %}{% if not loop.first %}, {% endif %}{{ to_json_string(k) }}: {% if v is sameas true %}\"true\"{% elif v is sameas false %}\"false\"{% else %}{{ to_json_string(v) }}{% endif %}{% endfor %} }{% set ns.sep = \", \" %}{% endif %} }",
+      "body": "{% set ns = namespace(sep=\"\") %}{ {% if mcp is defined and mcp.request is defined and mcp.request.ref is defined and mcp.request.ref is not none %}{{ ns.sep }}\"ref\": {{ to_json_string(mcp.request.ref) }}{% set ns.sep = \", \" %}{% endif %}{% if mcp is defined and mcp.request is defined and mcp.request.inputs is defined and mcp.request.inputs is not none %}{{ ns.sep }}\"inputs\": {{ to_json(mcp.request.inputs) }}{% set ns.sep = \", \" %}{% endif %} }",
       "body_type": "json",
       "yaml_as_json": false,
       "post_script": "",
@@ -420,7 +420,7 @@
         },
         "inputs": {
           "type": "object",
-          "description": "Optional workflow inputs as a JSON object with scalar values only, at most 25 keys; values are sent as strings (booleans as \"true\"/\"false\").",
+          "description": "Optional workflow inputs as a JSON object (at most 25 keys). Values keep their JSON types (strings, booleans, numbers, and nested objects/arrays when provided).",
           "required": false
         }
       },
@@ -523,7 +523,7 @@
         "Authorization": "Bearer {{ github_token }}"
       },
       "params": {},
-      "body": "{% set ns = namespace(sep=\"\") %}{ {% if mcp is defined and mcp.request is defined and mcp.request.title is defined and mcp.request.title is not none %}{{ ns.sep }}\"title\": {{ to_json_string(mcp.request.title) }}{% set ns.sep = \", \" %}{% endif %}{% if mcp is defined and mcp.request is defined and mcp.request.head is defined and mcp.request.head is not none %}{{ ns.sep }}\"head\": {{ to_json_string(mcp.request.head) }}{% set ns.sep = \", \" %}{% endif %}{% if mcp is defined and mcp.request is defined and mcp.request.base is defined and mcp.request.base is not none %}{{ ns.sep }}\"base\": {{ to_json_string(mcp.request.base) }}{% set ns.sep = \", \" %}{% endif %}{% if mcp is defined and mcp.request is defined and mcp.request.body is defined and mcp.request.body is not none %}{{ ns.sep }}\"body\": {{ to_json_string(mcp.request.body) }}{% set ns.sep = \", \" %}{% endif %}{% if mcp is defined and mcp.request is defined and mcp.request.draft is defined and mcp.request.draft is not none %}{{ ns.sep }}\"draft\": {% if mcp.request.draft %}true{% else %}false{% endif %}{% set ns.sep = \", \" %}{% endif %} }",
+      "body": "{% set ns = namespace(sep=\"\") %}{ {% if mcp is defined and mcp.request is defined and mcp.request.title is defined and mcp.request.title is not none %}{{ ns.sep }}\"title\": {{ to_json_string(mcp.request.title) }}{% set ns.sep = \", \" %}{% endif %}{% if mcp is defined and mcp.request is defined and mcp.request.head is defined and mcp.request.head is not none %}{{ ns.sep }}\"head\": {{ to_json_string(mcp.request.head) }}{% set ns.sep = \", \" %}{% endif %}{% if mcp is defined and mcp.request is defined and mcp.request.base is defined and mcp.request.base is not none %}{{ ns.sep }}\"base\": {{ to_json_string(mcp.request.base) }}{% set ns.sep = \", \" %}{% endif %}{% if mcp is defined and mcp.request is defined and mcp.request.body is defined and mcp.request.body is not none %}{{ ns.sep }}\"body\": {{ to_json_string(mcp.request.body) }}{% set ns.sep = \", \" %}{% endif %}{% if mcp is defined and mcp.request is defined and mcp.request.draft is defined and mcp.request.draft is not none %}{{ ns.sep }}\"draft\": {{ to_json(mcp.request.draft) }}{% set ns.sep = \", \" %}{% endif %} }",
       "body_type": "json",
       "yaml_as_json": false,
       "post_script": "",
@@ -1112,7 +1112,7 @@
         "Authorization": "Bearer {{ github_token }}"
       },
       "params": {},
-      "body": "{% set ns = namespace(sep=\"\") %}{ {% if mcp is defined and mcp.request is defined and mcp.request.title is defined and mcp.request.title is not none %}{{ ns.sep }}\"title\": {{ to_json_string(mcp.request.title) }}{% set ns.sep = \", \" %}{% endif %}{% if mcp is defined and mcp.request is defined and mcp.request.body is defined and mcp.request.body is not none %}{{ ns.sep }}\"body\": {{ to_json_string(mcp.request.body) }}{% set ns.sep = \", \" %}{% endif %}{% if mcp is defined and mcp.request is defined and mcp.request.labels is defined and mcp.request.labels is not none %}{{ ns.sep }}\"labels\": [{% for x in mcp.request.labels %}{% if not loop.first %}, {% endif %}{{ to_json_string(x) }}{% endfor %}]{% set ns.sep = \", \" %}{% endif %}{% if mcp is defined and mcp.request is defined and mcp.request.assignees is defined and mcp.request.assignees is not none %}{{ ns.sep }}\"assignees\": [{% for x in mcp.request.assignees %}{% if not loop.first %}, {% endif %}{{ to_json_string(x) }}{% endfor %}]{% set ns.sep = \", \" %}{% endif %} }",
+      "body": "{% set ns = namespace(sep=\"\") %}{ {% if mcp is defined and mcp.request is defined and mcp.request.title is defined and mcp.request.title is not none %}{{ ns.sep }}\"title\": {{ to_json_string(mcp.request.title) }}{% set ns.sep = \", \" %}{% endif %}{% if mcp is defined and mcp.request is defined and mcp.request.body is defined and mcp.request.body is not none %}{{ ns.sep }}\"body\": {{ to_json_string(mcp.request.body) }}{% set ns.sep = \", \" %}{% endif %}{% if mcp is defined and mcp.request is defined and mcp.request.labels is defined and mcp.request.labels is not none %}{{ ns.sep }}\"labels\": {{ to_json(mcp.request.labels) }}{% set ns.sep = \", \" %}{% endif %}{% if mcp is defined and mcp.request is defined and mcp.request.assignees is defined and mcp.request.assignees is not none %}{{ ns.sep }}\"assignees\": {{ to_json(mcp.request.assignees) }}{% set ns.sep = \", \" %}{% endif %} }",
       "body_type": "json",
       "yaml_as_json": false,
       "post_script": "",
@@ -1160,7 +1160,7 @@
         "Authorization": "Bearer {{ github_token }}"
       },
       "params": {},
-      "body": "{% set ns = namespace(sep=\"\") %}{ {% if mcp is defined and mcp.request is defined and mcp.request.title is defined and mcp.request.title is not none %}{{ ns.sep }}\"title\": {{ to_json_string(mcp.request.title) }}{% set ns.sep = \", \" %}{% endif %}{% if mcp is defined and mcp.request is defined and mcp.request.body is defined and mcp.request.body is not none %}{{ ns.sep }}\"body\": {{ to_json_string(mcp.request.body) }}{% set ns.sep = \", \" %}{% endif %}{% if mcp is defined and mcp.request is defined and mcp.request.state is defined and mcp.request.state is not none %}{{ ns.sep }}\"state\": {{ to_json_string(mcp.request.state) }}{% set ns.sep = \", \" %}{% endif %}{% if mcp is defined and mcp.request is defined and mcp.request.state_reason is defined and mcp.request.state_reason is not none %}{{ ns.sep }}\"state_reason\": {{ to_json_string(mcp.request.state_reason) }}{% set ns.sep = \", \" %}{% endif %}{% if mcp is defined and mcp.request is defined and mcp.request.labels is defined and mcp.request.labels is not none %}{{ ns.sep }}\"labels\": [{% for x in mcp.request.labels %}{% if not loop.first %}, {% endif %}{{ to_json_string(x) }}{% endfor %}]{% set ns.sep = \", \" %}{% endif %}{% if mcp is defined and mcp.request is defined and mcp.request.assignees is defined and mcp.request.assignees is not none %}{{ ns.sep }}\"assignees\": [{% for x in mcp.request.assignees %}{% if not loop.first %}, {% endif %}{{ to_json_string(x) }}{% endfor %}]{% set ns.sep = \", \" %}{% endif %} }",
+      "body": "{% set ns = namespace(sep=\"\") %}{ {% if mcp is defined and mcp.request is defined and mcp.request.title is defined and mcp.request.title is not none %}{{ ns.sep }}\"title\": {{ to_json_string(mcp.request.title) }}{% set ns.sep = \", \" %}{% endif %}{% if mcp is defined and mcp.request is defined and mcp.request.body is defined and mcp.request.body is not none %}{{ ns.sep }}\"body\": {{ to_json_string(mcp.request.body) }}{% set ns.sep = \", \" %}{% endif %}{% if mcp is defined and mcp.request is defined and mcp.request.state is defined and mcp.request.state is not none %}{{ ns.sep }}\"state\": {{ to_json_string(mcp.request.state) }}{% set ns.sep = \", \" %}{% endif %}{% if mcp is defined and mcp.request is defined and mcp.request.state_reason is defined and mcp.request.state_reason is not none %}{{ ns.sep }}\"state_reason\": {{ to_json_string(mcp.request.state_reason) }}{% set ns.sep = \", \" %}{% endif %}{% if mcp is defined and mcp.request is defined and mcp.request.labels is defined and mcp.request.labels is not none %}{{ ns.sep }}\"labels\": {{ to_json(mcp.request.labels) }}{% set ns.sep = \", \" %}{% endif %}{% if mcp is defined and mcp.request is defined and mcp.request.assignees is defined and mcp.request.assignees is not none %}{{ ns.sep }}\"assignees\": {{ to_json(mcp.request.assignees) }}{% set ns.sep = \", \" %}{% endif %} }",
       "body_type": "json",
       "yaml_as_json": false,
       "post_script": "",

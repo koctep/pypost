@@ -429,10 +429,8 @@ def _expected_body_value(arg: Arg, value: Any) -> Any:
     if arg.type == "array":
         return [str(item) for item in value]
     if arg.type == "object":
-        return {
-            str(key): ("true" if item is True else "false" if item is False else str(item))
-            for key, item in value.items()
-        }
+        # PYPOST-1343: ``to_json`` preserves JSON types inside objects (dispatch inputs).
+        return {str(key): item for key, item in value.items()}
     return value
 
 
@@ -1005,8 +1003,8 @@ def test_github_mcp_body_value_types_are_native_json():
         _full_args(SPECS_BY_TOOL["github_dispatch_workflow"]),
         "all",
     )
-    assert all(isinstance(value, str) for value in dispatch["inputs"].values()), (
-        f"dispatch inputs must be sent as strings: {dispatch['inputs']!r}"
+    assert dispatch["inputs"] == _OBJECT_SAMPLES["inputs"], (
+        f"dispatch inputs must keep JSON types: {dispatch['inputs']!r}"
     )
     empty_labels = _render_body_json(
         _request_for(collection, "github_update_issue"),
@@ -1419,13 +1417,13 @@ _BODY_ENCODING_CASES = (
     pytest.param(
         "github_dispatch_workflow",
         {"workflow_id": "ci.yml", "ref": "main", "inputs": {"env": "prod", "dry": True, "n": 3}},
-        {"ref": "main", "inputs": {"env": "prod", "dry": "true", "n": "3"}},
-        id="dispatch-inputs-stringified",
+        {"ref": "main", "inputs": {"env": "prod", "dry": True, "n": 3}},
+        id="dispatch-inputs-type-preserving",
     ),
     pytest.param(
         "github_dispatch_workflow",
         {"workflow_id": "ci.yml", "ref": "main", "inputs": {'k"ey': 'v"al', "off": False}},
-        {"ref": "main", "inputs": {'k"ey': 'v"al', "off": "false"}},
+        {"ref": "main", "inputs": {'k"ey': 'v"al', "off": False}},
         id="dispatch-inputs-escaped-keys",
     ),
     pytest.param(
@@ -1680,7 +1678,7 @@ def test_github_mcp_loopback_e2e_wire_contract():
     assert [request.body for request in captured] == [
         None,
         {"title": "Bug", "labels": ["bug", 'a"b'], "assignees": ["octocat"]},
-        {"ref": "main", "inputs": {"env": "prod", "dry": "true"}},
+        {"ref": "main", "inputs": {"env": "prod", "dry": True}},
         {},
     ]
     assert all(request.authorization == f"Bearer {token}" for request in captured)
