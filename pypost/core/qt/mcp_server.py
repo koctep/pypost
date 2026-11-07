@@ -241,6 +241,8 @@ class MCPServerManager(QObject):
 
     def update_tools(self, tools: list[RequestData]) -> bool:
         """Restart the server when the exposed tool set changes. Returns True if restarted."""
+        if isinstance(self._impl, MCPServerImpl):
+            self._impl.register_tools(tools)
         signature = mcp_tools_signature(tools)
         if signature == self._tools_signature:
             return False

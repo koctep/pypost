@@ -419,16 +419,27 @@ registry.refresh_environment(environment_id)
 registry.stop_all(timeout=10.0, max_workers=None)  # concurrent application/test shutdown
 ```
 
-`refresh_collection()` updates only servers selected for that collection;
-`MCPServerManager.update_tools()` may restart only those endpoint(s) when the
-tool signature changed; the restart path waits until the prior host/port is
-probe-bindable before starting again, retaining the worker thread ref if stop’s
-join times out (PYPOST-1178 / PYPOST-1196; see
-[MCP Integration](mcp_integration.md)). `refresh_environment()` replaces the
-variables and hidden-key suppliers only for servers that selected that
-environment. Library-sourced rows (`configuration.library_id` set) rebuild the
-snapshot through `LibraryRuntimeResolver` (Built-in adapter vs ordinary
-`library_service`); workspace rows keep raw environment variables.
+`refresh_collection()` updates only local servers selected for that collection
+(both workspace `collection_id` and library-backed `library_collection_path` /
+stem / filename matches; proxy servers are skipped). In `process` execution mode
+(PYPOST-1465), it sends `UPDATE_TOOLS` (and `UPDATE_VARIABLES` when collection or
+environment variables apply) over IPC via `ProcessServerRunner.update_tools()`,
+replacing `MCPServerImpl.tools_map` atomically in the worker without restarting
+the child process or changing its port/PID, while keeping `runner.start_snapshot`
+synchronized; if a worker has exited or fails IPC, only that instance transitions
+to `failed`. In `thread` execution mode, `MCPServerManager.update_tools()` always
+refreshes `MCPServerImpl.register_tools()` in place and restarts only those
+endpoint(s) when the `(id, name)` tool signature changed; the restart path waits
+until the prior host/port is probe-bindable before starting again, retaining the
+worker thread ref if stop’s join times out (PYPOST-1178 / PYPOST-1196; see
+[MCP Integration](mcp_integration.md)). For workspace rows, both `refresh_collection()`
+and `refresh_environment()` merge collection variable defaults beneath active
+environment variables and secret collection variables into `hidden_keys` via
+`_merge_workspace_variables()`. `refresh_environment()` replaces the
+variables and hidden-key suppliers (or `UPDATE_VARIABLES` snapshot in `process`
+mode) only for servers that selected that environment. Library-sourced rows
+(`configuration.library_id` set) rebuild the snapshot through
+`LibraryRuntimeResolver` (Built-in adapter vs ordinary `library_service`).
 `reconcile_references()` stops and marks only rows whose persisted inputs were
 removed — workspace collection/environment membership for workspace rows;
 library connection + library collection resolve + environment for ordinary
@@ -455,7 +466,12 @@ attempted port and reason. Ordinary-library lifecycle (PYPOST-1347) adds
 collection-miss stop, `mcp_registry_refresh_library_environment` (DEBUG) after
 a successful library refresh resolve (`variable_count` only), and
 `mcp_registry_refresh_library_environment_failed` (WARNING) when resolve raises
-during refresh.
+during refresh. Collection refresh (PYPOST-1465) emits
+`mcp_registry_collection_refreshed` (INFO) with `instance_id`, `collection_id`,
+`execution_mode`, `tool_count`, `variable_count`, and `hidden_key_count` only,
+and `mcp_registry_refresh_collection_worker_failed` /
+`mcp_registry_refresh_collection_variables_failed` (ERROR) when a process worker
+is unavailable during refresh.
 
 The registry covers the endpoint **runtime**; `McpServerSettingsController`
 covers **persistence** — `mcp_persisted_servers_loaded` at startup,
@@ -501,6 +517,6 @@ For comprehensive multi-server concurrency, variable isolation, hot reload, and 
 Run the focused checks after changing this subsystem:
 
 ```bash
-make test PYTEST_ARGS='tests/test_server_bind_errno.py tests/test_mcp_server_registry.py tests/test_mcp_library_lifecycle.py tests/test_mcp_builtin_lifecycle.py tests/test_mcp_servers_dialog.py tests/test_mcp_servers_dialog_variable_wizard_repro.py tests/test_mcp_standalone_wire_ipc_repro.py tests/test_mcp_concurrent_multiserver_repro.py tests/test_mcp_concurrent_teardown.py'
+make test PYTEST_ARGS='tests/test_server_bind_errno.py tests/test_mcp_server_registry.py tests/test_mcp_library_lifecycle.py tests/test_mcp_builtin_lifecycle.py tests/test_mcp_servers_dialog.py tests/test_mcp_servers_dialog_variable_wizard_repro.py tests/test_mcp_standalone_wire_ipc_repro.py tests/test_mcp_concurrent_multiserver_repro.py tests/test_mcp_concurrent_teardown.py tests/test_mcp_process_tool_refresh_repro.py'
 ```
 

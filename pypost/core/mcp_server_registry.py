@@ -495,30 +495,180 @@ class MCPServerRegistry(QObject):
             daemon=True,
         ).start()
 
+    def _matches_collection(
+        self, configuration: McpServerConfiguration, collection_id: str
+    ) -> bool:
+        if configuration.server_type == "proxy":
+            return False
+        if configuration.collection_id == collection_id:
+            return True
+        if configuration.library_id and configuration.library_collection_path:
+            col_path = Path(configuration.library_collection_path)
+            return (
+                configuration.library_collection_path == collection_id
+                or col_path.stem == collection_id
+                or col_path.name == collection_id
+            )
+        return False
+
+    @staticmethod
+    def _merge_workspace_variables(
+        collection: Collection, environment: Environment | None
+    ) -> tuple[dict[str, str], set[str], set[str]]:
+        vars_dict = {
+            v.name: str(v.default)
+            for v in (getattr(collection, "variables", None) or ())
+            if v.default is not None
+        }
+        hidden_set = {
+            v.name
+            for v in (getattr(collection, "variables", None) or ())
+            if getattr(v, "secret", False)
+        }
+        overridable_set: set[str] = set()
+        if environment is not None:
+            vars_dict.update(environment.variables)
+            hidden_set |= set(environment.hidden_keys)
+            overridable_set = set(environment.mcp_overridable_keys)
+        return vars_dict, hidden_set, overridable_set
+
     def refresh_collection(self, collection_id: str) -> None:
-        """Refresh tools only for running servers bound to ``collection_id``."""
-        collection = self._collection_lookup(collection_id)
+        """Refresh tools and collection variables for servers bound to ``collection_id``."""
         instance_ids = tuple(
             instance_id
             for instance_id, configuration in self._configurations.items()
-            if configuration.collection_id == collection_id
+            if self._matches_collection(configuration, collection_id)
         )
-        if collection is None:
-            for instance_id in instance_ids:
-                self._set_status(
-                    instance_id,
-                    "failed",
-                    f"{instance_id} cannot refresh: missing collection for "
-                    f"port {self._configuration(instance_id).port}",
-                )
-            return
-
         for instance_id in instance_ids:
+            configuration = self._configuration(instance_id)
+            if configuration.library_id:
+                runtime = self._runtime_inputs(configuration)
+                if runtime is None:
+                    missing = self._missing_reference(configuration)
+                    self._set_status(
+                        instance_id,
+                        "failed",
+                        f"{instance_id} cannot refresh: missing {missing} "
+                        f"for port {configuration.port}",
+                    )
+                    continue
+                tools, vars_dict, hidden_set, overridable_set = runtime
+                has_variables = True
+            else:
+                collection = self._collection_lookup(collection_id)
+                if collection is None:
+                    self._set_status(
+                        instance_id,
+                        "failed",
+                        f"{instance_id} cannot refresh: missing collection "
+                        f"for port {configuration.port}",
+                    )
+                    continue
+                tools = [req.model_copy(deep=True) for req in collection.requests]
+                env = (
+                    self._environment_lookup(configuration.environment_id)
+                    if configuration.environment_id
+                    else None
+                )
+                vars_dict, hidden_set, overridable_set = (
+                    self._merge_workspace_variables(collection, env)
+                )
+                has_variables = bool(getattr(collection, "variables", None)) or (
+                    env is not None
+                )
+
+            runner = self._runners.get(instance_id)
+            if isinstance(runner, ProcessServerRunner):
+                status = self._statuses.get(instance_id)
+                if status is not None and status.state == "stopped":
+                    continue
+                if not runner.worker_is_alive() or not runner.update_tools(tools):
+                    detail = (
+                        runner.last_start_error
+                        or "worker unavailable during collection refresh"
+                    )
+                    logger.error(
+                        "mcp_registry_refresh_collection_worker_failed "
+                        "instance_id=%s port=%d error=%s",
+                        instance_id,
+                        configuration.port,
+                        detail,
+                    )
+                    runner.mark_failed(detail)
+                    self._set_status(
+                        instance_id,
+                        "failed",
+                        f"{instance_id} on port {configuration.port}: {detail}",
+                    )
+                    continue
+                if has_variables:
+                    try:
+                        runner.update_variables(
+                            vars_dict, hidden_set, overridable_set
+                        )
+                    except Exception as exc:
+                        err = type(exc).__name__
+                        logger.error(
+                            "mcp_registry_refresh_collection_variables_failed "
+                            "instance_id=%s port=%d error=%s",
+                            instance_id,
+                            configuration.port,
+                            err,
+                        )
+                        runner.mark_failed(err)
+                        self._set_status(
+                            instance_id,
+                            "failed",
+                            f"{instance_id} on port {configuration.port}: {err}",
+                        )
+                        continue
+                logger.info(
+                    "mcp_registry_collection_refreshed instance_id=%s "
+                    "collection_id=%s execution_mode=%s tool_count=%d "
+                    "variable_count=%d hidden_key_count=%d",
+                    instance_id,
+                    collection_id,
+                    self._execution_mode,
+                    len(tools),
+                    len(vars_dict),
+                    len(hidden_set),
+                )
+                continue
+
             manager = self._managers.get(instance_id)
             if manager is None:
                 continue
-            tools = [request.model_copy(deep=True) for request in collection.requests]
+            if has_variables:
+                def supply_vars(
+                    snapshot: dict[str, str] = vars_dict,
+                ) -> dict[str, str]:
+                    return dict(snapshot)
+
+                def supply_hidden(
+                    snapshot: set[str] = hidden_set,
+                ) -> set[str]:
+                    return set(snapshot)
+
+                def supply_overridable(
+                    snapshot: set[str] = overridable_set,
+                ) -> set[str]:
+                    return set(snapshot)
+
+                manager.set_variable_supplier(supply_vars)
+                manager.set_hidden_keys_supplier(supply_hidden)
+                manager.set_overridable_keys_supplier(supply_overridable)
             manager.update_tools(tools)
+            logger.info(
+                "mcp_registry_collection_refreshed instance_id=%s "
+                "collection_id=%s execution_mode=%s tool_count=%d "
+                "variable_count=%d hidden_key_count=%d",
+                instance_id,
+                collection_id,
+                self._execution_mode,
+                len(tools),
+                len(vars_dict),
+                len(hidden_set),
+            )
 
     def reconcile_references(
         self,
@@ -757,9 +907,19 @@ class MCPServerRegistry(QObject):
                 hidden_set = set(resolved.hidden_keys)
                 overridable_set = set(resolved.overridable_keys)
             else:
-                vars_dict = dict(environment.variables)
-                hidden_set = set(environment.hidden_keys)
-                overridable_set = set(environment.mcp_overridable_keys)
+                collection = (
+                    self._collection_lookup(configuration.collection_id)
+                    if configuration.collection_id
+                    else None
+                )
+                if collection is not None:
+                    vars_dict, hidden_set, overridable_set = (
+                        self._merge_workspace_variables(collection, environment)
+                    )
+                else:
+                    vars_dict = dict(environment.variables)
+                    hidden_set = set(environment.hidden_keys)
+                    overridable_set = set(environment.mcp_overridable_keys)
 
             runner = self._runners.get(instance_id)
             if isinstance(runner, ProcessServerRunner):
@@ -940,11 +1100,14 @@ class MCPServerRegistry(QObject):
         environment = self._environment_lookup(configuration.environment_id)
         if collection is None or environment is None:
             return None
+        vars_dict, hidden_set, overridable_set = self._merge_workspace_variables(
+            collection, environment
+        )
         return (
             [request.model_copy(deep=True) for request in collection.requests],
-            dict(environment.variables),
-            set(environment.hidden_keys),
-            set(environment.mcp_overridable_keys),
+            vars_dict,
+            hidden_set,
+            overridable_set,
         )
 
     def _ordinary_library_collection_resolves(

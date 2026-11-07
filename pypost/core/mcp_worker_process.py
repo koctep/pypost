@@ -135,6 +135,7 @@ def worker_main(conn: Any) -> None:
     """Top-level spawn target: IPC control loop + uvicorn serving."""
     logging.basicConfig(level=logging.WARNING)
     store: _SnapshotStore | None = None
+    impl: MCPServerImpl | MCPProxyServerImpl | None = None
     hang_mode = False
     stop_flag: dict[str, Any] = {"stop": False, "server": None}
     serve_thread = None
@@ -202,6 +203,32 @@ def worker_main(conn: Any) -> None:
                     daemon=True,
                 )
                 serve_thread.start()
+
+            elif msg_type == "UPDATE_TOOLS":
+                if impl is None:
+                    continue
+                try:
+                    tools = decode_tools(list(message.get("tools") or []))
+                    if isinstance(impl, MCPServerImpl):
+                        impl.register_tools(tools)
+                    conn.send(make_message("ACK", correlating="UPDATE_TOOLS"))
+                except (BrokenPipeError, OSError, EOFError):
+                    pass
+                except Exception as exc:
+                    err_name = type(exc).__name__
+                    logger.error(
+                        "mcp_worker_update_tools_failed error=%s",
+                        err_name,
+                    )
+                    try:
+                        conn.send(
+                            make_message(
+                                "WORKER_ERROR",
+                                message=f"update_tools failed: {err_name}",
+                            )
+                        )
+                    except (BrokenPipeError, OSError, EOFError):
+                        pass
 
             elif msg_type == "UPDATE_VARIABLES":
                 if store is None:

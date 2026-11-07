@@ -8,6 +8,7 @@ MSG_V = 1
 
 MsgType = Literal[
     "START",
+    "UPDATE_TOOLS",
     "UPDATE_VARIABLES",
     "HEARTBEAT",
     "STOP",
