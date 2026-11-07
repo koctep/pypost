@@ -93,6 +93,7 @@ Host-facing lifecycle used by the registry:
 - `is_running() -> bool`
 - `is_listening() -> bool`
 - `last_start_error` → `str | None`
+- `update_tools(tools: list[Any]) -> bool`
 - `update_variables(variables, hidden_keys, overridable_keys) -> None`
 
 `ServerStartSpec` carries configuration, tools, and the initial variable snapshot
@@ -102,6 +103,10 @@ Host-facing lifecycle used by the registry:
 ### `ThreadServerRunner`
 
 Wraps `MCPServerManager`. Variable suppliers remain live `Callable` closures.
+`update_tools(tools)` delegates to `MCPServerManager.update_tools(tools)`, which
+always refreshes `MCPServerImpl.register_tools(tools)` in place (capturing updated
+URLs, methods, descriptions, headers, bodies, and parameter schemas) and restarts
+the thread transport only when the exposed `(id, name)` tool signature changes.
 Stop uses `CancellationTokenSource` and `adaptive_thread_join` (default ~2.0s).
 
 ### `ProcessServerRunner`
@@ -109,11 +114,51 @@ Stop uses `CancellationTokenSource` and `adaptive_thread_join` (default ~2.0s).
 Delegates to a shared `McpProcessSupervisor`. Forwards both local tool inputs and
 proxy settings (`server_type`, `upstream_url`, `upstream_transport`, copied `headers`,
 and `timeout`) from `ServerStartSpec.configuration` to `spawn_worker` (PYPOST-1464).
-Converts supplier updates into `UPDATE_VARIABLES` IPC snapshots. Exposes
+Converts tool updates into `UPDATE_TOOLS` IPC messages (`update_tools(tools) -> bool`,
+PYPOST-1465) and supplier updates into `UPDATE_VARIABLES` IPC snapshots. Exposes
 `send_debug_opcode` for tests only. The read-only `worker_id` identifies the supervisor
 entry independently of the public configuration ID. `start_snapshot` returns a deep copy
-of the accepted start payload (including proxy configuration); variable updates refresh
-the snapshot used for recovery.
+of the accepted start payload (including proxy configuration); both `update_tools` and
+`update_variables` refresh the `_spec` snapshot used for reconfiguration rollback recovery.
+
+### Live collection tool and variable refresh (PYPOST-1465)
+
+Calling `registry.refresh_collection(collection_id)` updates all local servers bound to
+`collection_id`—both workspace-backed (`configuration.collection_id == collection_id`) and
+library-backed (`configuration.library_id` with matching `library_collection_path`, stem,
+or filename)—while skipping proxy servers (`server_type == "proxy"`) and unrelated peers:
+
+1. **Resolution & Variable Merging**:
+   - **Library-backed rows**: Re-resolve `(tools, variables, hidden_keys, overridable_keys)`
+     via `_runtime_inputs(configuration)` (`LibraryRuntimeResolver` 3-tier merge: collection
+     defaults < active environment < local overlay).
+   - **Workspace-backed rows**: Copy `collection.requests` and merge collection variable
+     defaults (`Collection.variables`) beneath the active environment's variables via
+     `_merge_workspace_variables(collection, env)` while merging secret collection variable
+     names (`v.secret=True`) into `hidden_keys` and preserving `environment.mcp_overridable_keys`.
+   - If the target collection or library reference no longer resolves, only that instance
+     transitions to `failed` without affecting peers.
+2. **Process-mode zero-downtime update**:
+   - `ProcessServerRunner.update_tools(tools)` calls
+     `McpProcessSupervisor.update_tools(instance_id, tools) -> bool`, which verifies the
+     worker is running/alive and sends `make_message("UPDATE_TOOLS", tools=encode_tools(tools))`
+     over the parent control pipe (catching broken-pipe/serialization errors and returning
+     `False` instead of raising).
+   - In `mcp_worker_process.worker_main`, the worker decodes the tools via `decode_tools`,
+     invokes `MCPServerImpl.register_tools(tools)` (which atomically replaces `self.tools_map`
+     with a freshly constructed dict so concurrent `list_tools` / `call_tool` coroutines never
+     observe a partially cleared map), and replies with `ACK(correlating="UPDATE_TOOLS")`.
+   - When collection or environment variables are present, `runner.update_variables(...)`
+     follows with `UPDATE_VARIABLES`. Both updates preserve the existing worker PID and
+     listening socket with zero downtime and synchronize `runner._spec` (`start_snapshot`).
+   - If a process worker has exited or fails IPC dispatch during `refresh_collection`,
+     the registry logs `mcp_registry_refresh_collection_worker_failed` (or
+     `mcp_registry_refresh_collection_variables_failed`), marks only that instance `failed`,
+     and continues refreshing remaining healthy servers.
+3. **Thread-mode parity**:
+   - Updates variable/hidden/overridable suppliers on `MCPServerManager` and calls
+     `manager.update_tools(tools)`, refreshing `MCPServerImpl.register_tools(tools)` in place
+     even when tool IDs/names are unchanged.
 
 ### Live process reconfiguration (PYPOST-1463)
 
@@ -154,9 +199,16 @@ and retry the operation rather than replacing registry state around a live child
   (`server_type="local"`, `upstream_url=None`, `upstream_transport="streamable_http"`,
   `headers=None`, `timeout=30.0`) and copies `headers` into the `START` IPC message
   (PYPOST-1464).
+- `update_tools(instance_id, tools) -> bool` checks that the worker record is `running`
+  and `process.is_alive()`, encodes `tools` via `encode_tools`, sends `UPDATE_TOOLS` over
+  `parent_conn`, logs `mcp_worker_update_tools_sent instance_id=%s tool_count=%d`, and
+  returns `False` (logging `mcp_worker_update_tools_send_failed`) on broken pipes or
+  serialization errors without raising (PYPOST-1465).
 - Process table: `instance_id` → process handle, duplex Pipe, dedicated IPC reader
   thread, state (`starting` / `running` / `failed` / `stopped`).
-- One demux reader per worker owns `poll`+`recv` (no shared Pipe drain races).
+- One demux reader per worker owns `poll`+`recv` (no shared Pipe drain races) and traces
+  worker acknowledgments (`mcp_worker_ipc_ack`) and sanitized worker errors
+  (`mcp_worker_ipc_error`).
 - Monitor loop watches `process.is_alive()` / `exitcode` only; unexpected exit
   invokes `on_unexpected_exit` → registry marks the instance `failed`.
 - Default stop budget: `DEFAULT_STOP_BUDGET_S = 2.0`.
@@ -167,7 +219,11 @@ Headless spawn entrypoint. Must not import PySide6. On `START`, selects
 `MCPProxyServerImpl` when `server_type == "proxy"` (supplying `upstream_url`,
 `upstream_transport`, copied `headers`, `timeout`, and `_SnapshotStore`
 variable/key suppliers) or `MCPServerImpl` otherwise (registering decoded local
-tools only for local servers; PYPOST-1464). Runs uvicorn on a private asyncio loop
+tools only for local servers; PYPOST-1464). On `UPDATE_TOOLS`, decodes incoming
+tools via `decode_tools`, calls `impl.register_tools(tools)` on `MCPServerImpl`
+(atomically replacing `tools_map`), and responds with `ACK(correlating="UPDATE_TOOLS")`
+or `WORKER_ERROR` (logging exception class name only via `mcp_worker_update_tools_failed`;
+PYPOST-1465). Runs uvicorn on a private asyncio loop
 via `_run_uvicorn(impl: MCPServerImpl | MCPProxyServerImpl, ...)`. Disables uvicorn
 signal handlers so the **supervisor** owns SIGTERM/SIGKILL; the child reacts to IPC
 `STOP` primarily.
@@ -181,6 +237,7 @@ Envelopes are dicts with `"v": 1` and `"type": <MsgType>` (`mcp_worker_ipc.make_
 | Direction | Type | Payload (conceptual) |
 | --- | --- | --- |
 | Host → Child | `START` | `host`, `port`, `name`, `tools` (encoded), `variables`, `hidden_keys`, `overridable_keys`, `server_type`, `upstream_url`, `upstream_transport`, `headers`, `timeout` |
+| Host → Child | `UPDATE_TOOLS` | `tools` (encoded via `encode_tools`) |
 | Host → Child | `UPDATE_VARIABLES` | `variables`, `hidden_keys`, `overridable_keys` |
 | Host → Child | `HEARTBEAT` | optional `nonce` |
 | Host → Child | `STOP` | — |
@@ -188,25 +245,26 @@ Envelopes are dicts with `"v": 1` and `"type": <MsgType>` (`mcp_worker_ipc.make_
 | Child → Host | `STARTED` | `pid`, `host`, `port` |
 | Child → Host | `START_FAILED` | `message` |
 | Child → Host | `HEARTBEAT_PONG` | `nonce` |
-| Child → Host | `ACK` | e.g. `correlating="UPDATE_VARIABLES"` |
+| Child → Host | `ACK` | e.g. `correlating="UPDATE_TOOLS"` or `"UPDATE_VARIABLES"` |
 | Child → Host | `EXITED` | after cooperative STOP |
-| Child → Host | `WORKER_ERROR` | fatal path |
+| Child → Host | `WORKER_ERROR` | fatal / sanitized command error path |
 
 Tools are JSON-safe via `encode_tools` / `decode_tools` (`__mcp_tool_kind__`:
 `http` | `websocket`).
 
-### Variable sync
+### Tool & variable sync
 
 | Mode | Mechanism |
 | --- | --- |
-| Thread | Live closures into the in-process ASGI impl |
-| Process | Host sends snapshots; child `_SnapshotStore` feeds local callables |
+| Thread | Live closures into the in-process ASGI impl; `MCPServerManager.update_tools` updates `MCPServerImpl.register_tools` in place and restarts only when tool `(id, name)` signature changes |
+| Process | Host sends `UPDATE_TOOLS` (atomic `MCPServerImpl.register_tools` map replacement) and `UPDATE_VARIABLES` snapshots (`_SnapshotStore` feeds local callables) with zero downtime |
 
 Never pickle host closures, runtime HTTP clients, or Qt objects into the child.
 For proxy servers (`server_type="proxy"`), header templates are forwarded as primitive
 configuration and resolved inside the owning child process against its own
-`_SnapshotStore`; `START` payloads, `upstream_url`, header values, and variable
-snapshots are never logged.
+`_SnapshotStore`; `START`, `UPDATE_TOOLS`, and `UPDATE_VARIABLES` payloads,
+`upstream_url`, header values, request URLs/descriptions, and variable snapshots
+are never logged.
 
 ---
 
@@ -238,6 +296,7 @@ host survive a fatal child exit.
 | --- | --- | --- |
 | Process start fails / worker never `STARTED` | Bind error, spawn import error, or start timeout (15s) | Check `START_FAILED` / `last_start_error`; ensure port free; confirm worker import graph has no PySide6 |
 | Peer servers die with one crash | Registry still on `thread` | Set `mcp_execution_mode="process"` and rebuild registry |
+| Collection edits do not appear on process worker or mark row `failed` | Worker exited before `refresh_collection` or missing collection/library reference | Inspect `mcp_registry_refresh_collection_worker_failed` / `mcp_worker_update_tools_send_failed` logs and row status; restart the failed server once references are valid |
 | Isolation test gets empty / wrong vars | Echo gate unset across spawn | Export `PYPOST_MCP_TEST_ECHO_VARS=1` **before** spawning workers |
 | `send_debug_opcode` raises / DEBUG ignored | Debug gate unset | Set `PYPOST_MCP_ALLOW_DEBUG_IPC=1` in supervisor **and** child environment |
 | Stop hangs past ~2s | Unexpected; budget should force kill | Check `mcp_worker_kill` logs; verify child not outside supervisor table |
@@ -258,6 +317,7 @@ worker ownership must first be reclaimed through stop/stop_all.
 make test PYTEST_ARGS="tests/test_mcp_process_isolation_repro.py -v"
 make test WORKERS=1 PYTEST_ARGS="tests/test_mcp_process_reconfigure_repro.py -q"
 make test WORKERS=1 PYTEST_ARGS="tests/test_mcp_process_proxy_repro.py -q"
+make test WORKERS=1 PYTEST_ARGS="tests/test_mcp_process_tool_refresh_repro.py -q"
 make test PYTEST_ARGS="tests/test_mcp_multiserver_stress_10x.py"
 ```
 
@@ -270,6 +330,11 @@ Streamable HTTP and SSE upstream forwarding in isolated worker processes, `START
 proxy field propagation (`server_type`, `upstream_url`, `upstream_transport`, `headers`,
 `timeout`), child-side header template resolution, live proxy reconfiguration, and
 secret-safe structured logging.
+Tool refresh parity coverage (`tests/test_mcp_process_tool_refresh_repro.py`, PYPOST-1465)
+verifies live add/modify/remove tool refresh over `UPDATE_TOOLS` without PID/port change,
+collection-scoped variable and secret refresh with active environment override preservation,
+neighbor and proxy server isolation, dead-worker failure containment and `start_snapshot`
+synchronization, thread-mode regression parity, and secret-safe structured logging.
 
 ---
 

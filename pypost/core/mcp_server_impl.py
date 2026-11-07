@@ -343,11 +343,14 @@ class MCPServerImpl:
 
     def register_tools(self, requests: Sequence[RequestData | WebSocketConnection]):
         """Register HTTP requests and WebSocket connections as MCP tools."""
-        self.tools_map.clear()
+        new_map: Dict[str, RequestData | WebSocketConnection] = {}
         for item in requests:
             if item.expose_as_mcp:
                 pfx = "ws_" if isinstance(item, WebSocketConnection) else ""
-                self.tools_map[f"{pfx}{normalize_mcp_tool_name(item.name)}"] = item
+                copy_fn = getattr(item, "model_copy", None)
+                copied = copy_fn(deep=True) if callable(copy_fn) else item
+                new_map[f"{pfx}{normalize_mcp_tool_name(item.name)}"] = copied
+        self.tools_map = new_map
 
     def _generate_schema(self, req: RequestData) -> dict:
         hidden_keys = self._hidden_keys_supplier()

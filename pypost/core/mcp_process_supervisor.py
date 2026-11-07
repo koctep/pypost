@@ -131,6 +131,33 @@ class McpProcessSupervisor:
         self._send(instance_id, start_msg)
         self._wait_started(instance_id, timeout=start_timeout)
 
+    def update_tools(self, instance_id: str, tools: list[Any]) -> bool:
+        """Send UPDATE_TOOLS to a running worker; return False if unavailable."""
+        with self._lock:
+            record = self._workers.get(instance_id)
+            if (
+                record is None
+                or record.state != "running"
+                or not record.process.is_alive()
+            ):
+                return False
+            conn = record.parent_conn
+        try:
+            payload = make_message("UPDATE_TOOLS", tools=encode_tools(tools))
+            conn.send(payload)
+            logger.debug(
+                "mcp_worker_update_tools_sent instance_id=%s tool_count=%d",
+                instance_id,
+                len(tools),
+            )
+            return True
+        except (BrokenPipeError, OSError, EOFError, ValueError, TypeError):
+            logger.warning(
+                "mcp_worker_update_tools_send_failed instance_id=%s",
+                instance_id,
+            )
+            return False
+
     def update_variables(
         self,
         instance_id: str,
@@ -385,6 +412,20 @@ class McpProcessSupervisor:
                     instance_id,
                     record.process.pid,
                     record.last_error,
+                )
+            elif msg_type == "ACK":
+                logger.debug(
+                    "mcp_worker_ipc_ack instance_id=%s pid=%s correlating=%s",
+                    instance_id,
+                    record.process.pid,
+                    message.get("correlating"),
+                )
+            elif msg_type == "WORKER_ERROR":
+                logger.error(
+                    "mcp_worker_ipc_error instance_id=%s pid=%s message=%s",
+                    instance_id,
+                    record.process.pid,
+                    message.get("message"),
                 )
 
     def _monitor_loop(self) -> None:

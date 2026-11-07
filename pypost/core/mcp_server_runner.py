@@ -43,6 +43,8 @@ class MCPServerRunnerProtocol(Protocol):
     @property
     def last_start_error(self) -> str | None: ...
 
+    def update_tools(self, tools: list[Any]) -> bool: ...
+
     def update_variables(
         self,
         variables: dict[str, str],
@@ -93,6 +95,9 @@ class ThreadServerRunner:
     @property
     def last_start_error(self) -> str | None:
         return self._manager.last_start_error
+
+    def update_tools(self, tools: list[Any]) -> bool:
+        return self._manager.update_tools(tools)
 
     def update_variables(
         self,
@@ -195,22 +200,29 @@ class ProcessServerRunner:
             self._instance_id
         )
 
+    def update_tools(self, tools: list[Any]) -> bool:
+        if not self._supervisor.update_tools(self._instance_id, tools):
+            return False
+        if self._spec is not None:
+            self._spec.tools = deepcopy(list(tools))
+        return True
+
     def update_variables(
         self,
         variables: dict[str, str],
         hidden_keys: set[str],
         overridable_keys: set[str],
     ) -> None:
-        if self._spec is not None:
-            self._spec.variables = dict(variables)
-            self._spec.hidden_keys = set(hidden_keys)
-            self._spec.overridable_keys = set(overridable_keys)
         self._supervisor.update_variables(
             self._instance_id,
             variables,
             hidden_keys,
             overridable_keys,
         )
+        if self._spec is not None:
+            self._spec.variables = dict(variables)
+            self._spec.hidden_keys = set(hidden_keys)
+            self._spec.overridable_keys = set(overridable_keys)
 
     def send_debug_opcode(self, opcode: str) -> None:
         """Test-only IPC opcode (DEBUG_ABORT / DEBUG_HANG)."""
