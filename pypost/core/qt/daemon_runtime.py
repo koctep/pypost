@@ -128,6 +128,7 @@ class DaemonRuntime(QObject):
                 metrics=metrics,
                 template_service=TemplateService(metrics),
                 execution_mode=settings.mcp_execution_mode,
+                restart_policy=settings.mcp_restart_policy,
             )
             for configuration in enabled:
                 registry.upsert(configuration.model_copy(deep=True))
@@ -193,6 +194,8 @@ class DaemonRuntime(QObject):
         if self._registry is not None:
             try:
                 self._registry.stop_all()
+                if self._registry._process_supervisor is not None:
+                    self._registry._process_supervisor.shutdown()
             except Exception as exc:
                 self._exit_code = 1
                 logger.error("daemon_mcp_shutdown_failed category=%s", type(exc).__name__)

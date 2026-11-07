@@ -30,7 +30,10 @@ from pypost.core.server_bind import (
 from pypost.core.template_service import TemplateService
 from pypost.models.library_manager import LibraryConnectionRecord
 from pypost.models.models import Collection, Environment
-from pypost.models.settings import McpServerConfiguration
+from pypost.models.settings import (
+    McpServerConfiguration,
+    McpWorkerRestartPolicy,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -95,6 +98,7 @@ class MCPServerRegistry(QObject):
         library_service=None,
         builtin_view: BuiltinCollectionView | None = None,
         execution_mode: Literal["thread", "process"] = "thread",
+        restart_policy: McpWorkerRestartPolicy | None = None,
     ) -> None:
         super().__init__()
         if execution_mode not in ("thread", "process"):
@@ -109,6 +113,11 @@ class MCPServerRegistry(QObject):
         self._builtin_view = builtin_view or BuiltinCollectionView()
         self._bundled_adapter = _BundledLibraryAdapter(self._builtin_view)
         self._execution_mode = execution_mode
+        self._restart_policy = (
+            restart_policy.model_copy()
+            if restart_policy is not None
+            else None
+        )
         self._configurations: dict[str, McpServerConfiguration] = {}
         self._managers: dict[str, MCPServerManager] = {}
         self._runners: dict[str, ThreadServerRunner | ProcessServerRunner] = {}
@@ -124,7 +133,14 @@ class MCPServerRegistry(QObject):
         if execution_mode == "process":
             self._process_supervisor = McpProcessSupervisor(
                 on_unexpected_exit=self._on_worker_unexpected_exit,
+                on_worker_restarting=self._on_worker_restarting,
+                on_worker_restarted=self._on_worker_restarted,
+                restart_policy=self._restart_policy,
             )
+
+    @property
+    def restart_policy(self) -> McpWorkerRestartPolicy | None:
+        return self._restart_policy
 
     def get(self, instance_id: str) -> McpServerConfiguration | None:
         """Return the configuration for instance_id, or None if not found."""
@@ -446,8 +462,11 @@ class MCPServerRegistry(QObject):
         self._validate_replacement_references(instance_id, replacement)
         if (replacement.host, replacement.port) != (previous.host, previous.port):
             self._validate_os_port(replacement.host, replacement.port)
-        was_running = self.is_running(instance_id)
-        if not was_running:
+        runner = self._runners.get(instance_id)
+        was_active = self.is_running(instance_id) or (
+            isinstance(runner, ProcessServerRunner) and runner.is_restarting()
+        )
+        if not was_active:
             self._configurations[instance_id] = replacement.model_copy(deep=True)
             self._managers.pop(instance_id, None)
             return
@@ -1354,7 +1373,9 @@ class MCPServerRegistry(QObject):
     ) -> None:
         with self._reconfiguration_lock:
             previous = self._runners.get(instance_id)
-            if not isinstance(previous, ProcessServerRunner) or not previous.is_running():
+            if not isinstance(previous, ProcessServerRunner) or not (
+                previous.is_running() or previous.is_restarting()
+            ):
                 self._configurations[instance_id] = replacement.model_copy(deep=True)
                 return
             old_spec = previous.start_snapshot
@@ -1440,6 +1461,9 @@ class MCPServerRegistry(QObject):
         if self._process_supervisor is None:
             self._process_supervisor = McpProcessSupervisor(
                 on_unexpected_exit=self._on_worker_unexpected_exit,
+                on_worker_restarting=self._on_worker_restarting,
+                on_worker_restarted=self._on_worker_restarted,
+                restart_policy=self._restart_policy,
             )
         runner = ProcessServerRunner(
             instance_id,
@@ -1470,6 +1494,78 @@ class MCPServerRegistry(QObject):
     ) -> None:
         with self._reconfiguration_lock:
             self._handle_worker_unexpected_exit(worker_id, exitcode)
+
+    def _on_worker_restarting(
+        self, worker_id: str, attempt: int, delay_s: float, exitcode: int | None
+    ) -> None:
+        with self._reconfiguration_lock:
+            self._handle_worker_restarting(worker_id, attempt, delay_s, exitcode)
+
+    def _handle_worker_restarting(
+        self, worker_id: str, attempt: int, delay_s: float, exitcode: int | None
+    ) -> None:
+        instance_id = next(
+            (
+                key
+                for key, runner in tuple(self._runners.items())
+                if isinstance(runner, ProcessServerRunner)
+                and runner.worker_id == worker_id
+            ),
+            None,
+        )
+        if instance_id is None:
+            return
+        configuration = self._configurations.get(instance_id)
+        port = configuration.port if configuration is not None else 0
+        current = self._statuses.get(instance_id)
+        if current is not None and current.state == "stopped":
+            return
+        max_retries = (
+            self._restart_policy.max_retries
+            if self._restart_policy is not None
+            else 3
+        )
+        logger.info(
+            "mcp_registry_worker_restarting instance_id=%s port=%d attempt=%d "
+            "max_retries=%d delay_s=%.2f exitcode=%s",
+            instance_id,
+            port,
+            attempt,
+            max_retries,
+            delay_s,
+            exitcode,
+        )
+        message = (
+            f"Restarting after unexpected exit "
+            f"(attempt {attempt}/{max_retries}, delay {delay_s:.1f}s)"
+        )
+        self._set_status(instance_id, "starting", message)
+
+    def _on_worker_restarted(self, worker_id: str, attempt: int) -> None:
+        with self._reconfiguration_lock:
+            self._handle_worker_restarted(worker_id, attempt)
+
+    def _handle_worker_restarted(self, worker_id: str, attempt: int) -> None:
+        instance_id = next(
+            (
+                key
+                for key, runner in tuple(self._runners.items())
+                if isinstance(runner, ProcessServerRunner)
+                and runner.worker_id == worker_id
+            ),
+            None,
+        )
+        if instance_id is None:
+            return
+        current = self._statuses.get(instance_id)
+        if current is not None and current.state == "stopped":
+            return
+        logger.info(
+            "mcp_registry_worker_restarted instance_id=%s attempt=%d",
+            instance_id,
+            attempt,
+        )
+        self._set_status(instance_id, "running")
 
     def _handle_worker_unexpected_exit(
         self, worker_id: str, exitcode: int | None

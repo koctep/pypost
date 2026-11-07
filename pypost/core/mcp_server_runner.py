@@ -92,6 +92,12 @@ class ThreadServerRunner:
     def is_listening(self) -> bool:
         return self._manager.is_listening
 
+    def is_restarting(self) -> bool:
+        return False
+
+    def retry_count(self) -> int:
+        return 0
+
     @property
     def last_start_error(self) -> str | None:
         return self._manager.last_start_error
@@ -193,6 +199,12 @@ class ProcessServerRunner:
 
     def is_listening(self) -> bool:
         return self._listening and self.is_running()
+
+    def is_restarting(self) -> bool:
+        return self._supervisor.is_restarting(self._instance_id)
+
+    def retry_count(self) -> int:
+        return self._supervisor.retry_count(self._instance_id)
 
     @property
     def last_start_error(self) -> str | None:
