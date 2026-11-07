@@ -38,7 +38,7 @@ MCPServerRegistry(execution_mode=...)
 | Protocol / runners | `pypost/core/mcp_server_runner.py` | `MCPServerRunnerProtocol`, `ThreadServerRunner`, `ProcessServerRunner` |
 | Supervisor | `pypost/core/mcp_process_supervisor.py` | Process table, IPC send, STOP→SIGTERM→SIGKILL |
 | IPC helpers | `pypost/core/mcp_worker_ipc.py` | Versioned envelopes (`v: 1`), tool encode/decode |
-| Worker | `pypost/core/mcp_worker_process.py` | Spawn target; uvicorn + `MCPServerImpl` |
+| Worker | `pypost/core/mcp_worker_process.py` | Spawn target; uvicorn + `MCPServerImpl` (local) or `MCPProxyServerImpl` (proxy) |
 
 Host wiring passes the setting into the registry:
 
@@ -106,11 +106,14 @@ Stop uses `CancellationTokenSource` and `adaptive_thread_join` (default ~2.0s).
 
 ### `ProcessServerRunner`
 
-Delegates to a shared `McpProcessSupervisor`. Converts supplier updates into
-`UPDATE_VARIABLES` IPC snapshots. Exposes `send_debug_opcode` for tests only.
-The read-only `worker_id` identifies the supervisor entry independently of the public
-configuration ID. `start_snapshot` returns a deep copy of the accepted start payload;
-variable updates refresh the snapshot used for recovery.
+Delegates to a shared `McpProcessSupervisor`. Forwards both local tool inputs and
+proxy settings (`server_type`, `upstream_url`, `upstream_transport`, copied `headers`,
+and `timeout`) from `ServerStartSpec.configuration` to `spawn_worker` (PYPOST-1464).
+Converts supplier updates into `UPDATE_VARIABLES` IPC snapshots. Exposes
+`send_debug_opcode` for tests only. The read-only `worker_id` identifies the supervisor
+entry independently of the public configuration ID. `start_snapshot` returns a deep copy
+of the accepted start payload (including proxy configuration); variable updates refresh
+the snapshot used for recovery.
 
 ### Live process reconfiguration (PYPOST-1463)
 
@@ -147,6 +150,10 @@ and retry the operation rather than replacing registry state around a live child
 ### `McpProcessSupervisor`
 
 - Always uses `multiprocessing.get_context("spawn")` (Qt-safe; portable).
+- `spawn_worker` accepts optional typed proxy settings with local defaults
+  (`server_type="local"`, `upstream_url=None`, `upstream_transport="streamable_http"`,
+  `headers=None`, `timeout=30.0`) and copies `headers` into the `START` IPC message
+  (PYPOST-1464).
 - Process table: `instance_id` → process handle, duplex Pipe, dedicated IPC reader
   thread, state (`starting` / `running` / `failed` / `stopped`).
 - One demux reader per worker owns `poll`+`recv` (no shared Pipe drain races).
@@ -156,9 +163,14 @@ and retry the operation rather than replacing registry state around a live child
 
 ### `mcp_worker_process.worker_main`
 
-Headless spawn entrypoint. Must not import PySide6. Builds `MCPServerImpl` + uvicorn
-on a private asyncio loop. Disables uvicorn signal handlers so the **supervisor**
-owns SIGTERM/SIGKILL; the child reacts to IPC `STOP` primarily.
+Headless spawn entrypoint. Must not import PySide6. On `START`, selects
+`MCPProxyServerImpl` when `server_type == "proxy"` (supplying `upstream_url`,
+`upstream_transport`, copied `headers`, `timeout`, and `_SnapshotStore`
+variable/key suppliers) or `MCPServerImpl` otherwise (registering decoded local
+tools only for local servers; PYPOST-1464). Runs uvicorn on a private asyncio loop
+via `_run_uvicorn(impl: MCPServerImpl | MCPProxyServerImpl, ...)`. Disables uvicorn
+signal handlers so the **supervisor** owns SIGTERM/SIGKILL; the child reacts to IPC
+`STOP` primarily.
 
 ---
 
@@ -168,7 +180,7 @@ Envelopes are dicts with `"v": 1` and `"type": <MsgType>` (`mcp_worker_ipc.make_
 
 | Direction | Type | Payload (conceptual) |
 | --- | --- | --- |
-| Host → Child | `START` | `host`, `port`, `name`, `tools` (encoded), `variables`, `hidden_keys`, `overridable_keys` |
+| Host → Child | `START` | `host`, `port`, `name`, `tools` (encoded), `variables`, `hidden_keys`, `overridable_keys`, `server_type`, `upstream_url`, `upstream_transport`, `headers`, `timeout` |
 | Host → Child | `UPDATE_VARIABLES` | `variables`, `hidden_keys`, `overridable_keys` |
 | Host → Child | `HEARTBEAT` | optional `nonce` |
 | Host → Child | `STOP` | — |
@@ -190,7 +202,11 @@ Tools are JSON-safe via `encode_tools` / `decode_tools` (`__mcp_tool_kind__`:
 | Thread | Live closures into the in-process ASGI impl |
 | Process | Host sends snapshots; child `_SnapshotStore` feeds local callables |
 
-Never pickle host closures or Qt objects into the child.
+Never pickle host closures, runtime HTTP clients, or Qt objects into the child.
+For proxy servers (`server_type="proxy"`), header templates are forwarded as primitive
+configuration and resolved inside the owning child process against its own
+`_SnapshotStore`; `START` payloads, `upstream_url`, header values, and variable
+snapshots are never logged.
 
 ---
 
@@ -241,6 +257,7 @@ worker ownership must first be reclaimed through stop/stop_all.
 ```bash
 make test PYTEST_ARGS="tests/test_mcp_process_isolation_repro.py -v"
 make test WORKERS=1 PYTEST_ARGS="tests/test_mcp_process_reconfigure_repro.py -q"
+make test WORKERS=1 PYTEST_ARGS="tests/test_mcp_process_proxy_repro.py -q"
 make test PYTEST_ARGS="tests/test_mcp_multiserver_stress_10x.py"
 ```
 
@@ -248,12 +265,18 @@ Process-mode coverage: setting default/validation, crash isolation, variable iso
 under load, bounded stop with unresponsive worker, thread-mode 10x regression control.
 Reconfiguration coverage includes same/changed endpoints, bounded recovery and failed recovery,
 peer continuity, candidate cleanup, concurrent stop/edit ordering, and cleanup retries.
+Proxy parity coverage (`tests/test_mcp_process_proxy_repro.py`, PYPOST-1464) verifies
+Streamable HTTP and SSE upstream forwarding in isolated worker processes, `START` IPC
+proxy field propagation (`server_type`, `upstream_url`, `upstream_transport`, `headers`,
+`timeout`), child-side header template resolution, live proxy reconfiguration, and
+secret-safe structured logging.
 
 ---
 
 ## Related documentation
 
 - [Multi-Process Supervisor Evaluation (PYPOST-1438 / Phase 2)](mcp_process_supervisor_evaluation.md)
+- [MCP Reverse Proxy (PYPOST-1092)](mcp_proxy.md)
 - [Concurrent Multi-Server Lifecycle (PYPOST-1418)](mcp_concurrent_multiserver.md)
 - [Multiple Independent MCP Servers (PYPOST-1044)](mcp_server_registry.md)
 - [Cancellation / adaptive join (PYPOST-1437)](mcp_concurrent_multiserver.md#cooperative-cancellation-architecture-pypostcorecancellationpy)

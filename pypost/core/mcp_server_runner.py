@@ -157,6 +157,11 @@ class ProcessServerRunner:
                 hidden_keys=set(spec.hidden_keys),
                 overridable_keys=set(spec.overridable_keys),
                 name=config.name or config.id,
+                server_type=config.server_type,
+                upstream_url=config.upstream_url,
+                upstream_transport=config.upstream_transport,
+                headers=dict(config.headers),
+                timeout=config.timeout,
             )
             self._listening = True
         except Exception as exc:
