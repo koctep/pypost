@@ -11,10 +11,11 @@ import os
 import sys
 import threading
 import time
-from typing import Any
+from typing import Any, Literal, cast
 
 import uvicorn
 
+from pypost.core.mcp_proxy_server_impl import MCPProxyServerImpl
 from pypost.core.mcp_server_impl import MCPServerImpl
 from pypost.core.mcp_worker_ipc import (
     decode_tools,
@@ -61,7 +62,7 @@ class _SnapshotStore:
 
 
 def _run_uvicorn(
-    impl: MCPServerImpl,
+    impl: MCPServerImpl | MCPProxyServerImpl,
     host: str,
     port: int,
     stop_flag: dict[str, Any],
@@ -167,15 +168,33 @@ def worker_main(conn: Any) -> None:
                 host = str(message.get("host") or "127.0.0.1")
                 port = int(message.get("port") or 0)
 
-                impl = MCPServerImpl(
+                implementation = (
+                    MCPProxyServerImpl
+                    if message.get("server_type") == "proxy"
+                    else MCPServerImpl
+                )
+                proxy_settings: dict[str, Any] = {}
+                if implementation is MCPProxyServerImpl:
+                    proxy_settings = {
+                        "upstream_url": str(message.get("upstream_url") or ""),
+                        "upstream_transport": cast(
+                            Literal["streamable_http", "sse"],
+                            message.get("upstream_transport", "streamable_http"),
+                        ),
+                        "headers": dict(message.get("headers") or {}),
+                        "timeout": float(message.get("timeout", 30.0)),
+                    }
+                impl = implementation(
                     name=str(message.get("name") or "pypost-mcp-worker"),
                     variable_supplier=lambda: dict(store.variables),
                     hidden_keys_supplier=lambda: set(store.hidden_keys),
                     overridable_keys_supplier=lambda: set(
                         store.overridable_keys
                     ),
+                    **proxy_settings,
                 )
-                impl.register_tools(tools)
+                if isinstance(impl, MCPServerImpl):
+                    impl.register_tools(tools)
 
                 serve_thread = threading.Thread(
                     target=_run_uvicorn,

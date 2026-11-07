@@ -5,6 +5,7 @@ This document describes the design, implementation, configuration, and troublesh
 See also:
 - [MCP Integration (Developer Guide)](mcp_integration.md) for local MCP collection server architecture.
 - [Multiple Independent MCP Servers (PYPOST-1044)](mcp_server_registry.md) for multi-server lifecycle and registry management.
+- [MCP Process vs Thread Execution Mode (PYPOST-1439)](mcp_process_isolation.md) for isolated process-mode proxy workers (PYPOST-1464).
 - [MCP Secrets Policy](mcp_secrets_policy.md) and [Sensitive Data Masking Policy](sensitive_data_masking_policy.md).
 - [MCP Server Custom Headers Editor](mcp_server_headers_editor.md) for headers UI and variable autocomplete.
 - [Inbound MCP Trust Model](mcp_trust_model.md).
@@ -106,8 +107,15 @@ Coordinates persistence and multi-instance orchestration:
 - Checks `config.server_type`:
   - For `"local"`, validates collection existence and starts local `MCPServerImpl`.
   - For `"proxy"`, skips collection checks, binds the active environment snapshot, and starts `MCPProxyServerImpl`.
-- In `refresh_environment(environment_id, env_vars, hidden_keys)`, propagates updated variables to running proxy instances using `update_proxy_environment`.
+- In `refresh_environment(environment_id, env_vars, hidden_keys)`, propagates updated variables to running proxy instances using `update_proxy_environment` (thread mode) or `UPDATE_VARIABLES` IPC snapshots (process mode).
 - In `reconcile_references(collection_ids, environment_ids)`, preserves proxy configurations when collections are deleted.
+
+### 5. Process-Mode Proxy Workers (`pypost/core/mcp_server_runner.py`, `pypost/core/mcp_process_supervisor.py`, `pypost/core/mcp_worker_process.py`, PYPOST-1464)
+When `AppSettings.mcp_execution_mode == "process"`, proxy servers run inside OS-isolated child processes with full startup and forwarding parity:
+- `ProcessServerRunner.start(spec)` extracts `server_type`, `upstream_url`, `upstream_transport`, a copied `headers` mapping, and `timeout` from `spec.configuration` and forwards them to `McpProcessSupervisor.spawn_worker`.
+- `McpProcessSupervisor.spawn_worker` carries those fields in the `START` IPC message alongside the initial `variables`, `hidden_keys`, and `overridable_keys` snapshots.
+- `mcp_worker_process.worker_main` selects `MCPProxyServerImpl` when `server_type == "proxy"` and wires it to the child's `_SnapshotStore` variable/key suppliers. Header templates are resolved inside the child process per request, and `UPDATE_VARIABLES` IPC messages update `_SnapshotStore` live without exposing another worker's state or logging raw upstream URLs, header values, or variable snapshots.
+- See [MCP Process vs Thread Execution Mode](mcp_process_isolation.md) for full IPC and lifecycle details.
 
 ---
 

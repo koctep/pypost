@@ -70,6 +70,11 @@ class McpProcessSupervisor:
         overridable_keys: set[str],
         name: str | None = None,
         start_timeout: float = 15.0,
+        server_type: Literal["local", "proxy"] = "local",
+        upstream_url: str | None = None,
+        upstream_transport: Literal["streamable_http", "sse"] = "streamable_http",
+        headers: dict[str, str] | None = None,
+        timeout: float = 30.0,
     ) -> None:
         """Spawn a headless worker and wait until STARTED or START_FAILED."""
         with self._lock:
@@ -117,6 +122,11 @@ class McpProcessSupervisor:
             variables=dict(variables),
             hidden_keys=list(hidden_keys),
             overridable_keys=list(overridable_keys),
+            server_type=server_type,
+            upstream_url=upstream_url,
+            upstream_transport=upstream_transport,
+            headers=dict(headers or {}),
+            timeout=timeout,
         )
         self._send(instance_id, start_msg)
         self._wait_started(instance_id, timeout=start_timeout)
