@@ -90,7 +90,21 @@ def _run_uvicorn(
         original_startup = server_instance.startup
 
         async def startup_with_notify(sockets=None):
-            await original_startup(sockets=sockets)
+            try:
+                await original_startup(sockets=sockets)
+            except Exception as exc:
+                try:
+                    conn.send(
+                        make_message(
+                            "START_FAILED",
+                            message=format_bind_error(exc, host, port, "MCP server")
+                            if isinstance(exc, OSError)
+                            else f"MCP worker failed: {exc}",
+                        )
+                    )
+                except (BrokenPipeError, OSError, EOFError):
+                    pass
+                raise
             try:
                 conn.send(
                     make_message(
@@ -108,6 +122,16 @@ def _run_uvicorn(
         # Expose for STOP handler.
         stop_flag["server"] = server_instance
         loop.run_until_complete(server_instance.serve())
+        if not getattr(server_instance, "started", False):
+            try:
+                conn.send(
+                    make_message(
+                        "START_FAILED",
+                        message=f"MCP server on {host}:{port} failed to start",
+                    )
+                )
+            except (BrokenPipeError, OSError, EOFError):
+                pass
     except OSError as exc:
         try:
             conn.send(

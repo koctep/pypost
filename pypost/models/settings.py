@@ -10,6 +10,29 @@ from pypost.models.websocket import HeartbeatPolicy, ReconnectPolicy
 ThemeSetting = Literal["system", "light", "dark"]
 
 
+class McpWorkerRestartPolicy(BaseModel):
+    """Progressive exponential backoff restart policy for isolated MCP workers."""
+
+    enabled: bool = False
+    max_retries: int = Field(default=3, ge=0, le=100)
+    initial_backoff_s: float = Field(default=0.5, gt=0.0)
+    max_backoff_s: float = Field(default=8.0, gt=0.0)
+    backoff_multiplier: float = Field(default=2.0, ge=1.0)
+    healthy_reset_window_s: float = Field(default=30.0, ge=0.0)
+
+    @model_validator(mode="after")
+    def validate_backoff_bounds(self) -> "McpWorkerRestartPolicy":
+        if self.max_backoff_s < self.initial_backoff_s:
+            raise ValueError("max_backoff_s cannot be less than initial_backoff_s")
+        return self
+
+    def backoff_for_attempt(self, attempt: int) -> float:
+        if attempt <= 1:
+            return min(self.max_backoff_s, self.initial_backoff_s)
+        delay = self.initial_backoff_s * (self.backoff_multiplier ** (attempt - 1))
+        return min(self.max_backoff_s, delay)
+
+
 class McpServerConfiguration(BaseModel):
     """One independently managed, persisted MCP endpoint."""
 
@@ -82,6 +105,9 @@ class AppSettings(BaseModel):
     mcp_port: int = 1080
     mcp_host: str = "127.0.0.1"
     mcp_execution_mode: Literal["thread", "process"] = "thread"
+    mcp_restart_policy: McpWorkerRestartPolicy = Field(
+        default_factory=McpWorkerRestartPolicy
+    )
     mcp_servers: List[McpServerConfiguration] = []
     metrics_port: int = 9080
     metrics_host: str = "127.0.0.1"

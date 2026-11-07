@@ -7,11 +7,13 @@ import multiprocessing
 import os
 import threading
 import time
+from copy import deepcopy
 from dataclasses import dataclass, field
 from typing import Any, Callable, Literal
 
 from pypost.core.mcp_worker_ipc import encode_tools, make_message
 from pypost.core.mcp_worker_process import worker_main
+from pypost.models.settings import McpWorkerRestartPolicy
 
 logger = logging.getLogger(__name__)
 
@@ -25,15 +27,38 @@ _ALLOW_DEBUG_IPC_ENV = "PYPOST_MCP_ALLOW_DEBUG_IPC"
 
 
 @dataclass
+class _WorkerSpawnSpec:
+    host: str
+    port: int
+    tools: list[Any]
+    variables: dict[str, str]
+    hidden_keys: set[str]
+    overridable_keys: set[str]
+    name: str | None = None
+    start_timeout: float = 15.0
+    server_type: Literal["local", "proxy"] = "local"
+    upstream_url: str | None = None
+    upstream_transport: Literal["streamable_http", "sse"] = "streamable_http"
+    headers: dict[str, str] = field(default_factory=dict)
+    timeout: float = 30.0
+
+
+@dataclass
 class _WorkerRecord:
     instance_id: str
     process: Any
     parent_conn: Any
+    spec: _WorkerSpawnSpec | None = None
     state: WorkerState = "starting"
     last_error: str | None = None
     started_event: threading.Event = field(default_factory=threading.Event)
     reader_stop: threading.Event = field(default_factory=threading.Event)
     reader_thread: threading.Thread | None = None
+    started_at: float | None = None
+    retry_count: int = 0
+    next_retry_deadline: float | None = None
+    restarting: bool = False
+    cancel_event: threading.Event = field(default_factory=threading.Event)
 
 
 class McpProcessSupervisor:
@@ -43,12 +68,22 @@ class McpProcessSupervisor:
         self,
         *,
         on_unexpected_exit: Callable[[str, int | None], None] | None = None,
+        on_worker_restarting: Callable[[str, int, float, int | None], None] | None = None,
+        on_worker_restarted: Callable[[str, int], None] | None = None,
+        restart_policy: McpWorkerRestartPolicy | None = None,
         stop_budget_s: float = DEFAULT_STOP_BUDGET_S,
     ) -> None:
         self._ctx = multiprocessing.get_context("spawn")
         self._workers: dict[str, _WorkerRecord] = {}
         self._lock = threading.RLock()
         self._on_unexpected_exit = on_unexpected_exit
+        self._on_worker_restarting = on_worker_restarting
+        self._on_worker_restarted = on_worker_restarted
+        self._restart_policy = (
+            restart_policy.model_copy()
+            if restart_policy is not None
+            else McpWorkerRestartPolicy()
+        )
         self._stop_budget_s = stop_budget_s
         self._monitor_stop = threading.Event()
         self._monitor_thread = threading.Thread(
@@ -57,6 +92,20 @@ class McpProcessSupervisor:
             daemon=True,
         )
         self._monitor_thread.start()
+
+    @property
+    def restart_policy(self) -> McpWorkerRestartPolicy:
+        return self._restart_policy
+
+    def is_restarting(self, instance_id: str) -> bool:
+        with self._lock:
+            record = self._workers.get(instance_id)
+            return bool(record is not None and record.restarting)
+
+    def retry_count(self, instance_id: str) -> int:
+        with self._lock:
+            record = self._workers.get(instance_id)
+            return 0 if record is None else record.retry_count
 
     def spawn_worker(
         self,
@@ -77,6 +126,21 @@ class McpProcessSupervisor:
         timeout: float = 30.0,
     ) -> None:
         """Spawn a headless worker and wait until STARTED or START_FAILED."""
+        spec = _WorkerSpawnSpec(
+            host=host,
+            port=port,
+            tools=deepcopy(list(tools)),
+            variables=dict(variables),
+            hidden_keys=set(hidden_keys),
+            overridable_keys=set(overridable_keys),
+            name=name,
+            start_timeout=start_timeout,
+            server_type=server_type,
+            upstream_url=upstream_url,
+            upstream_transport=upstream_transport,
+            headers=dict(headers or {}),
+            timeout=timeout,
+        )
         with self._lock:
             existing = self._workers.get(instance_id)
             if existing is not None and existing.process.is_alive():
@@ -94,6 +158,7 @@ class McpProcessSupervisor:
                 instance_id=instance_id,
                 process=process,
                 parent_conn=parent_conn,
+                spec=spec,
             )
             self._workers[instance_id] = record
             process.start()
@@ -129,15 +194,24 @@ class McpProcessSupervisor:
             timeout=timeout,
         )
         self._send(instance_id, start_msg)
-        self._wait_started(instance_id, timeout=start_timeout)
+        try:
+            self._wait_started(instance_id, timeout=start_timeout)
+        except Exception:
+            self.stop_worker(instance_id)
+            raise
 
     def update_tools(self, instance_id: str, tools: list[Any]) -> bool:
         """Send UPDATE_TOOLS to a running worker; return False if unavailable."""
         with self._lock:
             record = self._workers.get(instance_id)
+            if record is None:
+                return False
+            if record.spec is not None:
+                record.spec.tools = deepcopy(list(tools))
+            if record.restarting:
+                return True
             if (
-                record is None
-                or record.state != "running"
+                record.state != "running"
                 or not record.process.is_alive()
             ):
                 return False
@@ -165,15 +239,35 @@ class McpProcessSupervisor:
         hidden_keys: set[str],
         overridable_keys: set[str],
     ) -> None:
-        self._send(
-            instance_id,
-            make_message(
-                "UPDATE_VARIABLES",
-                variables=dict(variables),
-                hidden_keys=list(hidden_keys),
-                overridable_keys=list(overridable_keys),
-            ),
-        )
+        with self._lock:
+            record = self._workers.get(instance_id)
+            if record is None:
+                raise KeyError(f"Unknown MCP worker: {instance_id}")
+            if record.spec is not None:
+                record.spec.variables = dict(variables)
+                record.spec.hidden_keys = set(hidden_keys)
+                record.spec.overridable_keys = set(overridable_keys)
+            if (
+                record.restarting
+                or record.state != "running"
+                or not record.process.is_alive()
+            ):
+                return
+            conn = record.parent_conn
+        try:
+            conn.send(
+                make_message(
+                    "UPDATE_VARIABLES",
+                    variables=dict(variables),
+                    hidden_keys=list(hidden_keys),
+                    overridable_keys=list(overridable_keys),
+                )
+            )
+        except (BrokenPipeError, OSError, EOFError):
+            logger.warning(
+                "mcp_worker_update_variables_send_failed instance_id=%s",
+                instance_id,
+            )
 
     def send_debug_opcode(self, instance_id: str, opcode: str) -> None:
         """Send a test-only DEBUG_* opcode to the child.
@@ -217,10 +311,20 @@ class McpProcessSupervisor:
             record = self._workers.get(instance_id)
             if record is None:
                 return True
+            record.cancel_event.set()
+            record.next_retry_deadline = None
+            if record.restarting:
+                logger.info(
+                    "mcp_worker_restart_cancelled instance_id=%s attempt=%d "
+                    "reason=operator_stop",
+                    instance_id,
+                    record.retry_count,
+                )
+                record.restarting = False
             process = record.process
             parent_conn = record.parent_conn
 
-        if process.is_alive():
+        if process is not None and process.is_alive():
             logger.info(
                 "mcp_worker_stop_requested instance_id=%s pid=%s budget_s=%.3f",
                 instance_id,
@@ -261,14 +365,14 @@ class McpProcessSupervisor:
                 remaining = max(0.0, deadline - time.monotonic())
                 process.join(timeout=max(remaining, 0.05))
 
-        stopped_cleanly = not process.is_alive()
+        stopped_cleanly = process is None or not process.is_alive()
         logger.info(
             "mcp_worker_stop_finished instance_id=%s pid=%s alive=%s "
             "exitcode=%s",
             instance_id,
-            process.pid,
-            process.is_alive(),
-            process.exitcode,
+            process.pid if process is not None else None,
+            process.is_alive() if process is not None else False,
+            process.exitcode if process is not None else None,
         )
 
         with self._lock:
@@ -288,6 +392,18 @@ class McpProcessSupervisor:
 
     def shutdown(self) -> None:
         self._monitor_stop.set()
+        with self._lock:
+            for record in self._workers.values():
+                record.cancel_event.set()
+                record.next_retry_deadline = None
+                if record.restarting:
+                    logger.info(
+                        "mcp_worker_restart_cancelled instance_id=%s "
+                        "attempt=%d reason=supervisor_shutdown",
+                        record.instance_id,
+                        record.retry_count,
+                    )
+                    record.restarting = False
         ids = list(self._workers.keys())
         for instance_id in ids:
             try:
@@ -296,6 +412,11 @@ class McpProcessSupervisor:
                 logger.exception(
                     "mcp_supervisor_shutdown_error instance_id=%s", instance_id
                 )
+        if (
+            self._monitor_thread.is_alive()
+            and threading.current_thread() != self._monitor_thread
+        ):
+            self._monitor_thread.join(timeout=1.0)
 
     def _send(self, instance_id: str, message: dict[str, Any]) -> None:
         with self._lock:
@@ -395,6 +516,7 @@ class McpProcessSupervisor:
                 return
             if msg_type == "STARTED":
                 record.state = "running"
+                record.started_at = time.monotonic()
                 record.started_event.set()
                 logger.info(
                     "mcp_worker_started instance_id=%s pid=%s",
@@ -429,34 +551,60 @@ class McpProcessSupervisor:
                 )
 
     def _monitor_loop(self) -> None:
-        """Watch child liveness only — never touch the Pipe (reader owns it)."""
-        while not self._monitor_stop.wait(0.1):
+        """Watch child liveness, reset windows, and backoff retries."""
+        while not self._monitor_stop.wait(0.05):
+            now = time.monotonic()
             unexpected: list[tuple[str, int | None]] = []
+            restarting_events: list[tuple[str, int, float, int | None]] = []
+            restart_attempts: list[_WorkerRecord] = []
+            readers_to_stop: list[_WorkerRecord] = []
+
             with self._lock:
                 for instance_id, record in list(self._workers.items()):
+                    # 1. Reset window check for running workers
+                    if (
+                        record.state == "running"
+                        and record.started_at is not None
+                        and (now - record.started_at)
+                        >= self._restart_policy.healthy_reset_window_s
+                        and record.retry_count > 0
+                    ):
+                        prev_count = record.retry_count
+                        uptime_s = now - record.started_at
+                        record.retry_count = 0
+                        pid = record.process.pid if record.process else None
+                        logger.info(
+                            "mcp_worker_restart_counter_reset instance_id=%s "
+                            "pid=%s uptime_s=%.2f previous_retry_count=%d",
+                            instance_id,
+                            pid,
+                            uptime_s,
+                            prev_count,
+                        )
+
+                    # 2. Check if a restarting worker's backoff deadline has elapsed
+                    if (
+                        record.restarting
+                        and record.next_retry_deadline is not None
+                        and now >= record.next_retry_deadline
+                        and not record.cancel_event.is_set()
+                    ):
+                        record.next_retry_deadline = None
+                        restart_attempts.append(record)
+
+                    # 3. Check for unexpected exits
                     if (
                         record.state in ("starting", "running")
+                        and not record.restarting
+                        and record.process is not None
                         and not record.process.is_alive()
                     ):
                         exitcode = record.process.exitcode
-                        if record.state == "running":
+                        if record.state == "starting":
+                            # Initial start failure (FR7)
                             record.state = "failed"
                             record.last_error = (
-                                f"unexpected worker exit (exitcode={exitcode})"
-                            )
-                            unexpected.append((instance_id, exitcode))
-                            logger.error(
-                                "mcp_worker_unexpected_exit instance_id=%s "
-                                "pid=%s exitcode=%s prior_state=running",
-                                instance_id,
-                                record.process.pid,
-                                exitcode,
-                            )
-                        elif record.state == "starting":
-                            record.state = "failed"
-                            record.last_error = (
-                                f"worker exited during start "
-                                f"(exitcode={exitcode})"
+                                f"worker exited during start (exitcode={exitcode})"
                             )
                             record.started_event.set()
                             logger.error(
@@ -466,6 +614,90 @@ class McpProcessSupervisor:
                                 record.process.pid,
                                 exitcode,
                             )
+                        elif record.state == "running":
+                            # Crashed from running state
+                            if (
+                                not self._restart_policy.enabled
+                                or record.retry_count
+                                >= self._restart_policy.max_retries
+                            ):
+                                record.state = "failed"
+                                record.last_error = (
+                                    f"unexpected worker exit (exitcode={exitcode})"
+                                )
+                                if (
+                                    self._restart_policy.enabled
+                                    and record.retry_count
+                                    >= self._restart_policy.max_retries
+                                ):
+                                    logger.error(
+                                        "mcp_worker_restart_exhausted "
+                                        "instance_id=%s attempts=%d "
+                                        "max_retries=%d exitcode=%s",
+                                        instance_id,
+                                        record.retry_count,
+                                        self._restart_policy.max_retries,
+                                        exitcode,
+                                    )
+                                else:
+                                    logger.error(
+                                        "mcp_worker_unexpected_exit "
+                                        "instance_id=%s pid=%s exitcode=%s "
+                                        "prior_state=running",
+                                        instance_id,
+                                        record.process.pid,
+                                        exitcode,
+                                    )
+                                unexpected.append((instance_id, exitcode))
+                                readers_to_stop.append(record)
+                            else:
+                                record.retry_count += 1
+                                delay_s = self._restart_policy.backoff_for_attempt(
+                                    record.retry_count
+                                )
+                                record.next_retry_deadline = now + delay_s
+                                record.restarting = True
+                                record.state = "starting"
+                                record.cancel_event.clear()
+                                record.started_event.clear()
+                                logger.info(
+                                    "mcp_worker_restart_scheduled "
+                                    "instance_id=%s attempt=%d max_retries=%d "
+                                    "delay_s=%.2f exitcode=%s",
+                                    instance_id,
+                                    record.retry_count,
+                                    self._restart_policy.max_retries,
+                                    delay_s,
+                                    exitcode,
+                                )
+                                restarting_events.append(
+                                    (
+                                        instance_id,
+                                        record.retry_count,
+                                        delay_s,
+                                        exitcode,
+                                    )
+                                )
+                                readers_to_stop.append(record)
+
+            # Stop dead readers outside the lock
+            for rec in readers_to_stop:
+                self._stop_reader(rec)
+
+            # Callbacks outside the lock
+            for instance_id, attempt, delay_s, exitcode in restarting_events:
+                if self._on_worker_restarting is not None:
+                    try:
+                        self._on_worker_restarting(
+                            instance_id, attempt, delay_s, exitcode
+                        )
+                    except Exception:
+                        logger.exception(
+                            "mcp_supervisor_restarting_callback_error "
+                            "instance_id=%s",
+                            instance_id,
+                        )
+
             for instance_id, exitcode in unexpected:
                 if self._on_unexpected_exit is not None:
                     try:
@@ -476,3 +708,206 @@ class McpProcessSupervisor:
                             "instance_id=%s",
                             instance_id,
                         )
+
+            # Launch restart attempts asynchronously
+            for rec in restart_attempts:
+                threading.Thread(
+                    target=self._attempt_restart,
+                    args=(rec,),
+                    name=f"mcp-restart-{rec.instance_id}",
+                    daemon=True,
+                ).start()
+
+    def _attempt_restart(self, record: _WorkerRecord) -> None:
+        instance_id = record.instance_id
+        if record.cancel_event.is_set() or self._monitor_stop.is_set():
+            return
+        spec = record.spec
+        if spec is None:
+            return
+
+        with self._lock:
+            if record.cancel_event.is_set() or self._monitor_stop.is_set():
+                return
+            parent_conn, child_conn = self._ctx.Pipe(duplex=True)
+            process = self._ctx.Process(
+                target=worker_main,
+                args=(child_conn,),
+                name=f"mcp-worker-{instance_id}",
+                daemon=False,
+            )
+            record.process = process
+            record.parent_conn = parent_conn
+            record.reader_stop = threading.Event()
+            record.started_event.clear()
+            try:
+                process.start()
+            except Exception as exc:
+                logger.error(
+                    "mcp_worker_restart_process_start_failed instance_id=%s error=%s",
+                    instance_id,
+                    exc,
+                )
+                self._handle_restart_failure(record, str(exc), None)
+                return
+
+            logger.info(
+                "mcp_worker_spawned instance_id=%s pid=%s host=%s port=%d "
+                "tool_count=%d",
+                instance_id,
+                process.pid,
+                spec.host,
+                spec.port,
+                len(spec.tools),
+            )
+            try:
+                child_conn.close()
+            except Exception:
+                pass
+            self._start_reader(record)
+
+        start_msg = make_message(
+            "START",
+            host=spec.host,
+            port=spec.port,
+            name=spec.name or instance_id,
+            tools=encode_tools(spec.tools),
+            variables=dict(spec.variables),
+            hidden_keys=list(spec.hidden_keys),
+            overridable_keys=list(spec.overridable_keys),
+            server_type=spec.server_type,
+            upstream_url=spec.upstream_url,
+            upstream_transport=spec.upstream_transport,
+            headers=dict(spec.headers),
+            timeout=spec.timeout,
+        )
+        try:
+            self._send(instance_id, start_msg)
+        except Exception as exc:
+            logger.error(
+                "mcp_worker_restart_start_send_failed instance_id=%s error=%s",
+                instance_id,
+                exc,
+            )
+            self._handle_restart_failure(record, str(exc), None)
+            return
+
+        deadline = time.monotonic() + spec.start_timeout
+        success = False
+        fail_reason: str | None = None
+        exitcode: int | None = None
+
+        while time.monotonic() < deadline:
+            if record.cancel_event.is_set() or self._monitor_stop.is_set():
+                return
+            with self._lock:
+                if record.state == "running":
+                    success = True
+                    break
+                if record.state == "failed":
+                    fail_reason = record.last_error or "start failed"
+                    break
+                if not record.process.is_alive():
+                    exitcode = record.process.exitcode
+                    fail_reason = (
+                        f"worker exited during restart (exitcode={exitcode})"
+                    )
+                    break
+            record.started_event.wait(timeout=0.05)
+
+        if record.cancel_event.is_set() or self._monitor_stop.is_set():
+            return
+
+        if success:
+            with self._lock:
+                record.state = "running"
+                record.restarting = False
+                record.started_at = time.monotonic()
+                record.next_retry_deadline = None
+                pid = record.process.pid
+                attempt = record.retry_count
+            logger.info(
+                "mcp_worker_restarted instance_id=%s pid=%s attempt=%d "
+                "max_retries=%d",
+                instance_id,
+                pid,
+                attempt,
+                self._restart_policy.max_retries,
+            )
+            if self._on_worker_restarted is not None:
+                try:
+                    self._on_worker_restarted(instance_id, attempt)
+                except Exception:
+                    logger.exception(
+                        "mcp_supervisor_worker_restarted_callback_error "
+                        "instance_id=%s",
+                        instance_id,
+                    )
+        else:
+            if fail_reason is None:
+                fail_reason = f"restart timed out after {spec.start_timeout}s"
+            self._handle_restart_failure(record, fail_reason, exitcode)
+
+    def _handle_restart_failure(
+        self, record: _WorkerRecord, fail_reason: str, exitcode: int | None
+    ) -> None:
+        instance_id = record.instance_id
+        scheduled: tuple[int, float] | None = None
+        exhausted = False
+        with self._lock:
+            if record.cancel_event.is_set() or self._monitor_stop.is_set():
+                return
+            if record.retry_count < self._restart_policy.max_retries:
+                record.retry_count += 1
+                delay_s = self._restart_policy.backoff_for_attempt(
+                    record.retry_count
+                )
+                record.next_retry_deadline = time.monotonic() + delay_s
+                record.restarting = True
+                record.state = "starting"
+                record.started_event.clear()
+                logger.info(
+                    "mcp_worker_restart_scheduled instance_id=%s attempt=%d "
+                    "max_retries=%d delay_s=%.2f exitcode=%s",
+                    instance_id,
+                    record.retry_count,
+                    self._restart_policy.max_retries,
+                    delay_s,
+                    exitcode,
+                )
+                scheduled = (record.retry_count, delay_s)
+            else:
+                record.restarting = False
+                record.state = "failed"
+                record.last_error = fail_reason
+                logger.error(
+                    "mcp_worker_restart_exhausted instance_id=%s attempts=%d "
+                    "max_retries=%d exitcode=%s",
+                    instance_id,
+                    record.retry_count,
+                    self._restart_policy.max_retries,
+                    exitcode,
+                )
+                exhausted = True
+
+        self._stop_reader(record)
+
+        if not exhausted and scheduled is not None:
+            attempt, delay_s = scheduled
+            if self._on_worker_restarting is not None:
+                try:
+                    self._on_worker_restarting(
+                        instance_id, attempt, delay_s, exitcode
+                    )
+                except Exception:
+                    logger.exception(
+                        "mcp_supervisor_restarting_callback_error"
+                    )
+        elif exhausted:
+            if self._on_unexpected_exit is not None:
+                try:
+                    self._on_unexpected_exit(instance_id, exitcode)
+                except Exception:
+                    logger.exception(
+                        "mcp_supervisor_unexpected_exit_callback_error"
+                    )

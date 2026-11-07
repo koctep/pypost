@@ -431,6 +431,7 @@ class McpServerSettingsController:
                 template_service=template_service,
                 library_service=library_service,
                 execution_mode=self._settings_provider().mcp_execution_mode,
+                restart_policy=self._settings_provider().mcp_restart_policy,
             )
         self.registry.reconfiguration_finished.connect(
             self._on_mcp_server_reconfiguration_finished

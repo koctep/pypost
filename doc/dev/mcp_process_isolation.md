@@ -33,10 +33,10 @@ MCPServerRegistry(execution_mode=...)
 
 | Component | Module | Role |
 | --- | --- | --- |
-| Setting | `pypost/models/settings.py` | `mcp_execution_mode` |
-| Registry | `pypost/core/mcp_server_registry.py` | Selects runner; maps unexpected child exit → `failed` |
+| Setting | `pypost/models/settings.py` | `mcp_execution_mode`, `mcp_restart_policy` |
+| Registry | `pypost/core/mcp_server_registry.py` | Selects runner; routes recovery transitions and exits |
 | Protocol / runners | `pypost/core/mcp_server_runner.py` | `MCPServerRunnerProtocol`, `ThreadServerRunner`, `ProcessServerRunner` |
-| Supervisor | `pypost/core/mcp_process_supervisor.py` | Process table, IPC send, STOP→SIGTERM→SIGKILL |
+| Supervisor | `pypost/core/mcp_process_supervisor.py` | Process table, IPC, STOP→SIGTERM→SIGKILL, backoff |
 | IPC helpers | `pypost/core/mcp_worker_ipc.py` | Versioned envelopes (`v: 1`), tool encode/decode |
 | Worker | `pypost/core/mcp_worker_process.py` | Spawn target; uvicorn + `MCPServerImpl` (local) or `MCPProxyServerImpl` (proxy) |
 
@@ -70,6 +70,42 @@ registry = MCPServerRegistry(execution_mode=settings.mcp_execution_mode)
 
 There is not yet a Settings dialog control for this field (tech debt); operators and
 tests set it on `AppSettings` / registry construction.
+
+### `mcp_restart_policy` (PYPOST-1466)
+
+Isolated process-mode workers support configurable automatic restart with progressive
+exponential backoff via `AppSettings.mcp_restart_policy`:
+
+| Field | Type | Default | Description |
+| --- | --- | --- | --- |
+| `enabled` | `bool` | `False` | Opt-in toggle. Default `False` fails immediately on exit. |
+| `max_retries` | `int` | `3` | Maximum consecutive restart attempts (`0` to `100`). |
+| `initial_backoff_s` | `float` | `0.5` | Delay in seconds before first restart attempt (`> 0.0`). |
+| `max_backoff_s` | `float` | `8.0` | Maximum capped backoff delay (`> 0.0`, `>= initial_backoff_s`). |
+| `backoff_multiplier` | `float` | `2.0` | Exponential growth factor applied per retry (`>= 1.0`). |
+| `healthy_reset_window_s` | `float` | `30.0` | Sustained uptime in seconds to reset retry count (`>= 0.0`). |
+
+```python
+from pypost.models.settings import AppSettings, McpWorkerRestartPolicy
+from pypost.core.mcp_server_registry import MCPServerRegistry
+
+policy = McpWorkerRestartPolicy(
+    enabled=True,
+    max_retries=3,
+    initial_backoff_s=0.5,
+    max_backoff_s=8.0,
+    backoff_multiplier=2.0,
+    healthy_reset_window_s=30.0,
+)
+settings = AppSettings(mcp_execution_mode="process", mcp_restart_policy=policy)
+registry = MCPServerRegistry(
+    execution_mode=settings.mcp_execution_mode,
+    restart_policy=settings.mcp_restart_policy,
+)
+```
+
+The restart policy defaults to disabled (`enabled=False`), maintaining backwards-compatible
+immediate crash containment (where child crashes transition directly to `failed`).
 
 ### Environment gates (test / debug only)
 
@@ -119,7 +155,9 @@ PYPOST-1465) and supplier updates into `UPDATE_VARIABLES` IPC snapshots. Exposes
 `send_debug_opcode` for tests only. The read-only `worker_id` identifies the supervisor
 entry independently of the public configuration ID. `start_snapshot` returns a deep copy
 of the accepted start payload (including proxy configuration); both `update_tools` and
-`update_variables` refresh the `_spec` snapshot used for reconfiguration rollback recovery.
+`update_variables` refresh the `_spec` snapshot used for reconfiguration rollback recovery
+and auto-restart respawn. `is_restarting()` and `retry_count()` reflect transient recovery
+progress (PYPOST-1466).
 
 ### Live collection tool and variable refresh (PYPOST-1465)
 
@@ -209,8 +247,10 @@ and retry the operation rather than replacing registry state around a live child
 - One demux reader per worker owns `poll`+`recv` (no shared Pipe drain races) and traces
   worker acknowledgments (`mcp_worker_ipc_ack`) and sanitized worker errors
   (`mcp_worker_ipc_error`).
-- Monitor loop watches `process.is_alive()` / `exitcode` only; unexpected exit
-  invokes `on_unexpected_exit` → registry marks the instance `failed`.
+- Monitor loop watches `process.is_alive()` / `exitcode`. When auto-restart is enabled and the
+  worker was `running`, it schedules exponential backoff and respawns up to `max_retries`. If
+  retries are exhausted, auto-restart is disabled, or exit occurred during initial startup
+  (`starting`), it invokes `on_unexpected_exit` → registry marks the instance `failed`.
 - Default stop budget: `DEFAULT_STOP_BUDGET_S = 2.0`.
 
 ### `mcp_worker_process.worker_main`
@@ -290,6 +330,129 @@ host survive a fatal child exit.
 
 ---
 
+## Auto-restart policy with exponential backoff (PYPOST-1466)
+
+Process mode provides crash recovery for isolated worker processes that exit unexpectedly
+from `running` state. When auto-restart is enabled, the supervisor automatically schedules
+recovery attempts using capped exponential backoff, preserving peer server isolation and
+avoiding manual operator intervention.
+
+### Configuration via `McpWorkerRestartPolicy`
+
+The policy is configured on `AppSettings.mcp_restart_policy` (and passed to `MCPServerRegistry`
+and `McpProcessSupervisor`):
+
+- `enabled: bool = False`: Opt-in toggle. Default `False` maintains immediate crash containment
+  where unexpected child exits transition directly to `failed` without retrying (`FR1`).
+- `max_retries: int = 3`: Maximum consecutive restart attempts (`0` to `100`).
+- `initial_backoff_s: float = 0.5`: Delay in seconds before attempt 1 (`> 0.0`).
+- `max_backoff_s: float = 8.0`: Maximum capped backoff delay (`> 0.0`, `>= initial_backoff_s`).
+- `backoff_multiplier: float = 2.0`: Multiplier applied per retry attempt (`>= 1.0`).
+- `healthy_reset_window_s: float = 30.0`: Required sustained uptime in seconds before the
+  consecutive failure counter resets to 0 (`>= 0.0`).
+
+### Exponential calculation formula
+
+The delay for attempt $k \in \{1 \dots \text{max\_retries}\}$ is computed via
+`policy.backoff_for_attempt(attempt)`:
+
+$$\text{delay} = \min(
+    \text{max\_backoff\_s},
+    \text{initial\_backoff\_s} \times \text{backoff\_multiplier}^{(\text{attempt} - 1)}
+)$$
+
+Default progression:
+- Attempt 1: $0.5 \times 2.0^0 = 0.5\,\text{s}$
+- Attempt 2: $0.5 \times 2.0^1 = 1.0\,\text{s}$
+- Attempt 3: $0.5 \times 2.0^2 = 2.0\,\text{s}$
+- Capped at `max_backoff_s` ($8.0\,\text{s}$) for higher retry counts.
+
+### Non-blocking deadline scheduling & monotonic timers
+
+The supervisor's `_monitor_loop` detects child termination every 100 ms without blocking:
+
+1. When a running worker crashes, the supervisor checks whether `policy.enabled` is `True`
+   and `retry_count < policy.max_retries`.
+2. If retries remain, the supervisor increments `retry_count`, transitions `record.state`
+   to `starting` (recovering), records `next_retry_deadline = time.monotonic() + delay_s`, and
+   notifies the registry via `on_worker_restarting(instance_id, attempt, delay_s, exitcode)`.
+   The registry sets status to `starting` with an explanatory message:
+   `Restarting after crash (attempt {attempt}/{max_retries} in {delay_s:.1f}s)`.
+3. An asynchronous restart attempt thread (`_attempt_restart`) waits on the worker's
+   `cancel_event` until the monotonic deadline expires.
+4. When the deadline elapses without cancellation, the supervisor spawns a new worker child
+   using `spawn_worker`. On receiving `STARTED`, `record.state` transitions back to `running`,
+   `started_at` is stamped with `time.monotonic()`, and `on_worker_restarted` returns registry
+   status to `running`.
+5. If retries are exhausted (`retry_count >= max_retries`), the supervisor transitions `state`
+   to `failed`, logs `mcp_worker_restart_exhausted`, and notifies `on_unexpected_exit`.
+
+### Consecutive failure counter reset
+
+To distinguish transient faults from permanent broken states, the supervisor monitors continuous
+uptime:
+
+- When a recovered worker remains continuously `running` for `healthy_reset_window_s`
+  (default 30.0s), the monitor loop resets `retry_count = 0` and logs
+  `mcp_worker_restart_counter_reset`.
+- If the worker crashes hours or days later, it receives a full retry quota instead of
+  failing prematurely (`FR4`).
+
+### Immediate cancellation on operator stop, reconfigure, or shutdown
+
+Restart delays never delay or block administrative operations (`FR6`):
+
+- When an operator invokes `stop_worker(instance_id)`, `reconfigure(instance_id, ...)`, or
+  supervisor `shutdown()`, the supervisor sets `cancel_event`.
+- The restart thread aborts its backoff sleep in milliseconds, cleans up temporary process
+  handles, and logs `mcp_worker_restart_cancelled` (`reason="operator_stop"` or
+  `reason="supervisor_shutdown"`).
+- In-flight restart timers do not block application exit or configuration changes.
+
+### State snapshot preservation across restarts (`_WorkerSpawnSpec`)
+
+During initial spawn, `McpProcessSupervisor` stores a typed `_WorkerSpawnSpec` on `_WorkerRecord`:
+
+- Captures `host`, `port`, `name`, `tools`, `variables`, `hidden_keys`, `overridable_keys`,
+  `server_type`, `upstream_url`, `upstream_transport`, `headers`, and `timeout`.
+- When tools or variables are refreshed at runtime (`update_tools` / `update_variables` via
+  collection updates or settings), the supervisor updates `_WorkerSpawnSpec` in place even while
+  the worker child is down or waiting in backoff (`FR5`).
+- The respawned child process is launched with the freshest tool catalog, variable values,
+  and proxy headers rather than stale start-time arguments.
+
+### Fast startup failure distinction (`FR7`)
+
+Auto-restart is strictly a post-start crash recovery mechanism:
+
+- If a worker fails during initial launch (e.g., port already bound, invalid socket address,
+  missing dependencies, or spawn error), the child emits `START_FAILED` and exits with
+  prior state `starting`.
+- Fast startup failures bypass the restart retry loop entirely. The supervisor cleans up the
+  failed child process, logs `mcp_worker_unexpected_exit prior_state=starting`, and transitions
+  to terminal `failed` with the startup error.
+
+### Observability log events and secret safety (`FR8`)
+
+Supervisor and registry lifecycle transitions emit structured key-value events. Context
+fields (`instance_id`, `pid`, `port`, `attempt`, `attempts`, `max_retries`, `delay_s`, `exitcode`,
+`uptime_s`, `previous_retry_count`, `reason`) provide visibility without leaking secrets:
+
+| Event Name | Level | Key Fields | Description |
+| --- | --- | --- | --- |
+| `mcp_worker_restart_scheduled` | INFO | `attempt`, `delay_s` | Scheduled backoff delay |
+| `mcp_worker_restarted` | INFO | `pid`, `attempt` | Worker respawned and listening |
+| `mcp_worker_restart_exhausted` | ERROR | `attempts`, `exitcode` | Retries exhausted; marked `failed` |
+| `mcp_worker_restart_counter_reset` | INFO | `uptime_s` | Counter reset after healthy window |
+| `mcp_worker_restart_cancelled` | INFO | `attempt`, `reason` | Cancelled on stop or shutdown |
+| `mcp_registry_worker_restarting` | INFO | `attempt`, `delay_s` | Registry transitional `starting` |
+| `mcp_registry_worker_restarted` | INFO | `attempt` | Registry transitioned to `running` |
+
+All events strictly omit sensitive data: variable maps, resolved tokens, headers, upstream URLs,
+and tool parameter schemas are never logged.
+
+---
+
 ## Troubleshooting
 
 | Symptom | Likely cause | Resolution |
@@ -301,6 +464,9 @@ host survive a fatal child exit.
 | `send_debug_opcode` raises / DEBUG ignored | Debug gate unset | Set `PYPOST_MCP_ALLOW_DEBUG_IPC=1` in supervisor **and** child environment |
 | Stop hangs past ~2s | Unexpected; budget should force kill | Check `mcp_worker_kill` logs; verify child not outside supervisor table |
 | Mode change ignored while running | Mode is construction-time | Stop servers; recreate registry with the new `execution_mode` |
+| Crash loop / retries exhausted | Crashes exceeded `max_retries` | Check logs, fix fault, and restart |
+| Startup failure not retried | Fast startup failure (`FR7`) | Verify port free, valid address, and imports |
+| Pending restart delay | Exponential backoff active | Wait for delay or call stop to abort |
 
 For a rejected live edit, inspect `mcp_registry_process_reconfigure_rejected`: the `phase`,
 `restored`, and `cleaned` fields distinguish startup, reclamation, and restoration outcomes
@@ -318,6 +484,7 @@ make test PYTEST_ARGS="tests/test_mcp_process_isolation_repro.py -v"
 make test WORKERS=1 PYTEST_ARGS="tests/test_mcp_process_reconfigure_repro.py -q"
 make test WORKERS=1 PYTEST_ARGS="tests/test_mcp_process_proxy_repro.py -q"
 make test WORKERS=1 PYTEST_ARGS="tests/test_mcp_process_tool_refresh_repro.py -q"
+make test WORKERS=1 PYTEST_ARGS="tests/test_mcp_process_autorestart_repro.py -q"
 make test PYTEST_ARGS="tests/test_mcp_multiserver_stress_10x.py"
 ```
 
@@ -335,6 +502,16 @@ verifies live add/modify/remove tool refresh over `UPDATE_TOOLS` without PID/por
 collection-scoped variable and secret refresh with active environment override preservation,
 neighbor and proxy server isolation, dead-worker failure containment and `start_snapshot`
 synchronization, thread-mode regression parity, and secret-safe structured logging.
+Auto-restart recovery coverage (`tests/test_mcp_process_autorestart_repro.py`, PYPOST-1466)
+verifies the 7 acceptance criteria:
+1. `AppSettings.mcp_restart_policy` defaults, field bounds, and backoff formula calculations.
+2. Default policy disabled (`enabled=False`): unexpected exits fail immediately without retries.
+3. Exponential backoff recovery with state preservation across live tool and variable updates.
+4. Retry exhaustion after `max_retries` consecutive failures transitioning to terminal `failed`.
+5. Healthy uptime reset window resetting the retry counter after sustained normal operation.
+6. Immediate backoff cancellation upon operator `stop_worker` and supervisor `shutdown`.
+7. Fast startup failure bypass: initial bind errors fail immediately without triggering restart.
+8. Observability structured logging and secret safety assertions verified via `caplog`.
 
 ---
 
