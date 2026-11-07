@@ -9,6 +9,7 @@ from concurrent.futures import ThreadPoolExecutor, wait
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, Literal
+from uuid import uuid4
 
 from PySide6.QtCore import QObject, Signal
 
@@ -111,6 +112,7 @@ class MCPServerRegistry(QObject):
         self._configurations: dict[str, McpServerConfiguration] = {}
         self._managers: dict[str, MCPServerManager] = {}
         self._runners: dict[str, ThreadServerRunner | ProcessServerRunner] = {}
+        self._process_cleanup: dict[str, list[ProcessServerRunner]] = {}
         self._statuses: dict[str, McpServerStatus] = {}
         self._pending_reconfigurations: dict[str, _PendingReconfiguration] = {}
         self._reconfiguration_lock = threading.RLock()
@@ -153,10 +155,12 @@ class MCPServerRegistry(QObject):
     def clear(self) -> None:
         """Drop registry state before loading a fresh persisted configuration."""
         self.stop_all()
-        self._configurations.clear()
-        self._statuses.clear()
-        self._managers.clear()
-        self._runners.clear()
+        with self._reconfiguration_lock:
+            self._require_process_cleanup_complete()
+            self._configurations.clear()
+            self._statuses.clear()
+            self._managers.clear()
+            self._runners.clear()
 
     def snapshot(self) -> dict[str, McpServerConfiguration]:
         """Return an isolated configuration snapshot for a higher-level transaction."""
@@ -165,12 +169,23 @@ class MCPServerRegistry(QObject):
     def restore_snapshot(self, snapshot: dict[str, McpServerConfiguration]) -> None:
         """Restore configuration state without sharing it with another registry."""
         self.stop_all()
-        self._configurations = {
-            key: value.model_copy(deep=True) for key, value in snapshot.items()
-        }
-        self._statuses = {key: McpServerStatus(key, "stopped") for key in self._configurations}
-        self._managers.clear()
-        self._runners.clear()
+        with self._reconfiguration_lock:
+            self._require_process_cleanup_complete()
+            self._configurations = {
+                key: value.model_copy(deep=True) for key, value in snapshot.items()
+            }
+            self._statuses = {
+                key: McpServerStatus(key, "stopped") for key in self._configurations
+            }
+            self._managers.clear()
+            self._runners.clear()
+
+    def _require_process_cleanup_complete(self) -> None:
+        if self._process_cleanup or any(
+            isinstance(runner, ProcessServerRunner) and runner.worker_is_alive()
+            for runner in self._runners.values()
+        ):
+            raise RuntimeError("MCP worker cleanup remains pending")
 
     def install_library_candidate(
         self, candidate: McpServerConfiguration, candidate_overlay=None
@@ -224,7 +239,8 @@ class MCPServerRegistry(QObject):
             return
 
         if self._execution_mode == "process":
-            self._start_process_runner(instance_id, configuration, runtime)
+            with self._reconfiguration_lock:
+                self._start_process_runner(instance_id, configuration, runtime)
             return
 
         manager = self._managers.get(instance_id)
@@ -239,6 +255,22 @@ class MCPServerRegistry(QObject):
         self._start_manager(manager, configuration, runtime)
 
     def stop(self, instance_id: str) -> None:
+        if self._execution_mode == "process":
+            with self._reconfiguration_lock:
+                if instance_id not in self._process_cleanup and instance_id not in self._runners:
+                    self._configuration(instance_id)
+                runners = self._process_cleanup.get(instance_id, []).copy()
+                current = self._runners.get(instance_id)
+                if isinstance(current, ProcessServerRunner):
+                    runners.append(current)
+                remaining = [runner for runner in runners if not runner.stop()]
+                self._process_cleanup[instance_id] = remaining
+                if remaining:
+                    self._set_status(instance_id, "failed", "Worker cleanup deadline exceeded")
+                    raise RuntimeError("MCP worker cleanup deadline exceeded")
+                self._process_cleanup.pop(instance_id, None)
+                self._set_status(instance_id, "stopped")
+            return
         if (
             instance_id not in self._configurations
             and instance_id not in self._managers
@@ -324,6 +356,7 @@ class MCPServerRegistry(QObject):
                     + list(self._runners.keys())
                     + list(self._pending_reconfigurations.keys())
                     + list(self._configurations.keys())
+                    + list(self._process_cleanup.keys())
                 )
             )
 
@@ -390,6 +423,14 @@ class MCPServerRegistry(QObject):
         )
 
     def reconfigure(self, instance_id: str, configuration: McpServerConfiguration) -> None:
+        """Replace an endpoint, serializing process decisions with its lifecycle."""
+        if self._execution_mode == "process":
+            with self._reconfiguration_lock:
+                self._reconfigure(instance_id, configuration)
+            return
+        self._reconfigure(instance_id, configuration)
+
+    def _reconfigure(self, instance_id: str, configuration: McpServerConfiguration) -> None:
         """Replace only the selected endpoint; neighbours keep their managers.
 
         Validate the replacement before disturbing a running manager.  In
@@ -417,6 +458,9 @@ class MCPServerRegistry(QObject):
                 f"MCP server {instance_id} references a missing "
                 f"{self._missing_reference(replacement)}"
             )
+        if self._execution_mode == "process":
+            self._reconfigure_process(instance_id, replacement, runtime)
+            return
         previous_manager = self._managers[instance_id]
         candidate = MCPServerManager(
             metrics=self._metrics, template_service=self._template_service
@@ -1139,6 +1183,87 @@ class MCPServerRegistry(QObject):
             )
             raise
 
+    def _reconfigure_process(
+        self,
+        instance_id: str,
+        replacement: McpServerConfiguration,
+        runtime: tuple[list, dict[str, str], set[str], set[str]],
+    ) -> None:
+        with self._reconfiguration_lock:
+            previous = self._runners.get(instance_id)
+            if not isinstance(previous, ProcessServerRunner) or not previous.is_running():
+                self._configurations[instance_id] = replacement.model_copy(deep=True)
+                return
+            old_spec = previous.start_snapshot
+            candidate = ProcessServerRunner(
+                f"{instance_id}:{uuid4().hex}", supervisor=previous.supervisor
+            )
+            tools, variables, hidden, overridable = runtime
+            spec = ServerStartSpec(replacement, tools, variables, hidden, overridable)
+            same_endpoint = (
+                replacement.host, replacement.port
+            ) == (old_spec.configuration.host, old_spec.configuration.port)
+            phase = "previous_stop"
+            self._set_status(instance_id, "starting")
+            try:
+                if same_endpoint and not previous.stop():
+                    raise RuntimeError("previous worker not reclaimed")
+                phase = "candidate_start"
+                candidate.start(spec)
+                if not candidate.is_running():
+                    raise RuntimeError("candidate not running")
+                phase = "previous_stop"
+                if not same_endpoint and not previous.stop():
+                    raise RuntimeError("previous worker not reclaimed")
+                phase = "candidate_liveness"
+                if not candidate.is_running():
+                    raise RuntimeError("candidate exited before commit")
+            except Exception:
+                cleaned = self._reclaim_process_candidate(instance_id, candidate)
+                restored = previous.is_running()
+                if cleaned and not restored and not previous.worker_is_alive():
+                    phase = "restore"
+                    recovery = ProcessServerRunner(
+                        f"{instance_id}:{uuid4().hex}", supervisor=previous.supervisor
+                    )
+                    try:
+                        recovery.start(old_spec)
+                        restored = recovery.is_running()
+                    except Exception:
+                        restored = False
+                    if restored:
+                        self._runners[instance_id] = recovery
+                    else:
+                        self._reclaim_process_candidate(instance_id, recovery)
+                message = f"Process reconfiguration rejected ({phase})"
+                if not cleaned or not restored:
+                    message += "; service restoration or cleanup failed"
+                self._set_status(
+                    instance_id, "running" if cleaned and restored else "failed", message
+                )
+                logger.warning(
+                    "mcp_registry_process_reconfigure_rejected instance_id=%s phase=%s "
+                    "restored=%s cleaned=%s", instance_id, phase, restored, cleaned,
+                )
+                self.reconfiguration_finished.emit(instance_id, False)
+                return
+            self._runners[instance_id] = candidate
+            self._configurations[instance_id] = replacement.model_copy(deep=True)
+            self._set_status(instance_id, "running")
+            logger.info("mcp_registry_process_reconfigured instance_id=%s", instance_id)
+            self.reconfiguration_finished.emit(instance_id, True)
+
+    def _reclaim_process_candidate(
+        self, instance_id: str, runner: ProcessServerRunner
+    ) -> bool:
+        try:
+            if runner.stop():
+                return True
+        except Exception:
+            pass
+        self._process_cleanup.setdefault(instance_id, []).append(runner)
+        return False
+
     def _start_process_runner(
         self,
         instance_id: str,
@@ -1178,8 +1303,22 @@ class MCPServerRegistry(QObject):
         self._set_status(instance_id, "running")
 
     def _on_worker_unexpected_exit(
-        self, instance_id: str, exitcode: int | None
+        self, worker_id: str, exitcode: int | None
     ) -> None:
+        with self._reconfiguration_lock:
+            self._handle_worker_unexpected_exit(worker_id, exitcode)
+
+    def _handle_worker_unexpected_exit(
+        self, worker_id: str, exitcode: int | None
+    ) -> None:
+        # Retired/candidate events cannot mutate the currently accepted generation.
+        instance_id = next(
+            (key for key, runner in tuple(self._runners.items())
+             if isinstance(runner, ProcessServerRunner) and runner.worker_id == worker_id),
+            None,
+        )
+        if instance_id is None:
+            return
         configuration = self._configurations.get(instance_id)
         port = configuration.port if configuration is not None else 0
         current = self._statuses.get(instance_id)

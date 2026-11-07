@@ -235,7 +235,12 @@ class McpProcessSupervisor:
         )
 
         with self._lock:
-            record = self._workers.pop(instance_id, None)
+            if stopped_cleanly:
+                record = self._workers.pop(instance_id, None)
+            else:
+                record.state = "failed"
+                record.last_error = "worker stop deadline exceeded"
+                return False
             if record is not None:
                 record.state = "stopped"
         # Join reader / close Pipe outside the process-table lock so

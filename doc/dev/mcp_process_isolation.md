@@ -108,6 +108,41 @@ Stop uses `CancellationTokenSource` and `adaptive_thread_join` (default ~2.0s).
 
 Delegates to a shared `McpProcessSupervisor`. Converts supplier updates into
 `UPDATE_VARIABLES` IPC snapshots. Exposes `send_debug_opcode` for tests only.
+The read-only `worker_id` identifies the supervisor entry independently of the public
+configuration ID. `start_snapshot` returns a deep copy of the accepted start payload;
+variable updates refresh the snapshot used for recovery.
+
+### Live process reconfiguration (PYPOST-1463)
+
+Call `registry.reconfigure(instance_id, replacement)` with the same configuration ID.
+Existing identity, reference, and port validation runs before disturbing the accepted
+worker. A stopped instance accepts the configuration for its next start. A running
+process instance uses a bounded supervised replacement transaction:
+
+1. Create a candidate runner with a unique internal worker ID on the shared supervisor.
+2. If the endpoint changes, keep the old worker serving until the candidate acknowledges
+   startup. If the endpoint stays the same, reclaim the old worker before candidate startup;
+   clients of that endpoint may briefly disconnect.
+3. Confirm candidate liveness and reclaim the prior worker before publishing the replacement
+   configuration and runner together. Emit `reconfiguration_finished(instance_id, True)`.
+4. On rejection, reclaim the candidate and retain the prior worker when still running.
+   Otherwise make one bounded restart attempt from the copied accepted runtime snapshot.
+   Emit `reconfiguration_finished(instance_id, False)` and retain the prior configuration.
+
+Recovery restores the accepted tools, variables, and hidden/overridable key sets rather
+than resolving possibly changed library or environment data. Failed restoration or cleanup
+publishes `failed`; recovered rejection publishes `running` with a safe rejection category.
+No new setting or environment variable is required. Existing startup and stop deadlines apply.
+
+Process start, stop, and the complete reconfiguration decision are serialized by the registry
+lifecycle lock. Peer child processes continue serving requests during the operation. Exit
+notifications resolve the currently accepted worker ID; retired or abandoned candidate events
+cannot mark a newer generation failed.
+
+If a child resists cleanup, ownership remains reachable for a later `stop(instance_id)` or
+`stop_all()` retry, including cleanup-only entries. `clear()` and `restore_snapshot()` refuse
+to discard registry state while process cleanup remains pending. Resolve the cleanup failure
+and retry the operation rather than replacing registry state around a live child.
 
 ### `McpProcessSupervisor`
 
@@ -169,7 +204,8 @@ Never pickle host closures or Qt objects into the child.
 2. `process.join` for remaining budget.
 3. If still alive: `process.terminate()` (SIGTERM / Windows terminate) and short join.
 4. If still alive: `process.kill()` (SIGKILL / TerminateProcess) and final join.
-5. Stop IPC reader, close Pipe, remove process-table entry.
+5. Once the child is dead, stop IPC reader, close Pipe, and remove its process-table entry.
+   If it remains alive, return failure and retain ownership so a later stop can retry.
 
 Structured logs: `mcp_worker_stop_requested`, `mcp_worker_terminate` (`signal=SIGTERM`),
 `mcp_worker_kill` (`signal=SIGKILL`), `mcp_worker_stop_finished`.
@@ -191,17 +227,27 @@ host survive a fatal child exit.
 | Stop hangs past ~2s | Unexpected; budget should force kill | Check `mcp_worker_kill` logs; verify child not outside supervisor table |
 | Mode change ignored while running | Mode is construction-time | Stop servers; recreate registry with the new `execution_mode` |
 
+For a rejected live edit, inspect `mcp_registry_process_reconfigure_rejected`: the `phase`,
+`restored`, and `cleaned` fields distinguish startup, reclamation, and restoration outcomes
+without exposing runtime secrets. `mcp_registry_process_reconfigured` records success.
+If the resulting status is failed, correct endpoint/resource availability and retry cleanup
+before restarting. `MCP worker cleanup remains pending` from clear/restore means retained
+worker ownership must first be reclaimed through stop/stop_all.
+
 ---
 
 ## Automated tests
 
 ```bash
 make test PYTEST_ARGS="tests/test_mcp_process_isolation_repro.py -v"
+make test WORKERS=1 PYTEST_ARGS="tests/test_mcp_process_reconfigure_repro.py -q"
 make test PYTEST_ARGS="tests/test_mcp_multiserver_stress_10x.py"
 ```
 
 Process-mode coverage: setting default/validation, crash isolation, variable isolation
 under load, bounded stop with unresponsive worker, thread-mode 10x regression control.
+Reconfiguration coverage includes same/changed endpoints, bounded recovery and failed recovery,
+peer continuity, candidate cleanup, concurrent stop/edit ordering, and cleanup retries.
 
 ---
 

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from copy import deepcopy
 from dataclasses import dataclass, field
 from typing import Any, Callable, Protocol, runtime_checkable
 
@@ -130,8 +131,19 @@ class ProcessServerRunner:
     def supervisor(self) -> McpProcessSupervisor:
         return self._supervisor
 
+    @property
+    def worker_id(self) -> str:
+        """Return the supervisor identity, independent of the public server ID."""
+        return self._instance_id
+
+    @property
+    def start_snapshot(self) -> ServerStartSpec:
+        if self._spec is None:
+            raise RuntimeError("MCP runner has no accepted start snapshot")
+        return deepcopy(self._spec)
+
     def start(self, spec: ServerStartSpec) -> None:
-        self._spec = spec
+        self._spec = deepcopy(spec)
         self._start_error = None
         self._listening = False
         config = spec.configuration
@@ -148,12 +160,12 @@ class ProcessServerRunner:
             )
             self._listening = True
         except Exception as exc:
-            self._start_error = str(exc)
+            self._start_error = type(exc).__name__
             self._listening = False
             logger.error(
                 "mcp_process_runner_start_failed instance_id=%s error=%s",
                 self._instance_id,
-                exc,
+                type(exc).__name__,
             )
             raise
 
