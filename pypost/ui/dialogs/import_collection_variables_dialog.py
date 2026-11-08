@@ -45,8 +45,20 @@ from pypost.ui.views.collection_variables_table_view import (
 from pypost.ui.widget_ids import (
     IMPORT_COLLECTION_BULK_KEEP_CURRENT_BUTTON,
     IMPORT_COLLECTION_BULK_OVERWRITE_BUTTON,
+    IMPORT_COLLECTION_CANCEL_DISCOVERY_BUTTON,
+    IMPORT_COLLECTION_CANCEL_LOADING_BUTTON,
     IMPORT_COLLECTION_DESELECT_ALL_BUTTON,
+    IMPORT_COLLECTION_DISCOVERY_CONTAINER,
+    IMPORT_COLLECTION_DISCOVERY_ERROR_CONTAINER,
+    IMPORT_COLLECTION_DISCOVERY_ERROR_LABEL,
+    IMPORT_COLLECTION_DISCOVERY_LABEL,
+    IMPORT_COLLECTION_ERROR_CONTAINER,
+    IMPORT_COLLECTION_ERROR_LABEL,
+    IMPORT_COLLECTION_LOADING_CONTAINER,
+    IMPORT_COLLECTION_LOADING_LABEL,
     IMPORT_COLLECTION_PRESET_COMBO,
+    IMPORT_COLLECTION_RETRY_DISCOVERY_BUTTON,
+    IMPORT_COLLECTION_RETRY_FETCH_BUTTON,
     IMPORT_COLLECTION_SELECT_ALL_BUTTON,
     IMPORT_COLLECTION_SOURCE_COMBO,
     IMPORT_COLLECTION_VARIABLES_DIALOG,
@@ -132,12 +144,59 @@ class ImportCollectionVariablesDialog(QDialog):
 
         layout.addLayout(source_layout)
 
-        # Loading container
+        # Discovery container (Dedicated UI for background manifest/catalog discovery)
+        self.discovery_container = QWidget()
+        set_widget_id(self.discovery_container, IMPORT_COLLECTION_DISCOVERY_CONTAINER)
+        discovery_layout = QHBoxLayout(self.discovery_container)
+        discovery_layout.setContentsMargins(0, 4, 0, 4)
+        self.discovery_label = QLabel("Discovering library collections...")
+        set_widget_id(self.discovery_label, IMPORT_COLLECTION_DISCOVERY_LABEL)
+        self.cancel_discovery_btn = QPushButton("Cancel")
+        set_widget_id(
+            self.cancel_discovery_btn, IMPORT_COLLECTION_CANCEL_DISCOVERY_BUTTON
+        )
+        self.cancel_discovery_btn.clicked.connect(self._on_cancel_discovery)
+        discovery_layout.addWidget(self.discovery_label)
+        discovery_layout.addWidget(self.cancel_discovery_btn)
+        discovery_layout.addStretch()
+        self.discovery_container.setVisible(False)
+        layout.addWidget(self.discovery_container)
+
+        # Discovery error container
+        self.discovery_error_container = QWidget()
+        set_widget_id(
+            self.discovery_error_container,
+            IMPORT_COLLECTION_DISCOVERY_ERROR_CONTAINER,
+        )
+        discovery_error_layout = QHBoxLayout(self.discovery_error_container)
+        discovery_error_layout.setContentsMargins(0, 4, 0, 4)
+        self.discovery_error_label = QLabel()
+        set_widget_id(
+            self.discovery_error_label, IMPORT_COLLECTION_DISCOVERY_ERROR_LABEL
+        )
+        self.discovery_error_label.setStyleSheet("color: red;")
+        self.retry_discovery_btn = QPushButton("Retry")
+        set_widget_id(
+            self.retry_discovery_btn, IMPORT_COLLECTION_RETRY_DISCOVERY_BUTTON
+        )
+        self.retry_discovery_btn.clicked.connect(self._on_retry_discovery)
+        discovery_error_layout.addWidget(self.discovery_error_label)
+        discovery_error_layout.addWidget(self.retry_discovery_btn)
+        discovery_error_layout.addStretch()
+        self.discovery_error_container.setVisible(False)
+        layout.addWidget(self.discovery_error_container)
+
+        # Loading container (Dedicated fetch chrome for remote collection contents)
         self.loading_container = QWidget()
+        set_widget_id(self.loading_container, IMPORT_COLLECTION_LOADING_CONTAINER)
         loading_layout = QHBoxLayout(self.loading_container)
         loading_layout.setContentsMargins(0, 4, 0, 4)
         self.loading_label = QLabel("Loading collection...")
+        set_widget_id(self.loading_label, IMPORT_COLLECTION_LOADING_LABEL)
         self.cancel_loading_btn = QPushButton("Cancel")
+        set_widget_id(
+            self.cancel_loading_btn, IMPORT_COLLECTION_CANCEL_LOADING_BUTTON
+        )
         self.cancel_loading_btn.clicked.connect(self._on_cancel_loading)
         loading_layout.addWidget(self.loading_label)
         loading_layout.addWidget(self.cancel_loading_btn)
@@ -145,13 +204,16 @@ class ImportCollectionVariablesDialog(QDialog):
         self.loading_container.setVisible(False)
         layout.addWidget(self.loading_container)
 
-        # Error container
+        # Error container (Dedicated fetch error banner for remote collection contents)
         self.error_container = QWidget()
+        set_widget_id(self.error_container, IMPORT_COLLECTION_ERROR_CONTAINER)
         error_layout = QHBoxLayout(self.error_container)
         error_layout.setContentsMargins(0, 4, 0, 4)
         self.error_label = QLabel()
+        set_widget_id(self.error_label, IMPORT_COLLECTION_ERROR_LABEL)
         self.error_label.setStyleSheet("color: red;")
         self.retry_fetch_btn = QPushButton("Retry")
+        set_widget_id(self.retry_fetch_btn, IMPORT_COLLECTION_RETRY_FETCH_BUTTON)
         self.retry_fetch_btn.clicked.connect(self._on_retry_fetch)
         error_layout.addWidget(self.error_label)
         error_layout.addWidget(self.retry_fetch_btn)
@@ -283,9 +345,10 @@ class ImportCollectionVariablesDialog(QDialog):
             "collection_variable_manifest_discovery_started gen=%d",
             gen,
         )
-        self.loading_container.setVisible(True)
-        self.loading_label.setText("Discovering library collections...")
-        self.cancel_loading_btn.setEnabled(True)
+        self.discovery_error_container.setVisible(False)
+        self.discovery_container.setVisible(True)
+        self.discovery_label.setText("Discovering library collections...")
+        self.cancel_discovery_btn.setEnabled(True)
 
         worker = ManifestDiscoveryWorker(
             library_service=self.library_service,
@@ -308,9 +371,7 @@ class ImportCollectionVariablesDialog(QDialog):
             return
 
         self._active_discovery_worker = None
-        # Only hide loading chrome if a remote collection fetch is not in progress.
-        if self._active_fetch_worker is None:
-            self.loading_container.setVisible(False)
+        self.discovery_container.setVisible(False)
 
         entry_list = list(entries or [])
         logger.info(
@@ -341,17 +402,38 @@ class ImportCollectionVariablesDialog(QDialog):
             return
 
         self._active_discovery_worker = None
-        if self._active_fetch_worker is None:
-            self.loading_container.setVisible(False)
+        self.discovery_container.setVisible(False)
 
         logger.warning(
-            "collection_variable_import_library_populate_failed error=%s",
+            "collection_variable_manifest_discovery_failed gen=%d error=%s",
+            gen,
             exc,
             exc_info=True,
         )
-        self.error_container.setVisible(True)
-        self.error_label.setText(f"Failed to discover library collections: {exc}")
-        self.retry_fetch_btn.setEnabled(True)
+        self.discovery_error_container.setVisible(True)
+        self.discovery_error_label.setText(
+            f"Failed to discover library collections: {exc}"
+        )
+        self.retry_discovery_btn.setEnabled(True)
+
+    def _on_cancel_discovery(self) -> None:
+        logger.info(
+            "collection_variable_manifest_discovery_cancelled gen=%d",
+            self._discovery_generation,
+        )
+        self._discovery_generation += 1
+        self._cancel_discovery_worker()
+        self.discovery_container.setVisible(False)
+        self.discovery_error_container.setVisible(False)
+
+    def _on_retry_discovery(self) -> None:
+        logger.info(
+            "collection_variable_manifest_discovery_retry_requested env_name=%s",
+            self.target_environment.name,
+        )
+        self.discovery_error_container.setVisible(False)
+        if self.library_service is not None:
+            self._start_manifest_discovery()
 
     def _on_collection_changed(self) -> None:
         data = self.collection_combo.currentData()
@@ -484,16 +566,6 @@ class ImportCollectionVariablesDialog(QDialog):
         self._update_preview_summary()
 
     def _on_cancel_loading(self) -> None:
-        if self._active_discovery_worker is not None:
-            logger.info(
-                "collection_variable_manifest_discovery_cancelled gen=%d",
-                self._discovery_generation,
-            )
-            self._discovery_generation += 1
-            self._cancel_discovery_worker()
-            self.loading_container.setVisible(False)
-            return
-
         logger.info(
             "collection_variable_remote_fetch_cancelled gen=%d",
             self._fetch_generation,
@@ -517,10 +589,6 @@ class ImportCollectionVariablesDialog(QDialog):
         if isinstance(data, tuple) and len(data) == 3 and data[0] == "library":
             self.error_container.setVisible(False)
             self._start_fetch_remote_collection(data[1], data[2])
-            return
-        if self.library_service is not None:
-            self.error_container.setVisible(False)
-            self._start_manifest_discovery()
 
     def _load_collection_into_view(self, col: Collection | None) -> None:
         self._current_collection = col

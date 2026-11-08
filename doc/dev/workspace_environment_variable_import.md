@@ -30,16 +30,18 @@ The import workflow is structured into three distinct layers:
 2. **Interactive UI (dialog + extracted virtualization modules, PYPOST-1423)**:
    `ImportCollectionVariablesDialog`
    (`pypost.ui.dialogs.import_collection_variables_dialog`) orchestrates source/preset
-   selection, loading/error chrome, and import acceptance. Virtualization pieces live in
-   dedicated modules: `CollectionVariablesTableModel` (`pypost.ui.models`),
-   `CollectionVariablesTableView` (`pypost.ui.views`), `ConflictStrategyDelegate`
-   (`pypost.ui.delegates`), `CollectionFetchWorker`, and `ManifestDiscoveryWorker`
-   (`pypost.ui.workers`). The dialog re-exports these symbols for backward-compatible
-   imports. Startup library catalog discovery is asynchronous (PYPOST-1424) so dialog
-   open stays instant on slow remotes. The UI still provides a 9-column side-by-side
-   diff table (Select, Name, Current Value, Candidate Value, Conflict Strategy, Type,
-   Secret, Status, Description) with per-row and bulk conflict strategies and dual-source
-   secret masking.
+   selection, dedicated discovery status UI, remote fetch loading/error chrome, and
+   import acceptance. Virtualization pieces live in dedicated modules:
+   `CollectionVariablesTableModel` (`pypost.ui.models`), `CollectionVariablesTableView`
+   (`pypost.ui.views`), `ConflictStrategyDelegate` (`pypost.ui.delegates`),
+   `CollectionFetchWorker`, and `ManifestDiscoveryWorker` (`pypost.ui.workers`). The
+   dialog re-exports these symbols for backward-compatible imports. Startup library
+   catalog discovery is asynchronous (PYPOST-1424) with a dedicated status container
+   and error banner completely separated from remote collection fetch chrome
+   (PYPOST-1450) so dialog open stays instant, responsive, and free of false error states.
+   The UI provides a 9-column side-by-side diff table (Select, Name, Current Value,
+   Candidate Value, Conflict Strategy, Type, Secret, Status, Description) with per-row
+   and bulk conflict strategies and dual-source secret masking.
 3. **Widget & Presenter Integration (`pypost.ui.widgets.environments`)**:
    `EnvironmentVariablesWidget` embeds the "Import from Collection…" button
    (`COLLECTION_VARIABLE_IMPORT_BUTTON`), orchestrates dialog invocation, handles user cancellation,
@@ -256,13 +258,17 @@ Located in `pypost/ui/widgets/environments/environment_variables_widget.py`:
 
 Located in `pypost/ui/dialogs/import_collection_variables_dialog.py`:
 
-- **Source Discovery**:
+- **Source Discovery & Dedicated Status UI (PYPOST-1424, PYPOST-1450)**:
   - Populates workspace collections from `workspace_collections` synchronously during
     `__init__` so the dialog paints immediately.
   - Discovers catalog collections asynchronously via `ManifestDiscoveryWorker`, which
     calls `library_service.list_connections()` and
     `library_service.list_manifest_collections()` off the UI thread and appends combo
     entries when complete (PYPOST-1424).
+  - Displays catalog discovery progress and errors in a dedicated discovery status UI
+    (`discovery_container`, `discovery_error_container`) positioned directly below the
+    source dropdowns, leaving the remote collection fetch loading chrome
+    (`loading_container`, `error_container`) completely unpolluted (PYPOST-1450).
 - **9-Column Side-by-Side Diff Table Layout (`IMPORT_COLLECTION_VARS_TABLE`)**:
   Columns: `[Select, Name, Current Value, Candidate Value, Conflict Strategy, Type, Secret, Status, Description]`
   - *Select* (col 0): Interactive row checkboxes allowing users to cherry-pick which variables to import.
@@ -412,9 +418,11 @@ class ManifestDiscoveryWorker(QThread):
    passing a `CancellationToken` so cancel can abort listing I/O (PYPOST-1425).
 3. On success, the dialog appends combo entries while preserving the prior selection
    index (so Qt’s empty-combo auto-select does not swallow a later `setCurrentIndex(0)`).
-4. Failures show the inline error banner; Retry restarts discovery when no library
-   collection is selected. Cancel / close / accept invalidate `_discovery_generation`
-   and cancel the worker (token abort + interruption).
+4. Failures show the dedicated inline discovery error banner (`discovery_error_container`);
+   `retry_discovery_btn` restarts discovery independently from collection fetching.
+   Cancel (`cancel_discovery_btn`) / close / accept invalidate `_discovery_generation`
+   and cancel the discovery worker (token abort + interruption) without affecting
+   active collection fetches or fetch chrome (PYPOST-1450).
 
 ### `CollectionFetchWorker(QThread)` & Background Remote Fetching
 
@@ -460,32 +468,70 @@ If a user rapidly changes the collection dropdown or triggers multiple requests,
   `OperationCancelledError` at cooperative checkpoints.
 - The worker checks interruption status before emitting signals; cancelled workers do not emit completion or failure events.
 - Generation discard remains a secondary safety net; transport abort is the primary stop.
-- Discovery cancel uses the same loading Cancel control when `_active_discovery_worker`
-  is active; `ManifestDiscoveryWorker` owns the same token/abort pattern for
-  `list_connections` / `list_manifest_collections`.
+- Prior to PYPOST-1450, discovery shared the fetch Cancel control. In PYPOST-1450,
+  discovery cancel is routed through the dedicated `cancel_discovery_btn` and
+  `_on_cancel_discovery()`. `ManifestDiscoveryWorker` implements the same cooperative
+  `CancellationToken` abort pattern as `CollectionFetchWorker`, allowing in-flight
+  connection listing or manifest retrieval to be interrupted promptly on cancel.
 
 ---
 
-### Non-Modal Error Handling and Retry Mechanisms
+### Non-Modal Status Containers, Error Handling, and Retry (PYPOST-1450)
 
-Previous dialog workflows relied on modal error message boxes (`QMessageBox.critical`) that blocked execution and disrupted user focus. PYPOST-1415 introduces non-modal inline status containers:
+Previous dialog workflows relied on modal error message boxes (`QMessageBox.critical`) that
+blocked execution and disrupted user focus. Prior to PYPOST-1450, manifest discovery and remote
+collection fetch shared inline status containers (`loading_container`, `error_container`), which
+caused cross-pollinated state, premature hiding when switching collections, and ambiguous cancel
+and retry triggers.
 
-1. **Inline Loading UI (`loading_container`)**:
-   - Contains `loading_label` and `cancel_loading_btn`.
-   - Shown during catalog discovery ("Discovering library collections...") and during
-     active collection fetches ("Loading collection from library...").
-   - During collection fetch, disables the `Import` button, preset dropdown, and
-     variable table while keeping Cancel active. Discovery does not disable the table
-     when workspace sources are already loaded.
-2. **Inline Error UI (`error_container`)**:
-   - Contains `error_label` (styled in red with error message) and `retry_fetch_btn`.
-   - Displayed non-modally when remote collection fetching or catalog discovery fails.
-   - Keeps the dialog open and interactive. The user can switch to another collection or click "Retry".
-3. **Retry Mechanism (`_on_retry_fetch`)**:
-   - Clicking `retry_fetch_btn` invokes `_start_fetch_remote_collection()` when a library
-     collection is selected; otherwise restarts `_start_manifest_discovery()`.
-   - If the user changes the dropdown selection or cancels, the error container is automatically hidden and reset.
-4. **Flaky network and corrupted manifests (PYPOST-1426)**:
+In PYPOST-1450, manifest discovery and remote collection fetch chrome are completely separated
+into distinct UI containers, dedicated slots, and decoupled state machines:
+
+1. **Dedicated Discovery Status UI (`discovery_container`)**:
+   - Contains `discovery_label` ("Discovering library collections...") and
+     `cancel_discovery_btn` ("Cancel").
+   - Widget IDs: `IMPORT_COLLECTION_DISCOVERY_CONTAINER`, `IMPORT_COLLECTION_DISCOVERY_LABEL`,
+     and `IMPORT_COLLECTION_CANCEL_DISCOVERY_BUTTON`.
+   - Displayed non-modally below `source_layout` during catalog discovery.
+   - Non-blocking: Workspace collections remain immediately interactive; table inspection,
+     preset switching, and the Import button are never disabled by catalog discovery.
+2. **Dedicated Discovery Error UI (`discovery_error_container`)**:
+   - Contains `discovery_error_label` (styled in red with discovery error text) and
+     `retry_discovery_btn` ("Retry").
+   - Widget IDs: `IMPORT_COLLECTION_DISCOVERY_ERROR_CONTAINER`,
+     `IMPORT_COLLECTION_DISCOVERY_ERROR_LABEL`, and `IMPORT_COLLECTION_RETRY_DISCOVERY_BUTTON`.
+   - Displayed non-modally when `ManifestDiscoveryWorker` fails. Keeps the dialog open and
+     functional for workspace collections without polluting the fetch error container.
+3. **Dedicated Remote Collection Fetch Loading Chrome (`loading_container`)**:
+   - Contains `loading_label` ("Loading collection from library...") and `cancel_loading_btn`.
+   - Widget IDs: `IMPORT_COLLECTION_LOADING_CONTAINER`, `IMPORT_COLLECTION_LOADING_LABEL`, and
+     `IMPORT_COLLECTION_CANCEL_LOADING_BUTTON`.
+   - Shown exclusively when a user selects a remote catalog collection. Disables the Import
+     button, preset dropdown, and variable table while keeping Cancel active.
+4. **Dedicated Remote Collection Fetch Error Chrome (`error_container`)**:
+   - Contains `error_label` (styled in red with fetch failure details) and `retry_fetch_btn`.
+   - Widget IDs: `IMPORT_COLLECTION_ERROR_CONTAINER`, `IMPORT_COLLECTION_ERROR_LABEL`, and
+     `IMPORT_COLLECTION_RETRY_FETCH_BUTTON`.
+   - Displayed non-modally when remote collection retrieval or deserialization fails.
+5. **Decoupled State Machines & Dedicated Slots**:
+   - **Cancellation Slots**:
+     - `_on_cancel_discovery()`: Triggered by `cancel_discovery_btn`. Increments
+       `_discovery_generation`, signals cancellation to `_active_discovery_worker`, and hides
+       `discovery_container` and `discovery_error_container`. Does not cancel `_active_fetch_worker`
+       or mutate `loading_container`.
+     - `_on_cancel_loading()`: Triggered by `cancel_loading_btn`. Increments `_fetch_generation`,
+       signals cancellation to `_active_fetch_worker`, hides `loading_container`, and resets the
+       table. Does not cancel `_active_discovery_worker` or touch discovery containers.
+   - **Retry Slots**:
+     - `_on_retry_discovery()`: Triggered by `retry_discovery_btn`. Restarts discovery via
+       `_start_manifest_discovery()`. Never triggers collection fetch.
+     - `_on_retry_fetch()`: Triggered by `retry_fetch_btn`. Restarts collection fetch for the
+       selected remote collection via `_start_fetch_remote_collection()`. Never restarts discovery.
+   - **Collection Switching**:
+     - Selecting a workspace collection in `_on_collection_changed()` resets only fetch chrome
+       (`loading_container`, `error_container`), leaving discovery running or displaying its
+       dedicated status strip.
+6. **Flaky network and corrupted manifests (PYPOST-1426)**:
    - The same inline error + Retry path covers `ConnectionResetError`, `BrokenPipeError`,
      truncated JSON (`CollectionSerializationError`), and malformed variable schemas raised
      from `read_collection` / deserialization.
@@ -527,6 +573,13 @@ The subsystem emits structured log events conforming to the repository logging p
 | `collection_variable_fetch_worker_interrupted` | DEBUG | `generation_id` | Worker aborted due to interruption |
 | `collection_variable_fetch_worker_transport_aborted` | DEBUG | `generation_id`, `error` | Transport abort raised `OperationCancelledError` |
 | `collection_variable_manifest_discovery_worker_transport_aborted` | DEBUG | `generation_id`, `error` | Discovery transport abort raised `OperationCancelledError` |
+| `collection_variable_manifest_discovery_started` | INFO | `gen` | Background catalog discovery worker started |
+| `collection_variable_manifest_discovery_completed` | INFO | `gen`, `entry_count` | Discovery finished and combo entries populated |
+| `collection_variable_manifest_discovery_failed` | WARNING | `gen`, `error` | Catalog discovery failed (recoverable warning) |
+| `collection_variable_manifest_discovery_cancelled` | INFO | `gen` | User cancelled active catalog discovery |
+| `collection_variable_manifest_discovery_retry_requested` | INFO | `env_name` | User clicked Retry discovery button |
+| `collection_variable_manifest_discovery_stale_discarded` | WARNING | `gen`, `current_gen` | Stale completed discovery dropped |
+| `collection_variable_manifest_discovery_error_stale_discarded` | WARNING | `gen`, `current_gen`, `error` | Stale discovery error response dropped |
 | `collection_variable_remote_fetch_started` | INFO | `connection_id`, `path`, `gen` | UI initiated background fetch |
 | `collection_variable_remote_fetch_completed` | INFO | `gen`, `collection_name`, `vars_count` | Remote fetch finished and loaded |
 | `collection_variable_remote_fetch_failed` | ERROR | `gen`, `error` | Remote fetch failed |
@@ -538,6 +591,35 @@ The subsystem emits structured log events conforming to the repository logging p
 | `collection_variables_table_model_strategy_changed` | DEBUG | `row`, `var_name`, `strategy` | Model updated row strategy |
 | `collection_variables_table_model_bulk_strategy_set` | DEBUG | `strategy`, `affected_rows`, `total_rows` | Bulk strategy applied in model |
 | `conflict_strategy_delegate_committed` | DEBUG | `row`, `strategy` | Delegate committed combo choice |
+
+---
+
+### Decoupled Discovery vs Fetch Observability (PYPOST-1450)
+
+Prior to PYPOST-1450, catalog discovery and remote collection fetching shared logging
+paths and generic error handling, producing ambiguous telemetry. The pipelines are now
+completely decoupled:
+
+1. **Independent Event Prefixes**:
+   - Catalog discovery emits `collection_variable_manifest_discovery_*`.
+   - Remote collection fetch emits `collection_variable_remote_fetch_*`.
+2. **Dedicated Severity Levels**:
+   - Discovery failures are logged at `WARNING` with exception traceback (`exc_info=True`).
+     Catalog discovery failure is non-fatal and recoverable; local workspace collections
+     remain fully functional and importable.
+   - Remote collection fetch failures are logged at `ERROR` with exception traceback
+     (`exc_info=True`). The user explicitly requested a collection that failed to load.
+3. **Independent Generation Tracking**:
+   - `_discovery_generation` tracks discovery freshness. Stale completions or errors
+     emit `collection_variable_manifest_discovery_stale_discarded` or
+     `collection_variable_manifest_discovery_error_stale_discarded`.
+   - `_fetch_generation` tracks remote collection fetch freshness. Stale completions or
+     errors emit `collection_variable_remote_fetch_stale_discarded` or
+     `collection_variable_remote_fetch_error_stale_discarded`.
+4. **Zero Secret Leakage**:
+   - Variable values and defaults are never emitted in cleartext logs. Only structural
+     metadata (`gen`, `env_name`, `connection_id`, `path`, `entry_count`, `vars_count`)
+     is recorded.
 
 ---
 
@@ -567,6 +649,29 @@ The subsystem emits structured log events conforming to the repository logging p
 
 Automated test coverage is maintained in:
 
+- `tests/test_discovery_status_ui_repro.py` (PYPOST-1450):
+  - **Dedicated Discovery Status UI**: Asserts presence and initial hidden state of
+    `discovery_container`, `discovery_label`, `cancel_discovery_btn`,
+    `discovery_error_container`, `discovery_error_label`, and `retry_discovery_btn`
+    with registered IDs in `pypost/ui/widget_ids.py`.
+  - **Fetch Loading Chrome Isolation**: Verifies active manifest discovery displays
+    `discovery_container` and sets `discovery_label` without mutating or revealing
+    `loading_container`.
+  - **Fetch Error Chrome Isolation**: Verifies discovery failure displays
+    `discovery_error_container` with `discovery_error_label` without mutating,
+    revealing, or polluting `error_container`.
+  - **Independent Cancellation Slots**: Verifies `cancel_discovery_btn` triggers
+    `_on_cancel_discovery` to cancel discovery without affecting `_active_fetch_worker`
+    or `loading_container`, and vice versa for `cancel_loading_btn`.
+  - **Independent Retry Slots**: Verifies `retry_discovery_btn` triggers
+    `_on_retry_discovery` to restart discovery without triggering remote collection fetch,
+    and `retry_fetch_btn` triggers `_on_retry_fetch` for the selected collection.
+  - **Concurrent Cancellation Independence**: Verifies independent cancellation when
+    both discovery and fetch workers are concurrently active in background threads.
+  - **Decoupled Observability Lifecycles**: Enforces emission of independent
+    `collection_variable_manifest_discovery_*` (INFO/WARNING) and
+    `collection_variable_remote_fetch_*` (INFO/ERROR) structured events with zero
+    cross-pipeline pollution.
 - `tests/test_async_manifest_discovery_repro.py`:
   - **Non-Blocking Dialog Init**: Asserts `__init__` returns before a slow
     `list_connections` completes, tracks `_active_discovery_worker`, keeps workspace
