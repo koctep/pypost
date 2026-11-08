@@ -476,7 +476,7 @@ If a user rapidly changes the collection dropdown or triggers multiple requests,
 
 ---
 
-### Non-Modal Status Containers, Error Handling, and Retry (PYPOST-1450)
+### Non-Modal Status Containers, Error Handling, and Retry (PYPOST-1450, PYPOST-1451)
 
 Previous dialog workflows relied on modal error message boxes (`QMessageBox.critical`) that
 blocked execution and disrupted user focus. Prior to PYPOST-1450, manifest discovery and remote
@@ -484,8 +484,9 @@ collection fetch shared inline status containers (`loading_container`, `error_co
 caused cross-pollinated state, premature hiding when switching collections, and ambiguous cancel
 and retry triggers.
 
-In PYPOST-1450, manifest discovery and remote collection fetch chrome are completely separated
-into distinct UI containers, dedicated slots, and decoupled state machines:
+In PYPOST-1450 and PYPOST-1451, manifest discovery and remote collection fetch chrome are completely
+separated into distinct UI containers, dedicated slots, and decoupled state machines with automated
+failure, retry, cancellation, and isolation coverage:
 
 1. **Dedicated Discovery Status UI (`discovery_container`)**:
    - Contains `discovery_label` ("Discovering library collections...") and
@@ -502,6 +503,13 @@ into distinct UI containers, dedicated slots, and decoupled state machines:
      `IMPORT_COLLECTION_DISCOVERY_ERROR_LABEL`, and `IMPORT_COLLECTION_RETRY_DISCOVERY_BUTTON`.
    - Displayed non-modally when `ManifestDiscoveryWorker` fails. Keeps the dialog open and
      functional for workspace collections without polluting the fetch error container.
+   - **Error Label Reset Contract (PYPOST-1451)**: `discovery_error_label` is guaranteed to be
+     cleared via `setText("")` across every discovery start and recovery transition:
+     `_start_manifest_discovery()` on initial launch, `_on_retry_discovery()` when a retry is
+     dispatched, and `_on_discovery_completed()` when discovery succeeds. This contract prevents
+     obsolete error strings from persisting into successful or pending states (consolidating
+     these transitions into a single UI state helper is tracked in
+     [PYPOST-1516](https://pypost.atlassian.net/browse/PYPOST-1516)).
 3. **Dedicated Remote Collection Fetch Loading Chrome (`loading_container`)**:
    - Contains `loading_label` ("Loading collection from library...") and `cancel_loading_btn`.
    - Widget IDs: `IMPORT_COLLECTION_LOADING_CONTAINER`, `IMPORT_COLLECTION_LOADING_LABEL`, and
@@ -531,7 +539,35 @@ into distinct UI containers, dedicated slots, and decoupled state machines:
      - Selecting a workspace collection in `_on_collection_changed()` resets only fetch chrome
        (`loading_container`, `error_container`), leaving discovery running or displaying its
        dedicated status strip.
-6. **Flaky network and corrupted manifests (PYPOST-1426)**:
+6. **Catalog Discovery Failure, Retries, and Isolation (PYPOST-1451)**:
+   - **Network & OS Fault Resiliency**: Enumeration handles `ConnectionResetError`,
+     `TimeoutError`, `BrokenPipeError`, and `OSError` in `ManifestDiscoveryWorker` without
+     crashing the UI thread, surfacing recoverable inline error banners.
+   - **Mid-Stream Traversal Errors**: If `list_connections` succeeds but a connection fails
+     during `list_manifest_collections`, the worker safely aborts traversal and discards
+     partial results to prevent corrupted catalog dropdown listings (fault-tolerant
+     partial catalog traversal is tracked in
+     [PYPOST-1515](https://pypost.atlassian.net/browse/PYPOST-1515)).
+   - **End-to-End Fail-Then-Recover Lifecycle**: Clicking `retry_discovery_btn` dispatches a fresh
+     discovery worker run, resets the error label contract, displays the discovery spinner
+     container, and upon success populates catalog collections while hiding the error container.
+   - **Stale Generation Discard on Rapid Retries**: Successive clicks on `retry_discovery_btn`
+     increment `_discovery_generation`. Delayed completions or errors from superseded worker
+     runs are dropped via `collection_variable_manifest_discovery_stale_discarded` and
+     `collection_variable_manifest_discovery_error_stale_discarded`.
+   - **Cooperative Cancellation During Fault State**: Clicking `cancel_discovery_btn` while
+     in a fault state hides the error UI, sets worker cancellation flags, and invokes
+     `requestInterruption()` so late failures do not trigger false UI states.
+   - **Workspace Collection Isolation**: Local workspace collections remain 100% operational
+     when discovery errors occur; variable diff inspection, preset switching, strategy selection,
+     and imports into the target environment are completely unaffected.
+   - **Dialog Teardown & Worker Join**: Dialog close / reject aborts in-flight discovery and
+     performs a bounded `wait(1000)` thread join (adaptive non-blocking teardown tracked in
+     [PYPOST-1453](https://pypost.atlassian.net/browse/PYPOST-1453); forwarding cancellation
+     tokens into connection providers tracked in
+     [PYPOST-1452](https://pypost.atlassian.net/browse/PYPOST-1452); large-scale high-concurrency
+     discovery tests tracked in [PYPOST-1517](https://pypost.atlassian.net/browse/PYPOST-1517)).
+7. **Flaky network and corrupted manifests (PYPOST-1426)**:
    - The same inline error + Retry path covers `ConnectionResetError`, `BrokenPipeError`,
      truncated JSON (`CollectionSerializationError`), and malformed variable schemas raised
      from `read_collection` / deserialization.
@@ -572,6 +608,11 @@ The subsystem emits structured log events conforming to the repository logging p
 | `collection_variable_fetch_worker_cancelled` | DEBUG | `generation_id`, `connection_id` | Worker cancel method invoked |
 | `collection_variable_fetch_worker_interrupted` | DEBUG | `generation_id` | Worker aborted due to interruption |
 | `collection_variable_fetch_worker_transport_aborted` | DEBUG | `generation_id`, `error` | Transport abort raised `OperationCancelledError` |
+| `collection_variable_manifest_discovery_worker_started` | DEBUG | `generation_id` | Discovery worker thread started |
+| `collection_variable_manifest_discovery_worker_completed` | DEBUG | `generation_id`, `entry_count` | Discovery worker finished successfully |
+| `collection_variable_manifest_discovery_worker_failed` | WARNING | `generation_id`, `error` | Discovery worker encountered error |
+| `collection_variable_manifest_discovery_worker_cancelled` | DEBUG | `generation_id` | Discovery worker cancel invoked |
+| `collection_variable_manifest_discovery_worker_interrupted` | DEBUG | `generation_id` | Discovery worker aborted due to interruption |
 | `collection_variable_manifest_discovery_worker_transport_aborted` | DEBUG | `generation_id`, `error` | Discovery transport abort raised `OperationCancelledError` |
 | `collection_variable_manifest_discovery_started` | INFO | `gen` | Background catalog discovery worker started |
 | `collection_variable_manifest_discovery_completed` | INFO | `gen`, `entry_count` | Discovery finished and combo entries populated |
@@ -672,6 +713,40 @@ Automated test coverage is maintained in:
     `collection_variable_manifest_discovery_*` (INFO/WARNING) and
     `collection_variable_remote_fetch_*` (INFO/ERROR) structured events with zero
     cross-pipeline pollution.
+- `tests/test_async_manifest_discovery_failure_repro.py` (PYPOST-1451):
+  - **Fault Injection on `list_connections`**: Injects `ConnectionResetError`,
+    `TimeoutError`, `BrokenPipeError`, and `OSError` into connection listing; asserts
+    `ManifestDiscoveryWorker` catches exceptions, logs
+    `collection_variable_manifest_discovery_worker_failed` and
+    `collection_variable_manifest_discovery_failed`, and displays
+    `discovery_error_container` with `retry_discovery_btn` enabled while fetch chrome
+    stays hidden.
+  - **Mid-Stream Traversal Errors on `list_manifest_collections`**: Injects failure on
+    manifest listing for secondary connections; verifies worker aborts traversal,
+    discards partial results, and surfaces the error banner without leaving half-populated
+    catalogs (follow-up [PYPOST-1515](https://pypost.atlassian.net/browse/PYPOST-1515)).
+  - **End-to-End Fail-Then-Recover Lifecycle**: Verifies initial discovery failure, user
+    retry via `retry_discovery_btn`, error label reset contract (verifying
+    `discovery_error_label` text is cleared immediately on retry and completion), and
+    successful catalog combo population (follow-up
+    [PYPOST-1516](https://pypost.atlassian.net/browse/PYPOST-1516)).
+  - **Stale Generation Discard on Rapid Retries**: Triggers rapid discovery retries,
+    verifying monotonic `_discovery_generation` counter increments and discard of
+    out-of-order completion or failure signals via warning logs.
+  - **Cooperative Cancellation During Fault State**: Cancels active discovery via
+    `cancel_discovery_btn`; verifies `discovery_container` and `discovery_error_container`
+    hide, worker aborts via `CancellationToken` and interruption, and late signals do not
+    alter UI state.
+  - **Workspace Collection Usability & Isolation**: Asserts that during remote discovery
+    failure, local workspace collections remain fully functional: switching collections,
+    diff table rendering, preset selection, row/bulk conflict strategies, and target
+    environment imports succeed normally.
+  - **Clean Worker Thread Termination & Bounded Join**: Closes or rejects dialog during
+    active or failing discovery; verifies cooperative worker cancellation, bounded
+    `wait(1000)` thread join, and leak-free teardown (follow-ups
+    [PYPOST-1452](https://pypost.atlassian.net/browse/PYPOST-1452),
+    [PYPOST-1453](https://pypost.atlassian.net/browse/PYPOST-1453),
+    [PYPOST-1517](https://pypost.atlassian.net/browse/PYPOST-1517)).
 - `tests/test_async_manifest_discovery_repro.py`:
   - **Non-Blocking Dialog Init**: Asserts `__init__` returns before a slow
     `list_connections` completes, tracks `_active_discovery_worker`, keeps workspace
