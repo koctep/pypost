@@ -346,6 +346,7 @@ class ImportCollectionVariablesDialog(QDialog):
             gen,
         )
         self.discovery_error_container.setVisible(False)
+        self.discovery_error_label.setText("")
         self.discovery_container.setVisible(True)
         self.discovery_label.setText("Discovering library collections...")
         self.cancel_discovery_btn.setEnabled(True)
@@ -372,6 +373,7 @@ class ImportCollectionVariablesDialog(QDialog):
 
         self._active_discovery_worker = None
         self.discovery_container.setVisible(False)
+        self.discovery_error_label.setText("")
 
         entry_list = list(entries or [])
         logger.info(
@@ -432,6 +434,7 @@ class ImportCollectionVariablesDialog(QDialog):
             self.target_environment.name,
         )
         self.discovery_error_container.setVisible(False)
+        self.discovery_error_label.setText("")
         if self.library_service is not None:
             self._start_manifest_discovery()
 
