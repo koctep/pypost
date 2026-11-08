@@ -130,6 +130,7 @@ class DaemonRuntime(QObject):
                 execution_mode=settings.mcp_execution_mode,
                 restart_policy=settings.mcp_restart_policy,
                 resource_limits=settings.mcp_resource_limits,
+                heartbeat_policy=settings.mcp_heartbeat_policy,
             )
             for configuration in enabled:
                 registry.upsert(configuration.model_copy(deep=True))

@@ -31,6 +31,7 @@ from pypost.core.template_service import TemplateService
 from pypost.models.library_manager import LibraryConnectionRecord
 from pypost.models.models import Collection, Environment
 from pypost.models.settings import (
+    McpHeartbeatPolicy,
     McpResourceLimitsPolicy,
     McpServerConfiguration,
     McpWorkerRestartPolicy,
@@ -101,6 +102,7 @@ class MCPServerRegistry(QObject):
         execution_mode: Literal["thread", "process"] = "thread",
         restart_policy: McpWorkerRestartPolicy | None = None,
         resource_limits: McpResourceLimitsPolicy | None = None,
+        heartbeat_policy: McpHeartbeatPolicy | None = None,
     ) -> None:
         super().__init__()
         if execution_mode not in ("thread", "process"):
@@ -125,6 +127,11 @@ class MCPServerRegistry(QObject):
             if resource_limits is not None
             else McpResourceLimitsPolicy()
         )
+        self._heartbeat_policy = (
+            heartbeat_policy.model_copy()
+            if heartbeat_policy is not None
+            else None
+        )
         self._configurations: dict[str, McpServerConfiguration] = {}
         self._managers: dict[str, MCPServerManager] = {}
         self._runners: dict[str, ThreadServerRunner | ProcessServerRunner] = {}
@@ -144,6 +151,7 @@ class MCPServerRegistry(QObject):
                 on_worker_restarted=self._on_worker_restarted,
                 restart_policy=self._restart_policy,
                 resource_limits=self._resource_limits,
+                heartbeat_policy=self._heartbeat_policy,
             )
 
     @property
@@ -153,6 +161,10 @@ class MCPServerRegistry(QObject):
     @property
     def resource_limits(self) -> McpResourceLimitsPolicy | None:
         return self._resource_limits
+
+    @property
+    def heartbeat_policy(self) -> McpHeartbeatPolicy | None:
+        return self._heartbeat_policy
 
     def get(self, instance_id: str) -> McpServerConfiguration | None:
         """Return the configuration for instance_id, or None if not found."""
@@ -1477,6 +1489,7 @@ class MCPServerRegistry(QObject):
                 on_worker_restarted=self._on_worker_restarted,
                 restart_policy=self._restart_policy,
                 resource_limits=self._resource_limits,
+                heartbeat_policy=self._heartbeat_policy,
             )
         runner = ProcessServerRunner(
             instance_id,

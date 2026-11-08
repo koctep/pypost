@@ -33,12 +33,12 @@ MCPServerRegistry(execution_mode=...)
 
 | Component | Module | Role |
 | --- | --- | --- |
-| Setting | `pypost/models/settings.py` | `mcp_execution_mode`, restart, `mcp_resource_limits` |
-| Registry | `pypost/core/mcp_server_registry.py` | Selects runner; routes recovery transitions and exits |
-| Protocol / runners | `pypost/core/mcp_server_runner.py` | `MCPServerRunnerProtocol`, `ThreadServerRunner`, `ProcessServerRunner` |
-| Supervisor | `pypost/core/mcp_process_supervisor.py` | Process table, IPC, STOP→SIGTERM→SIGKILL, backoff |
+| Setting | `pypost/models/settings.py` | `mcp_execution_mode`, heartbeat, restart, limits |
+| Registry | `pypost/core/mcp_server_registry.py` | Selects runner; routes recovery and exits |
+| Runners | `pypost/core/mcp_server_runner.py` | `MCPServerRunnerProtocol`, thread/process runners |
+| Supervisor | `pypost/core/mcp_process_supervisor.py` | Process table, IPC, stop, backoff |
 | IPC helpers | `pypost/core/mcp_worker_ipc.py` | Versioned envelopes (`v: 1`), tool encode/decode |
-| Worker | `pypost/core/mcp_worker_process.py` | Spawn target; uvicorn + `MCPServerImpl` (local) or `MCPProxyServerImpl` (proxy) |
+| Worker | `pypost/core/mcp_worker_process.py` | Spawn target; uvicorn + local or proxy server |
 
 Host wiring passes the setting into the registry:
 
@@ -57,8 +57,8 @@ on the **next** registry construction / server start — do not mix runners for 
 
 | Value | Behavior |
 | --- | --- |
-| `thread` (default) | In-process daemon threads; live variable supplier closures; cooperative cancel + `adaptive_thread_join` |
-| `process` | One OS process per server via `multiprocessing.get_context("spawn")`; variable **snapshots** over IPC |
+| `thread` (default) | In-process daemon threads; live suppliers; cooperative cancel |
+| `process` | One OS process per server via spawn; variable snapshots over IPC |
 
 ```python
 from pypost.models.settings import AppSettings
@@ -81,9 +81,9 @@ exponential backoff via `AppSettings.mcp_restart_policy`:
 | `enabled` | `bool` | `False` | Opt-in toggle. Default `False` fails immediately on exit. |
 | `max_retries` | `int` | `3` | Maximum consecutive restart attempts (`0` to `100`). |
 | `initial_backoff_s` | `float` | `0.5` | Delay in seconds before first restart attempt (`> 0.0`). |
-| `max_backoff_s` | `float` | `8.0` | Maximum capped backoff delay (`> 0.0`, `>= initial_backoff_s`). |
+| `max_backoff_s` | `float` | `8.0` | Capped backoff delay (`> 0.0`, `>= initial_backoff_s`). |
 | `backoff_multiplier` | `float` | `2.0` | Exponential growth factor applied per retry (`>= 1.0`). |
-| `healthy_reset_window_s` | `float` | `30.0` | Sustained uptime in seconds to reset retry count (`>= 0.0`). |
+| `healthy_reset_window_s` | `float` | `30.0` | Uptime in seconds to reset retry count (`>= 0.0`). |
 
 ```python
 from pypost.models.settings import AppSettings, McpWorkerRestartPolicy
@@ -144,12 +144,43 @@ Cross-field validation enforces `hard_memory_limit_mb >= soft_memory_limit_mb` w
 thresholds are enabled (> 0.0). By default, resource limits are unconstrained (0 / 0.0),
 maintaining backward-compatible operation.
 
+### `mcp_heartbeat_policy` (PYPOST-1468)
+
+Isolated process-mode workers support an active heartbeat watchdog to detect event loop freezes,
+deadlocks, and unresponsive processes via `AppSettings.mcp_heartbeat_policy`:
+
+| Field | Type | Default | Description |
+| --- | --- | --- | --- |
+| `enabled` | `bool` | `True` | Opt-in watchdog toggle. Default `True` enables probing. |
+| `interval_s` | `float` | `2.0` | Heartbeat probe frequency in seconds (`> 0.0`). |
+| `timeout_s` | `float` | `5.0` | Probe-to-pong timeout latency in seconds (`> 0.0`). |
+
+```python
+from pypost.models.settings import AppSettings, McpHeartbeatPolicy
+from pypost.core.mcp_server_registry import MCPServerRegistry
+
+policy = McpHeartbeatPolicy(
+    enabled=True,
+    interval_s=2.0,
+    timeout_s=5.0,
+)
+settings = AppSettings(mcp_execution_mode="process", mcp_heartbeat_policy=policy)
+registry = MCPServerRegistry(
+    execution_mode=settings.mcp_execution_mode,
+    heartbeat_policy=settings.mcp_heartbeat_policy,
+)
+```
+
+Cross-field validation enforces `timeout_s >= interval_s > 0.0` to prevent watchdog flapping.
+By default, the watchdog is active (`enabled=True`), providing automated freeze detection.
+
+
 ### Environment gates (test / debug only)
 
 | Variable | Effect |
 | --- | --- |
-| `PYPOST_MCP_ALLOW_DEBUG_IPC=1` | Allows supervisor `send_debug_opcode` and worker handling of `DEBUG_ABORT` / `DEBUG_HANG`. Without it, the supervisor raises; the worker logs and ignores. |
-| `PYPOST_MCP_TEST_ECHO_VARS=1` | `MCPServerImpl` echoes `server_index` / `unique_secret` / `server_id` in the tool response body so process-mode isolation tests can assert snapshots without parent-side request mocks (which do not cross `spawn`). |
+| `PYPOST_MCP_ALLOW_DEBUG_IPC=1` | Enables supervisor debug opcodes (`DEBUG_ABORT`, `DEBUG_HANG`). |
+| `PYPOST_MCP_TEST_ECHO_VARS=1` | Echoes variable snapshot in response body for isolation tests. |
 
 Neither gate is required for production. Isolation tests set both as needed before spawn.
 
@@ -313,7 +344,7 @@ Envelopes are dicts with `"v": 1` and `"type": <MsgType>` (`mcp_worker_ipc.make_
 
 | Direction | Type | Payload (conceptual) |
 | --- | --- | --- |
-| Host → Child | `START` | `host`, `port`, `name`, `tools` (encoded), `variables`, `hidden_keys`, `overridable_keys`, `server_type`, `upstream_url`, `upstream_transport`, `headers`, `timeout` |
+| Host → Child | `START` | Server config, tools, variable snapshot, proxy settings |
 | Host → Child | `UPDATE_TOOLS` | `tools` (encoded via `encode_tools`) |
 | Host → Child | `UPDATE_VARIABLES` | `variables`, `hidden_keys`, `overridable_keys` |
 | Host → Child | `HEARTBEAT` | optional `nonce` |
@@ -334,8 +365,8 @@ Tools are JSON-safe via `encode_tools` / `decode_tools` (`__mcp_tool_kind__`:
 
 | Mode | Mechanism |
 | --- | --- |
-| Thread | Live closures into the in-process ASGI impl; `MCPServerManager.update_tools` updates `MCPServerImpl.register_tools` in place and restarts only when tool `(id, name)` signature changes |
-| Process | Host sends `UPDATE_TOOLS` (atomic `MCPServerImpl.register_tools` map replacement) and `UPDATE_VARIABLES` snapshots (`_SnapshotStore` feeds local callables) with zero downtime |
+| Thread | Live closures; updates tools in place; restarts on tool signature change |
+| Process | Zero-downtime atomic tool and variable updates via IPC messages |
 
 Never pickle host closures, runtime HTTP clients, or Qt objects into the child.
 For proxy servers (`server_type="proxy"`), header templates are forwarded as primitive
@@ -536,10 +567,10 @@ fields (`instance_id`, `pid`, `port`, `attempt`, `attempts`, `max_retries`, `del
 | --- | --- | --- | --- |
 | `mcp_worker_restart_scheduled` | INFO | `attempt`, `delay_s` | Scheduled backoff delay |
 | `mcp_worker_restarted` | INFO | `pid`, `attempt` | Worker respawned and listening |
-| `mcp_worker_restart_exhausted` | ERROR | `attempts`, `exitcode` | Retries exhausted; marked `failed` |
+| `mcp_worker_restart_exhausted` | ERROR | `attempts`, `exitcode` | Retries exhausted; `failed` |
 | `mcp_worker_restart_counter_reset` | INFO | `uptime_s` | Counter reset after healthy window |
 | `mcp_worker_restart_cancelled` | INFO | `attempt`, `reason` | Cancelled on stop or shutdown |
-| `mcp_registry_worker_restarting` | INFO | `attempt`, `delay_s` | Registry transitional `starting` |
+| `mcp_registry_worker_restarting` | INFO | `attempt`, `delay_s` | Transitional `starting` |
 | `mcp_registry_worker_restarted` | INFO | `attempt` | Registry transitioned to `running` |
 
 All events strictly omit sensitive data: variable maps, resolved tokens, headers, upstream URLs,
@@ -627,21 +658,111 @@ Supervisor resource limit operations emit structured key-value events:
 
 Events strictly omit sensitive runtime data (no payload bodies, variables, or tokens).
 
+## Active Heartbeat Watchdog (PYPOST-1468)
+
+Isolated process-mode workers run an active heartbeat watchdog between the host supervisor and
+child worker processes. This detects worker hangs, deadlocks, and event-loop freezes where the OS
+process remains alive (`process.is_alive() == True`) but fails to respond to requests or commands.
+
+### Nonce ping/pong protocol exchange (`HEARTBEAT`, `HEARTBEAT_PONG`)
+
+Active probing uses a nonce-correlated protocol over the bidirectional worker IPC pipe:
+
+1. **Probe Dispatch**:
+   - The supervisor generates an ephemeral 16-character hexadecimal nonce (`uuid.uuid4().hex[:16]`).
+   - Stored in the worker's record as `pending_heartbeat_nonce` with `pending_heartbeat_sent_at`.
+   - Dispatched across the control pipe as `make_message("HEARTBEAT", nonce=nonce)`.
+2. **Worker Echo**:
+   - In `mcp_worker_process.worker_main`, the worker IPC polling loop receives `HEARTBEAT`.
+   - It immediately replies with `make_message("HEARTBEAT_PONG", nonce=message.get("nonce"))`.
+3. **Supervisor Nonce Verification**:
+   - In `McpProcessSupervisor._apply_ipc_message`, incoming `HEARTBEAT_PONG` messages are validated.
+   - If `received_nonce == record.pending_heartbeat_nonce`, the probe roundtrip is confirmed.
+   - Supervisor calculates `latency_s = now - record.pending_heartbeat_sent_at`, logs
+     `mcp_worker_heartbeat_pong` at `DEBUG` level, stamps `record.last_heartbeat_pong_at = now`,
+     and clears `pending_heartbeat_nonce`.
+   - If the received nonce does not match (or probe was already cleared/timed out), the supervisor
+     logs `mcp_worker_heartbeat_pong_mismatch` at `WARNING` level and discards the message without
+     clearing the in-flight probe.
+
+### Supervisor active probe evaluation in `_monitor_loop`
+
+The supervisor's dedicated background thread (`_monitor_loop`) polls every 50 ms to evaluate
+worker health:
+
+- **Eligibility**: Probing runs when `heartbeat_policy.enabled` is `True`, worker state is
+  `running`, `not record.restarting`, and `record.process.is_alive()`.
+- **Interval Check**: If no probe is currently pending (`pending_heartbeat_nonce is None`) and
+  `now - record.last_heartbeat_sent_at >= heartbeat_policy.interval_s`, the supervisor generates
+  a fresh nonce, stamps `last_heartbeat_sent_at`, and sends `HEARTBEAT`.
+- **Timeout Check**: If a probe is pending (`pending_heartbeat_nonce is not None`), the supervisor
+  compares elapsed time `now - record.pending_heartbeat_sent_at` against `timeout_s`. If elapsed
+  time exceeds `timeout_s`, the watchdog escalates to process termination.
+
+### Watchdog timeout escalation (SIGTERM → SIGKILL)
+
+When a pending probe times out:
+
+1. **Timeout Logging**: Supervisor logs `mcp_worker_heartbeat_timeout` at `ERROR` level with
+   `instance_id`, child `pid`, and configured `timeout_s`.
+2. **Process Escalation**:
+   - The supervisor sends `process.terminate()` (SIGTERM / TerminateProcess).
+   - Waits up to 0.2s for graceful exit via `process.join(timeout=0.2)`.
+   - If the process is still alive, escalates to `process.kill()` (SIGKILL).
+3. **Record Cleanup**:
+   - Clears `pending_heartbeat_nonce` and `pending_heartbeat_sent_at`.
+   - Sets `record.last_error = f"heartbeat timeout ({timeout_s}s)"`.
+   - Schedules reader thread termination via `readers_to_stop`.
+
+### Auto-restart interplay
+
+Watchdog timeout integrates seamlessly with `McpWorkerRestartPolicy`:
+
+- **Auto-restart Enabled (`restart_policy.enabled=True`)**:
+  - If `record.retry_count < restart_policy.max_retries`:
+    - Supervisor increments `retry_count`, computes backoff delay via `backoff_for_attempt`,
+      stamps `next_retry_deadline = now + delay_s`, sets `record.restarting = True`, and updates
+      `record.state = "starting"`.
+    - Logs `mcp_worker_restart_scheduled` with `reason=heartbeat_timeout`.
+    - Dispatches `on_worker_restarting` notification to the registry.
+    - When backoff deadline expires, supervisor spawns a new worker child with preserved spec.
+  - If retries are exhausted (`retry_count >= restart_policy.max_retries`):
+    - Supervisor marks `record.state = "failed"`, logs `mcp_worker_restart_exhausted`, and
+      dispatches `on_unexpected_exit(instance_id, exitcode)`.
+- **Auto-restart Disabled (`restart_policy.enabled=False`)**:
+  - Supervisor transitions `record.state = "failed"` immediately upon timeout termination.
+  - Sets `record.cancel_event.set()` and dispatches `on_unexpected_exit`.
+  - Registry marks the instance `failed` with descriptive `last_error`.
+
+### Observability events
+
+Watchdog operations emit structured key-value events with strict secret safety:
+
+| Event Name | Level | Key Fields | Description |
+| --- | --- | --- | --- |
+| `mcp_worker_heartbeat_timeout` | ERROR | `instance_id`, `pid`, `timeout_s` | Watchdog timeout |
+| `mcp_worker_heartbeat_pong` | DEBUG | `instance_id`, `pid`, `latency_s` | Valid pong roundtrip |
+| `mcp_worker_heartbeat_pong_mismatch` | WARN | `expected`, `got` | Stale or invalid nonce |
+| `mcp_worker_restart_scheduled` | INFO | `instance_id`, `attempt`, `delay_s` | Respawn scheduled |
+
+All events omit secret credentials, tokens, payloads, and environment variables. Nonces are
+ephemeral random hex strings.
+
 ---
 
 ## Troubleshooting
 
 | Symptom | Likely cause | Resolution |
 | --- | --- | --- |
-| Process start fails / worker never `STARTED` | Bind error, spawn import error, or start timeout (15s) | Check `START_FAILED` / `last_start_error`; ensure port free; confirm worker import graph has no PySide6 |
-| Peer servers die with one crash | Registry still on `thread` | Set `mcp_execution_mode="process"` and rebuild registry |
-| Collection edits do not appear on process worker or mark row `failed` | Worker exited before `refresh_collection` or missing collection/library reference | Inspect `mcp_registry_refresh_collection_worker_failed` / `mcp_worker_update_tools_send_failed` logs and row status; restart the failed server once references are valid |
-| Isolation test gets empty / wrong vars | Echo gate unset across spawn | Export `PYPOST_MCP_TEST_ECHO_VARS=1` **before** spawning workers |
-| `send_debug_opcode` raises / DEBUG ignored | Debug gate unset | Set `PYPOST_MCP_ALLOW_DEBUG_IPC=1` in supervisor **and** child environment |
-| Stop hangs past ~2s | Unexpected; budget should force kill | Check `mcp_worker_kill` logs; verify child not outside supervisor table |
-| Mode change ignored while running | Mode is construction-time | Stop servers; recreate registry with the new `execution_mode` |
-| Crash loop / retries exhausted | Crashes exceeded `max_retries` | Check logs, fix fault, and restart |
-| Startup failure not retried | Fast startup failure (`FR7`) | Verify port free, valid address, and imports |
+| Start fails / never `STARTED` | Bind, import, or timeout | Check `last_start_error`; free port |
+| Peer dies on crash | Registry on `thread` | Set `mcp_execution_mode="process"` |
+| Edits missing / row `failed` | Worker exited or bad ref | Check logs; restart failed server |
+| Empty / wrong vars in test | Echo gate unset | Export `PYPOST_MCP_TEST_ECHO_VARS=1` |
+| Debug opcode raises/ignored | Debug gate unset | Set `PYPOST_MCP_ALLOW_DEBUG_IPC=1` |
+| Stop hangs past ~2s | Budget should force kill | Check `mcp_worker_kill` logs |
+| Mode change ignored | Mode is construction-time | Stop servers and recreate registry |
+| Crash loop exhausted | Crashes exceeded retries | Check logs, fix fault, restart |
+| Startup failure not retried | Fast startup failure | Verify port free and valid address |
 | Pending restart delay | Exponential backoff active | Wait for delay or call stop to abort |
 | Spawn rejected (`McpAdmissionError`) | Cap/budget reached | Stop idle servers or raise limits |
 | Memory warning in logs | Worker RSS exceeded soft limit | Inspect memory; recycle or tune limit |
@@ -649,6 +770,7 @@ Events strictly omit sensitive runtime data (no payload bodies, variables, or to
 | Restart halted by admission | Limits exceeded in backoff | Resolve pressure; restart when free |
 | Worker start version mismatch | Incompatible protocol version | Ensure worker and host use `v=1` |
 | Runtime command version rejected | Unsupported message `v` | Discarded as WORKER_ERROR (v=1) |
+| Heartbeat timeout in logs | Worker frozen or deadlocked | Terminated to failed; tune timeout |
 
 For a rejected live edit, inspect `mcp_registry_process_reconfigure_rejected`: the `phase`,
 `restored`, and `cleaned` fields distinguish startup, reclamation, and restoration outcomes
@@ -669,6 +791,7 @@ make test WORKERS=1 PYTEST_ARGS="tests/test_mcp_process_tool_refresh_repro.py -q
 make test WORKERS=1 PYTEST_ARGS="tests/test_mcp_process_autorestart_repro.py -q"
 make test WORKERS=1 PYTEST_ARGS="tests/test_mcp_process_resource_limits_repro.py -q"
 make test WORKERS=1 PYTEST_ARGS="tests/test_mcp_ipc_protocol_version_repro.py -q"
+make test WORKERS=1 PYTEST_ARGS="tests/test_mcp_ipc_heartbeat_watchdog_repro.py -q"
 make test PYTEST_ARGS="tests/test_mcp_multiserver_stress_10x.py"
 ```
 
@@ -709,13 +832,21 @@ IPC protocol versioning coverage (`tests/test_mcp_ipc_protocol_version_repro.py`
 verifies strict envelope integer versioning, worker start rejection (`START_FAILED`), runtime
 command rejection (`WORKER_ERROR`), supervisor ingress rejection during starting and running
 states, and secret-safe structured logging via `caplog`.
+Heartbeat watchdog coverage (`tests/test_mcp_ipc_heartbeat_watchdog_repro.py`, PYPOST-1468)
+verifies the 6 acceptance criteria:
+1. `AppSettings.mcp_heartbeat_policy` defaults, field bounds, and cross-field validation.
+2. Normal worker heartbeats roundtrip successfully across multiple probe intervals.
+3. Hung or deadlocked workers time out, undergo SIGTERM->SIGKILL escalation, and enter `failed`.
+4. Disabled watchdog (`enabled=False`) preserves process without termination during freezes.
+5. Watchdog timeout initiates automatic respawn cycles when auto-restart is enabled.
+6. Mismatched or stale heartbeat pong nonces emit warning logs and are safely ignored.
 
 ---
 
 ## Related documentation
 
-- [Multi-Process Supervisor Evaluation (PYPOST-1438 / Phase 2)](mcp_process_supervisor_evaluation.md)
+- [Multi-Process Supervisor Evaluation (PYPOST-1438)](mcp_process_supervisor_evaluation.md)
 - [MCP Reverse Proxy (PYPOST-1092)](mcp_proxy.md)
 - [Concurrent Multi-Server Lifecycle (PYPOST-1418)](mcp_concurrent_multiserver.md)
 - [Multiple Independent MCP Servers (PYPOST-1044)](mcp_server_registry.md)
-- [Cancellation / adaptive join (PYPOST-1437)](mcp_concurrent_multiserver.md#cooperative-cancellation-architecture-pypostcorecancellationpy)
+- [Cancellation / adaptive join (PYPOST-1437)](mcp_concurrent_multiserver.md#cancellation)
