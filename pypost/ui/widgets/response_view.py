@@ -31,12 +31,15 @@ from pypost.ui.widgets.fold import BodyFormat, detect_body_format
 from pypost.ui.widgets.foldable_code_view import FoldableCodeView
 from pypost.ui.widgets.json_highlighter import JsonHighlighter
 from pypost.ui.widgets.response_mask_controller import (
+    MaskedTokenSpan,
     ResponseMaskController,
     format_masked_json,
 )
+from pypost.ui.widgets.response_mask_worker import ResponseMaskWorker
 
 logger = logging.getLogger(__name__)
 
+MEDIUM_DOC_CHAR_THRESHOLD = 50 * 1024
 LARGE_DOC_CHAR_THRESHOLD = 100 * 1024
 MATCH_COUNT_CAP = 1000
 MATCH_INDEX_SAFETY_LIMIT = 10000
@@ -55,6 +58,8 @@ class ResponseView(QWidget):
         self.current_env_keys = None
         self._last_response: ResponseData | None = None
         self._last_hidden_fields: list[str] | None = None
+        self._mask_worker: ResponseMaskWorker | None = None
+        self._mask_format_generation: int = 0
         self.init_ui()
 
     def init_ui(self):
@@ -320,12 +325,22 @@ class ResponseView(QWidget):
         except Exception:
             pass
 
+    def _cancel_mask_worker(self) -> None:
+        """Interrupt any running mask worker and invalidate pending emissions."""
+        self._mask_format_generation += 1
+        if self._mask_worker is not None:
+            if self._mask_worker.isRunning():
+                self._mask_worker.requestInterruption()
+            self._mask_worker = None
+
     def clear_body(self):
         """Clears the response body and status labels."""
+        self._cancel_mask_worker()
         self._search_timer.stop()
         self.mask_controller.clear()
         self._last_response = None
         self._last_hidden_fields = None
+        self.body_view.setPlaceholderText("")
         self.body_view.clear()
         self.status_label.setText("Status: -")
         self.time_label.setText("Time: -")
@@ -346,6 +361,7 @@ class ResponseView(QWidget):
         response: ResponseData,
         hidden_fields: Sequence[str] | None = None,
     ):
+        self._cancel_mask_worker()
         self._search_timer.stop()
         self.status_label.setText(f"Status: {response.status_code}")
         self.time_label.setText(f"Time: {response.elapsed_time:.3f}s")
@@ -388,34 +404,114 @@ class ResponseView(QWidget):
                     len(body_str),
                     LARGE_DOC_CHAR_THRESHOLD,
                 )
+            self.body_view.setPlaceholderText("")
             self.body_view.setText(body_str)
+            self.body_view.fold_controller().ensure_scanned()
         else:
             if detected_format == BodyFormat.JSON:
                 if hidden_fields:
-                    try:
-                        pretty_json, spans = format_masked_json(
-                            body_str, hidden_fields, indent=self.indent_size
+                    if len(body_str) >= MEDIUM_DOC_CHAR_THRESHOLD:
+                        self.body_view.clear()
+                        self.body_view.setPlaceholderText("Formatting masked response...")
+                        generation = self._mask_format_generation
+                        worker = ResponseMaskWorker(
+                            generation=generation,
+                            raw_body=body_str,
+                            hidden_fields=hidden_fields,
+                            indent=self.indent_size,
                         )
-                        self.body_view.setText(pretty_json)
-                        self.mask_controller.set_masked_spans(spans)
-                        if spans:
-                            self._metrics.track_hidden_value_mask_applied("gui_response")
+                        self._mask_worker = worker
+                        worker.formatting_completed.connect(self._on_mask_formatting_completed)
+                        worker.formatting_failed.connect(self._on_mask_formatting_failed)
+                        worker.finished.connect(lambda w=worker: self._on_mask_worker_finished(w))
+                        worker.finished.connect(worker.deleteLater)
                         logger.debug(
-                            "response_masking_initialized span_count=%d selectors_count=%d",
-                            len(spans),
+                            "response_masking_worker_dispatched "
+                            "generation=%d chars=%d selectors_count=%d",
+                            generation,
+                            len(body_str),
                             len(hidden_fields),
                         )
-                    except Exception:
-                        logger.debug("response_masking_failed")
-                        self.body_view.setText(body_str)
+                        worker.start()
+                    else:
+                        self.body_view.setPlaceholderText("")
+                        try:
+                            pretty_json, spans = format_masked_json(
+                                body_str, hidden_fields, indent=self.indent_size
+                            )
+                            self.body_view.setText(pretty_json)
+                            self.mask_controller.set_masked_spans(spans)
+                            if spans:
+                                self._metrics.track_hidden_value_mask_applied("gui_response")
+                            logger.debug(
+                                "response_masking_initialized span_count=%d selectors_count=%d",
+                                len(spans),
+                                len(hidden_fields),
+                            )
+                        except Exception:
+                            logger.debug("response_masking_failed")
+                            self.body_view.setText(body_str)
+                        self.body_view.fold_controller().ensure_scanned()
                 else:
+                    self.body_view.setPlaceholderText("")
                     try:
                         parsed = json.loads(body_str)
                         pretty_json = json.dumps(parsed, indent=self.indent_size)
                         self.body_view.setText(pretty_json)
                     except Exception:
                         self.body_view.setText(body_str)
+                    self.body_view.fold_controller().ensure_scanned()
             else:
+                self.body_view.setPlaceholderText("")
                 self.body_view.setText(body_str)
+                self.body_view.fold_controller().ensure_scanned()
 
+    def _on_mask_worker_finished(self, worker: ResponseMaskWorker) -> None:
+        """Clear active worker reference when a worker finishes."""
+        if self._mask_worker is worker:
+            self._mask_worker = None
+
+    def _on_mask_formatting_completed(
+        self, generation: int, formatted_text: str, spans: list[MaskedTokenSpan]
+    ) -> None:
+        """Apply asynchronously formatted JSON and masked token spans to body view."""
+        if generation != self._mask_format_generation:
+            logger.debug(
+                "response_masking_worker_stale_result_ignored generation=%d current_generation=%d",
+                generation,
+                self._mask_format_generation,
+            )
+            return
+
+        self._mask_worker = None
+        self.body_view.setPlaceholderText("")
+        self.body_view.setText(formatted_text)
+        self.mask_controller.set_masked_spans(spans)
+        if spans:
+            self._metrics.track_hidden_value_mask_applied("gui_response")
+        logger.debug(
+            "response_masking_async_completed generation=%d span_count=%d",
+            generation,
+            len(spans),
+        )
+        self.body_view.fold_controller().ensure_scanned()
+
+    def _on_mask_formatting_failed(self, generation: int, raw_body: str) -> None:
+        """Fall back to displaying raw response body if worker formatting failed."""
+        if generation != self._mask_format_generation:
+            logger.debug(
+                "response_masking_worker_stale_failure_ignored generation=%d current_generation=%d",
+                generation,
+                self._mask_format_generation,
+            )
+            return
+
+        self._mask_worker = None
+        self.body_view.setPlaceholderText("")
+        self.body_view.setText(raw_body)
+        logger.warning(
+            "response_masking_async_failed_fallback generation=%d chars=%d",
+            generation,
+            len(raw_body),
+        )
         self.body_view.fold_controller().ensure_scanned()

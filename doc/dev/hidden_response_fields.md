@@ -1,4 +1,4 @@
-# Hidden Response Fields Architecture and Decomposition (PYPOST-1312 / PYPOST-1376 / PYPOST-1395)
+# Hidden Response Fields Architecture and Decomposition (PYPOST-1312 / PYPOST-1376 / PYPOST-1395 / PYPOST-1396)
 
 ## Overview
 
@@ -20,7 +20,10 @@ task [PYPOST-1376](https://pypost.atlassian.net/browse/PYPOST-1376) established 
 specifications, security boundaries, and decomposition into four focused child stories scheduled for Sprint 2032.
 Subsequent hardening task [PYPOST-1395](https://pypost.atlassian.net/browse/PYPOST-1395) expanded sample
 masking configurations across the remaining bundled reference collections (GitHub, GitLab, and Jira Cloud)
-with dedicated automated contract verification.
+with dedicated automated contract verification. Performance optimization task
+[PYPOST-1396](https://pypost.atlassian.net/browse/PYPOST-1396) introduced asynchronous background worker thread
+formatting for medium-sized (50 KB – 100 KB) payloads ([`ResponseMaskWorker`](response_mask_worker.md))
+to maintain a fluid 60 FPS UI experience without freezes.
 
 ---
 
@@ -327,11 +330,11 @@ display_response(response, hidden_fields)
   - If a user selects an unmasked secret and clicks "Set Variable" or "Copy", the authentic secret value is read from the cursor (`cursor.selectedText()`) and emitted or copied.
   - Because `eventFilter` checks `not self.code_view.textCursor().hasSelection()`, drag-selecting revealed text never accidentally triggers a re-mask toggle.
 
-#### Large-Document Fallback & Streaming Safety
-- **Large-Document Fallback (> 100 KB)**:
-  - If the response payload exceeds `LARGE_DOC_CHAR_THRESHOLD` (100 * 1024 characters), `display_response` logs `response_masking_large_doc_fallback` and bypasses pretty-printing, AST traversal, and span tracking.
-  - The raw payload is passed directly to `self.body_view.setText(body_str)` and `mask_controller.clear()` is called.
-  - This prevents UI event loop freezes or memory bloat on multi-megabyte payloads.
+#### Operating Bands, Background Offloading & Streaming Safety
+- **Operating Bands Routing**:
+  - **Small Payloads (`< 50 KB`)**: Formatted and masked synchronously via `format_masked_json` in sub-frame latency (<5 ms).
+  - **Medium Payloads (`50 KB – 100 KB`)**: Asynchronously formatted via dedicated background worker [`ResponseMaskWorker`](response_mask_worker.md) (`QThread`), preventing UI stutters and keeping frame rates at 60 FPS while setting placeholder `"Formatting masked response..."` to guarantee zero secret flash. Obsolete background tasks are cancelled cooperatively upon tab switches or rapid response arrivals.
+  - **Large Documents (`> 100 KB`)**: If the payload exceeds `LARGE_DOC_CHAR_THRESHOLD` (`100 * 1024` chars), `display_response` logs `response_masking_large_doc_fallback` and bypasses pretty-printing, AST traversal, and span tracking, setting raw text directly to protect editor performance.
 - **In-Flight Streaming Response Safety**:
   - During streaming requests, chunks arrive incrementally via `ResponseView.append_body(chunk)` without attempting partial AST parsing.
   - Upon request completion, `TabsPresenterWorker._on_request_finished` calls `display_response(response, hidden_fields=tab.request_data.hidden_response_fields)`, cleanly replacing the streamed text with the formatted, masked JSON document.
@@ -628,6 +631,8 @@ For complete API specifications and code examples, see
 ## References
 
 - Unified JSON Selector Engine: [`doc/dev/json_selector_engine.md`](json_selector_engine.md)
+- Background Worker Thread Formatting for Medium JSON Responses: [`doc/dev/response_mask_worker.md`](response_mask_worker.md)
+- ResponseMaskWorker Test Suite: [`tests/test_response_mask_worker.py`](../../tests/test_response_mask_worker.py)
 - Reference Collection Masking Contract Tests: [`tests/test_reference_collection_masking_contract.py`](../../tests/test_reference_collection_masking_contract.py)
 - Google Drive Reference Collection Fixture: [`examples/collections/google_drive.json`](../../examples/collections/google_drive.json)
 - GitHub Reference Collection Fixture: [`examples/collections/github_mcp.json`](../../examples/collections/github_mcp.json)
@@ -645,3 +650,4 @@ For complete API specifications and code examples, see
 - Integration & Edge-Case Tests: [`tests/test_hidden_response_fields_integration_edge_cases.py`](../../tests/test_hidden_response_fields_integration_edge_cases.py)
 - MASK-4 Roadmap & Verification: [`ai-tasks/PYPOST-1380/00-roadmap.md`](../../ai-tasks/PYPOST-1380/00-roadmap.md)
 - PYPOST-1395 Roadmap & Verification: [`ai-tasks/PYPOST-1395/00-roadmap.md`](../../ai-tasks/PYPOST-1395/00-roadmap.md)
+- PYPOST-1396 Roadmap & Verification: [`ai-tasks/PYPOST-1396/00-roadmap.md`](../../ai-tasks/PYPOST-1396/00-roadmap.md)
