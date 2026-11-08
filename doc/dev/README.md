@@ -18,6 +18,7 @@ conventions.
 1. [Architecture Decision Records (ADR) index](../adr/README.md)
 1. [Request Execution](request_execution.md)
 1. [HTTP Path Segment Rejection (`.`, `..`) (PYPOST-1346)](http_path_segment_rejection.md)
+1. [HTTP Transport Abort and Session Teardown (PYPOST-1454)](http_transport_abort.md)
 1. [WebSocket Transport Seam and Session Engine (PYPOST-1127)](websocket_session_engine.md)
 1. [WebSocket Message Stream, Codecs, and Transcript Export (PYPOST-1130 / PYPOST-1286 / PYPOST-1301)](websocket_message_stream.md)
 1. [WebSocket TLS and Connection-Security Policy (PYPOST-1131)](websocket_tls_security.md)

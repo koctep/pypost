@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from typing import Callable, Dict, Protocol, runtime_checkable
 
+from pypost.core.cancellation import CancellationToken
 from pypost.core.http_client import HTTPRequestResult
 from pypost.models.models import RequestData
 
@@ -18,4 +19,5 @@ class HTTPClientProtocol(Protocol):
         stream_callback: Callable[[str], None] | None = None,
         stop_flag: Callable[[], bool] | None = None,
         headers_callback: Callable[[int, Dict], None] | None = None,
+        cancellation_token: CancellationToken | None = None,
     ) -> HTTPRequestResult: ...

@@ -99,6 +99,10 @@ but does **not** increment `request_errors_total`.
 _on_request_error` checks `error.category == ErrorCategory.CANCELLED` and returns without
 showing a dialog. Legacy `str` cancellation payloads still use substring matching.
 
+For remote transport cancellation, active socket closure and prompt session abort are
+orchestrated via `CancellationToken` and `pypost/core/http_transport_abort.py`.
+See [HTTP Transport Abort](http_transport_abort.md).
+
 ### Response body streaming display (PYPOST-887)
 
 `RequestWorker` may emit `chunk_received` while the body is still streaming. The presenter
@@ -195,6 +199,7 @@ request_data)` use the captured tab directly. `_find_tab_for_sender` was removed
 | `pypost/core/worker.py` | Background thread; calls `RequestService.execute()` |
 | `pypost/core/request_service.py` | Orchestrates MCP/HTTP, scripts, history |
 | `pypost/core/http_client.py` | HTTP transport; single URL render per send; `.` / `..` path reject (PYPOST-1346) |
+| `pypost/core/http_transport_abort.py` | Active socket shutdown and transport abort registration (PYPOST-1454) |
 | `pypost/core/mcp_client_service.py` | MCP transport; typed httpx error mapping |
 | `pypost/core/template_service.py` | Jinja2 rendering and validation |
 
@@ -203,7 +208,10 @@ request_data)` use the captured tab directly. `_find_tab_for_sender` was removed
 - `tests/test_request_service.py` — `test_execute_http_does_not_pre_render_url`
 - `tests/test_http_client.py` — `test_url_template_rendered_once_per_request`;
   `TestHTTPClientDotPathSegmentRejection` (PYPOST-1346)
+- `tests/test_remote_http_transport_abort_repro.py` — active socket abort under 0.5s (PYPOST-1454)
 - `tests/test_mcp_client_service.py` — httpx exception category mapping
 - `tests/test_worker_race.py` — worker stop flag and tab worker lifecycle guards
 
-See also: [HTTP Path Segment Rejection](http_path_segment_rejection.md).
+See also:
+- [HTTP Path Segment Rejection](http_path_segment_rejection.md)
+- [HTTP Transport Abort](http_transport_abort.md)

@@ -4,12 +4,25 @@ import json
 import logging
 import time
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, List
+from typing import Any, Callable, Dict
 from urllib.parse import urlsplit
 
 import requests
 
+from pypost.core.cancellation import CancellationToken
 from pypost.core.http_response_body_reader import read_streamed_body
+from pypost.core.http_sse import (
+    SSE_PROBE_CONNECT_TIMEOUT,
+    SSE_PROBE_TIMEOUT,
+    _headers_accept_event_stream,
+    _is_sse_content_type,
+    handle_sse_response,
+)
+from pypost.core.http_transport_abort import (
+    TransportAbortGuard,
+    create_abortable_session,
+    mount_abortable_adapter,
+)
 from pypost.core.sensitive_text_sanitizer import sanitize_text
 from pypost.core.metrics_protocol import MetricsTrackerProtocol, resolve_metrics
 from pypost.core.template_service import TemplateService
@@ -25,28 +38,11 @@ from pypost.models.response import ResponseData
 
 logger = logging.getLogger(__name__)
 
-SSE_PROBE_TIMEOUT = 10.0
-SSE_PROBE_CONNECT_TIMEOUT = 3.0
-SSE_PROBE_MAX_EVENTS = 5
 DEFAULT_REQUEST_TIMEOUT = 30.0
 DEFAULT_MAX_RESPONSE_BYTES = 52_428_800  # 50 MiB
 TRUNCATION_NOTICE = "\n\n[Response body truncated: exceeded max_response_bytes limit]"
 ERROR_LOG_URL_MAX_LENGTH = 512
 TEMPLATE_ERROR_LOG_URL_PLACEHOLDER = "[invalid-url]"
-
-
-def _is_sse_content_type(content_type: str) -> bool:
-    """Return True when Content-Type indicates an SSE response body."""
-    if not content_type:
-        return False
-    media_type = content_type.split(";", 1)[0].strip().lower()
-    return media_type == "text/event-stream"
-
-
-def _headers_accept_event_stream(headers: Dict[str, str]) -> bool:
-    """Return True when the request Accept header asks for event-stream."""
-    accept = headers.get("Accept", "")
-    return "text/event-stream" in accept.lower()
 
 
 def _assert_no_dot_path_segments(url: str) -> None:
@@ -91,7 +87,13 @@ class HTTPClient:
         session: requests.Session | None = None,
         max_response_bytes: int = DEFAULT_MAX_RESPONSE_BYTES,
     ):
-        self.session = session if session is not None else requests.Session()
+        self._custom_session = session is not None
+        if session is not None:
+            self.session = session
+            if isinstance(session, requests.Session):
+                mount_abortable_adapter(session)
+        else:
+            self.session = create_abortable_session()
         self._metrics = resolve_metrics(metrics)
         self._max_response_bytes = max_response_bytes
         self._template_service = (
@@ -228,71 +230,7 @@ class HTTPClient:
     def _handle_sse_response(
         self, response, request_data: RequestData, start_time: float
     ) -> ResponseData:
-        import sseclient
-
-        elapsed = time.time() - start_time
-        resp_headers = dict(response.headers)
-
-        if response.status_code != 200:
-            try:
-                body = response.text
-            except Exception:
-                body = f"HTTP {response.status_code}"
-            response.close()
-            return ResponseData(
-                status_code=response.status_code,
-                headers=resp_headers,
-                body=body,
-                elapsed_time=elapsed,
-                size=len(body.encode("utf-8")),
-            )
-
-        events: List[str] = []
-        try:
-            client = sseclient.SSEClient(response)
-            for i, event in enumerate(client.events()):
-                if i >= SSE_PROBE_MAX_EVENTS:
-                    break
-                desc = event.event or "message"
-                if event.data:
-                    data = event.data or ""
-                    desc += f": {data[:100]}..." if len(data) > 100 else f": {data}"
-                events.append(desc)
-        except Exception as e:
-            response.close()
-            err_str = str(e)
-            if "timed out" in err_str or "ReadTimeout" in type(e).__name__:
-                body = (
-                    "SSE stream opened. Connection established. "
-                    "Server may not send events until client sends InitializeRequest."
-                )
-            else:
-                body = f"SSE probe: connection opened, parse error: {e}"
-            return ResponseData(
-                status_code=200,
-                headers=resp_headers,
-                body=body,
-                elapsed_time=time.time() - start_time,
-                size=len(body.encode("utf-8")),
-            )
-        finally:
-            response.close()
-
-        count = len(events)
-        if count > 0:
-            summary = f"SSE stream opened. Received {count} event(s)."
-            summary += f" First: {events[0]}"
-        else:
-            summary = (
-                "SSE stream opened. No events received within timeout. " "Connection may be idle."
-            )
-        return ResponseData(
-            status_code=200,
-            headers=resp_headers,
-            body=summary,
-            elapsed_time=elapsed,
-            size=len(summary.encode("utf-8")),
-        )
+        return handle_sse_response(response, request_data, start_time)
 
     def send_request(
         self,
@@ -301,6 +239,7 @@ class HTTPClient:
         stream_callback: Callable[[str], None] | None = None,
         stop_flag: Callable[[], bool] | None = None,
         headers_callback: Callable[[int, Dict], None] | None = None,
+        cancellation_token: CancellationToken | None = None,
     ) -> HTTPRequestResult:
         if variables is None:
             variables = {}
@@ -308,117 +247,149 @@ class HTTPClient:
         start_time = time.time()
         self._metrics.track_request_sent(request_data.method)
 
-        try:
-            url = self._render_request_field(request_data.url, variables)
-            kwargs, resolved = self._prepare_request_kwargs(
-                request_data, variables, rendered_url=url
-            )
-            if request_data.method == "GET" and _headers_accept_event_stream(
-                kwargs.get("headers", {})
-            ):
-                kwargs["timeout"] = (SSE_PROBE_CONNECT_TIMEOUT, SSE_PROBE_TIMEOUT)
-                headers = dict(kwargs.get("headers", {}))
-                headers.setdefault("Accept", "text/event-stream")
-                kwargs["headers"] = headers
-            response = self.session.request(**kwargs)
-        except IntegerConversionError as exc:
-            logger.error(
-                "template_integer_conversion_failed method=%s url=%r",
-                request_data.method,
-                self._template_error_log_url(request_data.url, variables),
-            )
-            raise ExecutionError(
-                category=ErrorCategory.TEMPLATE,
-                message="Could not render integer template expression.",
-                detail=str(exc),
-            ) from exc
-        except requests.Timeout as exc:
-            safe_url = self._error_log_url(url, variables)
-            logger.error(
-                "http_request_timed_out method=%s url=%r",
-                request_data.method,
-                safe_url,
-            )
-            raise ExecutionError(
-                category=ErrorCategory.TIMEOUT,
-                message=f"Request to {safe_url} timed out.",
-                detail=str(exc),
-            ) from exc
-        except requests.ConnectionError as exc:
-            safe_url = self._error_log_url(url, variables)
-            logger.error(
-                "http_connection_failed method=%s url=%r",
-                request_data.method,
-                safe_url,
-            )
-            raise ExecutionError(
-                category=ErrorCategory.NETWORK,
-                message=f"Could not connect to {safe_url}.",
-                detail=str(exc),
-            ) from exc
-        except requests.RequestException as exc:
-            logger.error(
-                "http_request_failed method=%s url=%r detail=%s",
-                request_data.method,
-                self._error_log_url(url, variables),
-                exc,
-            )
-            raise ExecutionError(
-                category=ErrorCategory.UNKNOWN,
-                message="An unexpected request error occurred.",
-                detail=str(exc),
-            ) from exc
+        with TransportAbortGuard(self, self.session, cancellation_token) as guard:
+            try:
+                url = self._render_request_field(request_data.url, variables)
+                kwargs, resolved = self._prepare_request_kwargs(
+                    request_data, variables, rendered_url=url
+                )
+                if request_data.method == "GET" and _headers_accept_event_stream(
+                    kwargs.get("headers", {})
+                ):
+                    kwargs["timeout"] = (SSE_PROBE_CONNECT_TIMEOUT, SSE_PROBE_TIMEOUT)
+                    headers = dict(kwargs.get("headers", {}))
+                    headers.setdefault("Accept", "text/event-stream")
+                    kwargs["headers"] = headers
+                response = self.session.request(**kwargs)
+            except IntegerConversionError as exc:
+                logger.error(
+                    "template_integer_conversion_failed method=%s url=%r",
+                    request_data.method,
+                    self._template_error_log_url(request_data.url, variables),
+                )
+                raise ExecutionError(
+                    category=ErrorCategory.TEMPLATE,
+                    message="Could not render integer template expression.",
+                    detail=str(exc),
+                ) from exc
+            except requests.Timeout as exc:
+                safe_url = self._error_log_url(url, variables)
+                if cancellation_token is not None and cancellation_token.is_cancellation_requested:
+                    logger.debug(
+                        "http_request_aborted_by_cancellation method=%s timeout_during_abort=True",
+                        request_data.method,
+                    )
+                else:
+                    logger.error(
+                        "http_request_timed_out method=%s url=%r",
+                        request_data.method,
+                        safe_url,
+                    )
+                raise ExecutionError(
+                    category=ErrorCategory.TIMEOUT,
+                    message=f"Request to {safe_url} timed out.",
+                    detail=str(exc),
+                ) from exc
+            except requests.ConnectionError as exc:
+                safe_url = self._error_log_url(url, variables)
+                if cancellation_token is not None and cancellation_token.is_cancellation_requested:
+                    logger.debug(
+                        "http_request_aborted_by_cancellation method=%s connection_severed=True",
+                        request_data.method,
+                    )
+                else:
+                    logger.error(
+                        "http_connection_failed method=%s url=%r",
+                        request_data.method,
+                        safe_url,
+                    )
+                raise ExecutionError(
+                    category=ErrorCategory.NETWORK,
+                    message=f"Could not connect to {safe_url}.",
+                    detail=str(exc),
+                ) from exc
+            except requests.RequestException as exc:
+                safe_url = self._error_log_url(url, variables)
+                if cancellation_token is not None and cancellation_token.is_cancellation_requested:
+                    logger.debug(
+                        "http_request_aborted_by_cancellation method=%s",
+                        request_data.method,
+                    )
+                else:
+                    logger.error(
+                        "http_request_failed method=%s url=%r detail=%s",
+                        request_data.method,
+                        safe_url,
+                        exc,
+                    )
+                raise ExecutionError(
+                    category=ErrorCategory.UNKNOWN,
+                    message="An unexpected request error occurred.",
+                    detail=str(exc),
+                ) from exc
 
-        if headers_callback:
-            headers_callback(response.status_code, dict(response.headers))
+            guard.set_active_response(response)
+            if cancellation_token is not None:
+                cancellation_token.throw_if_cancellation_requested()
 
-        content_type = response.headers.get("Content-Type", "")
-        if request_data.method == "GET" and _is_sse_content_type(content_type):
+            if headers_callback:
+                headers_callback(response.status_code, dict(response.headers))
+
+            content_type = response.headers.get("Content-Type", "")
+            if request_data.method == "GET" and _is_sse_content_type(content_type):
+                logger.debug(
+                    "sse_stream_detected method=%s url=%s content_type=%s",
+                    request_data.method,
+                    self._error_log_url(url, variables),
+                    content_type,
+                )
+                return HTTPRequestResult(
+                    response=self._handle_sse_response(response, request_data, start_time),
+                    resolved=resolved,
+                )
+
+            def _check_stop() -> bool:
+                if stop_flag is not None and stop_flag():
+                    return True
+                if cancellation_token is not None and cancellation_token.is_cancellation_requested:
+                    return True
+                return False
+
+            content, truncated = read_streamed_body(
+                response,
+                max_response_bytes=self._max_response_bytes,
+                stream_callback=stream_callback,
+                stop_flag=_check_stop,
+            )
+            if cancellation_token is not None:
+                cancellation_token.throw_if_cancellation_requested()
+
+            if truncated:
+                self._metrics.track_response_body_truncated(request_data.method)
+                logger.warning(
+                    "response_body_truncated method=%s url=%s max_bytes=%d",
+                    request_data.method,
+                    self._error_log_url(url, variables),
+                    self._max_response_bytes,
+                )
+                content = f"{content}{TRUNCATION_NOTICE}"
+
+            end_time = time.time()
+            self._metrics.track_response_received(request_data.method, str(response.status_code))
             logger.debug(
-                "sse_stream_detected method=%s url=%s content_type=%s",
+                "request_complete method=%s status=%d elapsed_ms=%.0f size=%d",
                 request_data.method,
-                self._error_log_url(url, variables),
-                content_type,
+                response.status_code,
+                (end_time - start_time) * 1000,
+                len(content.encode("utf-8")),
             )
             return HTTPRequestResult(
-                response=self._handle_sse_response(response, request_data, start_time),
+                response=ResponseData(
+                    status_code=response.status_code,
+                    headers=dict(response.headers),
+                    body=content,
+                    elapsed_time=end_time - start_time,
+                    size=len(content.encode("utf-8")),
+                ),
                 resolved=resolved,
             )
-
-        content, truncated = read_streamed_body(
-            response,
-            max_response_bytes=self._max_response_bytes,
-            stream_callback=stream_callback,
-            stop_flag=stop_flag,
-        )
-        if truncated:
-            self._metrics.track_response_body_truncated(request_data.method)
-            logger.warning(
-                "response_body_truncated method=%s url=%s max_bytes=%d",
-                request_data.method,
-                self._error_log_url(url, variables),
-                self._max_response_bytes,
-            )
-            content = f"{content}{TRUNCATION_NOTICE}"
-
-        end_time = time.time()
-
-        # 3. Process response
-        self._metrics.track_response_received(request_data.method, str(response.status_code))
-        logger.debug(
-            "request_complete method=%s status=%d elapsed_ms=%.0f size=%d",
-            request_data.method,
-            response.status_code,
-            (end_time - start_time) * 1000,
-            len(content.encode("utf-8")),
-        )
-        return HTTPRequestResult(
-            response=ResponseData(
-                status_code=response.status_code,
-                headers=dict(response.headers),
-                body=content,
-                elapsed_time=end_time - start_time,
-                size=len(content.encode("utf-8")),
-            ),
-            resolved=resolved,
-        )
