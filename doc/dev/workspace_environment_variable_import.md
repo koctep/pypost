@@ -553,6 +553,76 @@ interfaces, rigid joins created unnecessary UI freezing or risked unhandled attr
      thread=%s elapsed=%.3fs timeout=%.3fs is_alive=%s`), facilitating troubleshooting of stuck
      worker threads.
 
+#### Slow-Drip / Delayed-Success Remote Read Invariants (PYPOST-1457)
+
+High-latency or throttled network connections can cause remote collection reads to stream
+data slowly over several seconds before completing cleanly. During this delayed-success
+interval, `ImportCollectionVariablesDialog` and `CollectionFetchWorker` enforce strict
+concurrency invariants to ensure predictable UX, zero false error states, and responsive UI:
+
+1. **Persistent Loading Chrome & Action Invalidation**:
+   - `loading_container` remains visible throughout the drip with
+     `"Loading collection from library..."`.
+   - Content-dependent controls (`preset_combo`, `vars_table`, `import_button`) remain disabled.
+   - The virtualized table model renders 0 rows until data collection completes; no partial or
+     malformed candidate rows are displayed mid-stream.
+2. **Spurious Error Suppression**:
+   - `error_container` is strictly suppressed while data drips and upon delayed clean completion.
+   - Slow transfer latency is never misclassified as a timeout or network fault.
+3. **Accurate Eventual Table Population**:
+   - Upon completion, `loading_container` hides, table and presets enable, and all candidate
+     variables populate matching their declared types, presets, and dual-source secret masks.
+   - Import summary preview reflects correct candidate counts (`add`, `overwrite`, `keep`).
+   - If the remote collection defines 0 variables, the table displays a clean empty state with
+     the Import button disabled and no error banner.
+4. **Prompt Cooperative Cancellation (< 0.5s)**:
+   - Clicking `cancel_loading_btn` requests worker interruption and signals the
+     `CancellationToken`.
+   - Slicing delay loops abort immediately upon `cancellation_token.wait()`, raising
+     `OperationCancelledError` without waiting out the full delay budget.
+   - Cancellation completes in < 0.5s (`ABORT_ELAPSED_LIMIT_S = 0.5s`), increments
+     `_fetch_generation`, hides loading chrome, and leaves the table empty without false errors.
+5. **Selection Supersession & Monotonic Generation Discard**:
+   - Selecting a new collection while a slow read is in-flight increments `_fetch_generation`
+     and cancels the active worker.
+   - When the superseded worker eventually terminates, its completion signal is recognized as
+     stale (`gen != _fetch_generation`), quietly discarded, and logged with
+     `collection_variable_remote_fetch_stale_discarded`.
+   - The table displays only data from the newly selected collection.
+6. **Dialog Teardown & Polymorphic Join (< 1.0s)**:
+   - Dismissing the dialog (`reject()`, `closeEvent()`) while a drip is active cancels the
+     worker and joins it adaptively via `_cancel_fetch_worker()` and `adaptive_thread_join()`.
+   - Teardown unblocks promptly (< 1.0s), leaving zero lingering background threads or
+     orphaned callbacks directed at destroyed widgets.
+7. **UI Responsiveness Guarantees (< 50ms latency)**:
+   - Remote streaming executes off-thread in `CollectionFetchWorker`.
+   - The main Qt event loop processes events smoothly with event processing latency < 50ms,
+     preventing UI freezes or unresponsive window states.
+
+#### Slicing Delay Simulation (`SlowDripSimulator`)
+
+Automated testing of delayed-success reads without live network dependencies is provided by
+`SlowDripSimulator` and `slow_drip_collection_side_effect` in
+`tests/helpers/remote_collection_faults.py`:
+
+```python
+sim = slow_drip_collection_side_effect(
+    collection=remote_col,
+    total_delay_s=0.35,
+    slice_interval_s=0.02,
+    max_duration_s=5.0,
+)
+```
+
+- **Slicing Loop**: Instead of an uninterruptible `time.sleep()`, `SlowDripSimulator` executes
+  a sliced delay loop using `cancellation_token.wait(timeout=self.slice_interval_s)`.
+- **Cooperative Abort**: When cancellation is requested mid-drip, `wait()` unblocks instantly
+  and raises `OperationCancelledError("Slow drip aborted during slice")`, setting
+  `self.cancelled`.
+- **Deterministic Synchronization**: Exposes `entered`, `completed`, and `cancelled`
+  `threading.Event` primitives and counts `slices_elapsed`, allowing test fixtures to verify
+  in-flight invariants deterministically before unblocking.
+
 ---
 
 ### Non-Modal Status Containers, Error Handling, and Retry (PYPOST-1450, PYPOST-1451)
@@ -655,6 +725,14 @@ failure, retry, cancellation, and isolation coverage:
      must not present a fetch-failure banner for the cancelled generation.
    - Automated coverage: `tests/test_remote_collection_fault_injection_repro.py` with helpers
      in `tests/helpers/remote_collection_faults.py`.
+8. **Slow-drip streaming and delayed-success invariants (PYPOST-1457)**:
+   - While PYPOST-1426 characterized hard faults (network drop, corrupted JSON, schema mismatch),
+     PYPOST-1457 characterizes slow-drip streaming reads that dribble data before succeeding.
+   - Proves loading chrome persistence, zero false error popups or banners during streaming,
+     prompt cooperative cancellation (< 0.5s), selection supersession with stale signal
+     discard, clean dialog teardown (< 1.0s), and UI event loop responsiveness (< 50ms latency).
+   - Automated coverage: `tests/test_remote_collection_slow_drip_repro.py` using slicing delay
+     helpers from `tests/helpers/remote_collection_faults.py`.
 
 ---
 
@@ -862,6 +940,24 @@ Automated test coverage is maintained in:
     asserts recoverable UX and worker `fetch_failed` emission.
   - **Cancel mid-stream**: Combines PYPOST-1425 transport abort with a blocked mid-stream
     read; cancel must abort promptly without a false fetch-failure banner.
+- `tests/test_remote_collection_slow_drip_repro.py` (PYPOST-1457):
+  - **Loading Chrome & Error Suppression**: Verifies loading container stays visible, action
+    controls stay disabled, table shows 0 partial rows, and error container remains suppressed
+    during slow-drip reads and upon delayed clean completion.
+  - **Eventual Population Matches Schema**: Verifies complete delayed loading of candidate
+    variables, types, secret masks (`HIDDEN_MASK`), raw values, presets, and button enablement.
+  - **Prompt Cooperative Cancellation**: Asserts mid-stream cancel aborts worker cooperatively
+    in < 0.5s, increments fetch generation, hides chrome, and leaves table empty without errors.
+  - **Selection Supersession**: Validates switching collection mid-drip cancels active worker,
+    discards stale completion signals, and renders only the newly selected collection.
+  - **Dialog Close Teardown**: Verifies dialog rejection mid-drip aborts and joins workers
+    promptly (< 1.0s) without thread leaks or unhandled callbacks.
+  - **Zero Variables Handling**: Asserts delayed collection with 0 variables renders clean empty
+    state with disabled import button and zero error warnings.
+  - **UI Responsiveness Contract**: Proves Qt event loop latency remains < 50ms during background
+    slow-drip streaming.
+  - **Structured Observability**: Asserts logging contracts for `remote_fetch_started`,
+    `remote_fetch_completed`, `remote_fetch_cancelled`, and `remote_fetch_stale_discarded`.
 - `tests/test_collection_variables_paged_model_repro.py` (PYPOST-1427):
   - **Instant extreme load**: 50,000-variable `load_collection` under wall-clock budget with empty cache before first row access.
   - **Bounded chunk cache**: Sparse scroll across many chunks keeps `cached_record_count ≤ CHUNK_SIZE * MAX_CACHED_CHUNKS`.

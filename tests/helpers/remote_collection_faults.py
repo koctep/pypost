@@ -6,9 +6,14 @@ truncated JSON manifests, and malformed variable schemas without live I/O.
 from __future__ import annotations
 
 import threading
+import time
 from typing import Any, Callable
 from unittest.mock import MagicMock
 
+from pypost.core.cancellation import (
+    CancellationToken,
+    OperationCancelledError,
+)
 from pypost.core.collection_serializer import (
     CollectionSerializationError,
     deserialize_collection_from_json,
@@ -63,6 +68,7 @@ def build_library_service(
     remote_name: str = "FaultyRemote",
     remote_path: str = "cols/faulty.json",
     read_side_effect: Callable[..., Collection] | BaseException | None = None,
+    manifest_collections: list[dict[str, str]] | None = None,
 ) -> MagicMock:
     """Return a library service mock with one remote catalog entry."""
     mock_service = MagicMock()
@@ -70,9 +76,12 @@ def build_library_service(
     conn_mock.stable_id = "conn_1"
     conn_mock.name = "Remote Conn"
     mock_service.list_connections.return_value = [conn_mock]
-    mock_service.list_manifest_collections.return_value = [
-        {"name": remote_name, "path": remote_path},
-    ]
+    if manifest_collections is not None:
+        mock_service.list_manifest_collections.return_value = manifest_collections
+    else:
+        mock_service.list_manifest_collections.return_value = [
+            {"name": remote_name, "path": remote_path},
+        ]
     if isinstance(read_side_effect, BaseException):
         mock_service.read_collection.side_effect = read_side_effect
     elif read_side_effect is not None:
@@ -145,8 +154,6 @@ def mid_stream_reset_or_abort_side_effect(
     raises ``OperationCancelledError``. Otherwise raises ``ConnectionResetError``
     to simulate a peer reset after a partial transfer wait.
     """
-    from pypost.core.cancellation import OperationCancelledError
-
     def _read(
         connection_id: str,
         collection_path: str,
@@ -186,3 +193,68 @@ def assert_raises_collection_serialization(fn: Callable[[], None]) -> None:
     except CollectionSerializationError:
         return
     raise AssertionError("expected CollectionSerializationError")
+
+
+class SlowDripSimulator:
+    """Simulates a high-latency remote read that drips data before succeeding."""
+
+    def __init__(
+        self,
+        collection: Collection | None = None,
+        total_delay_s: float = 0.3,
+        slice_interval_s: float = 0.02,
+        max_duration_s: float = 5.0,
+    ) -> None:
+        self.collection = collection or recovered_collection()
+        self.total_delay_s = total_delay_s
+        self.slice_interval_s = slice_interval_s
+        self.max_duration_s = max_duration_s
+        self.entered = threading.Event()
+        self.completed = threading.Event()
+        self.cancelled = threading.Event()
+        self.slices_elapsed = 0
+
+    def __call__(
+        self,
+        connection_id: str,
+        collection_path: str,
+        cancellation_token: CancellationToken | None = None,
+        **kwargs: Any,
+    ) -> Collection:
+        self.entered.set()
+        start = time.monotonic()
+        while (time.monotonic() - start) < self.total_delay_s:
+            if time.monotonic() - start > self.max_duration_s:
+                break
+            if cancellation_token is not None:
+                if cancellation_token.is_cancellation_requested:
+                    self.cancelled.set()
+                    raise OperationCancelledError("Slow drip cancelled via token")
+                if cancellation_token.wait(timeout=self.slice_interval_s):
+                    self.cancelled.set()
+                    raise OperationCancelledError("Slow drip aborted during slice")
+            else:
+                time.sleep(self.slice_interval_s)
+            self.slices_elapsed += 1
+
+        if cancellation_token is not None and cancellation_token.is_cancellation_requested:
+            self.cancelled.set()
+            raise OperationCancelledError("Slow drip cancelled at completion boundary")
+
+        self.completed.set()
+        return self.collection
+
+
+def slow_drip_collection_side_effect(
+    collection: Collection | None = None,
+    total_delay_s: float = 0.3,
+    slice_interval_s: float = 0.02,
+    max_duration_s: float = 5.0,
+) -> SlowDripSimulator:
+    """Return a SlowDripSimulator instance simulating delayed-success remote read."""
+    return SlowDripSimulator(
+        collection=collection,
+        total_delay_s=total_delay_s,
+        slice_interval_s=slice_interval_s,
+        max_duration_s=max_duration_s,
+    )
