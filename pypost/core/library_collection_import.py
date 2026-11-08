@@ -13,7 +13,11 @@ from enum import Enum
 from pathlib import Path, PurePosixPath, PureWindowsPath
 from typing import Any, Iterable, Optional
 
-from pypost.core.cancellation import CancellationToken
+from pypost.core.cancellation import (
+    CancellationToken,
+    OperationCancelledError,
+    call_with_cancellation_token,
+)
 from pypost.core.collection_import import (
     CollectionImportFileError,
     CollectionImportPlanResult,
@@ -189,7 +193,11 @@ class LibraryCollectionImportService:
         diagnostic.  This lets the selector explain why an item is unavailable
         without making one malformed entry hide the remaining libraries.
         """
-        connections = [connection] if connection is not None else self._connections()
+        connections = (
+            [connection]
+            if connection is not None
+            else self._connections(cancellation_token=cancellation_token)
+        )
         entries: list[LibraryCollectionImportEntry] = []
         for record in connections:
             if cancellation_token is not None:
@@ -294,7 +302,10 @@ class LibraryCollectionImportService:
             if cancellation_token is not None:
                 cancellation_token.throw_if_cancellation_requested()
             try:
-                record = self._find_connection(entry.library_id)
+                record = self._find_connection(
+                    entry.library_id,
+                    cancellation_token=cancellation_token,
+                )
                 if record is None:
                     raise LibraryCollectionImportError(
                         f"Library '{entry.library_id}' is unavailable."
@@ -432,11 +443,14 @@ class LibraryCollectionImportService:
         mode: LibraryImportMode,
         conflict_decisions: dict[str, ImportConflictDecision] | None = None,
         cancelled: bool = False,
+        cancellation_token: CancellationToken | None = None,
     ) -> LibraryCollectionImportResult:
         """Resolve, validate, and apply selected entries without source writes."""
         if cancelled or conflict_decisions is None:
             raise LibraryCollectionImportCancelled()
-        resolution = self.resolve_entries(entries)
+        if cancellation_token is not None:
+            cancellation_token.throw_if_cancellation_requested()
+        resolution = self.resolve_entries(entries, cancellation_token=cancellation_token)
         if not resolution.candidates:
             raise LibraryCollectionImportError(
                 resolution.errors or ["No selected library collection is available."]
@@ -446,6 +460,7 @@ class LibraryCollectionImportService:
             resolution.candidates,
             mode,
             conflict_decisions,
+            cancelled=cancelled,
         )
         return LibraryCollectionImportResult(
             result.plan,
@@ -453,8 +468,14 @@ class LibraryCollectionImportService:
             resolution_errors=resolution.errors,
         )
 
-    def resolve_link(self, link: LibraryCollectionLink) -> Collection:
+    def resolve_link(
+        self,
+        link: LibraryCollectionLink,
+        cancellation_token: CancellationToken | None = None,
+    ) -> Collection:
         """Resolve the current source content for a persisted Link metadata value."""
+        if cancellation_token is not None:
+            cancellation_token.throw_if_cancellation_requested()
         entry = LibraryCollectionImportEntry(
             library_id=link.library_id,
             manifest_id=link.manifest_id,
@@ -463,40 +484,87 @@ class LibraryCollectionImportService:
             source_type=LibrarySourceType.REGISTERED,
             collection_index=link.collection_index,
         )
-        resolution = self.resolve_entries([entry])
+        resolution = self.resolve_entries([entry], cancellation_token=cancellation_token)
         if not resolution.candidates:
             raise LibraryCollectionImportError(
                 resolution.errors or ["The linked library collection is unavailable."]
             )
         return self.materialize_candidate(resolution.candidates[0], LibraryImportMode.LINK)
 
-    def refresh_linked_collection(self, collection: Collection) -> Collection:
+    def refresh_linked_collection(
+        self,
+        collection: Collection,
+        cancellation_token: CancellationToken | None = None,
+    ) -> Collection:
         """Return source-authoritative content while preserving the active ID."""
         if collection.library_link is None:
             raise LibraryCollectionImportError("The collection has no library link.")
-        refreshed = self.resolve_link(collection.library_link)
+        refreshed = self.resolve_link(
+            collection.library_link,
+            cancellation_token=cancellation_token,
+        )
         return refreshed.model_copy(update={"id": collection.id}, deep=True)
 
     # A concise alias for presenter code and callers using the architecture name.
     refresh_link = refresh_linked_collection
 
-    def _connections(self) -> list[LibraryConnectionRecord]:
-        list_connections = getattr(self.library_manager, "list_connections", None)
-        if not callable(list_connections):
-            return []
-        records = list_connections()
-        return [record for record in records or [] if isinstance(record, LibraryConnectionRecord)]
+    def _connections(
+        self,
+        cancellation_token: CancellationToken | None = None,
+    ) -> list[LibraryConnectionRecord]:
+        try:
+            if cancellation_token is not None:
+                cancellation_token.throw_if_cancellation_requested()
+            list_connections = getattr(self.library_manager, "list_connections", None)
+            if not callable(list_connections):
+                return []
+            records = call_with_cancellation_token(
+                list_connections,
+                cancellation_token=cancellation_token,
+            )
+            if cancellation_token is not None:
+                cancellation_token.throw_if_cancellation_requested()
+            return [
+                record for record in records or []
+                if isinstance(record, LibraryConnectionRecord)
+            ]
+        except OperationCancelledError:
+            logger.debug("library_collection_connections_cancelled")
+            raise
 
-    def _find_connection(self, stable_id: str) -> LibraryConnectionRecord | None:
-        for record in self._connections():
-            if record.stable_id == stable_id:
-                return record
-        get_connection = getattr(self.library_manager, "get_connection", None)
-        if callable(get_connection):
-            record = get_connection(stable_id)
-            if isinstance(record, LibraryConnectionRecord):
-                return record
-        return None
+    def _find_connection(
+        self,
+        stable_id: str,
+        cancellation_token: CancellationToken | None = None,
+    ) -> LibraryConnectionRecord | None:
+        try:
+            if cancellation_token is not None:
+                cancellation_token.throw_if_cancellation_requested()
+            logger.debug(
+                "library_collection_find_connection_lookup library_id=%s",
+                stable_id,
+            )
+            for record in self._connections(cancellation_token=cancellation_token):
+                if record.stable_id == stable_id:
+                    return record
+            get_connection = getattr(self.library_manager, "get_connection", None)
+            if callable(get_connection):
+                record = call_with_cancellation_token(
+                    get_connection,
+                    stable_id,
+                    cancellation_token=cancellation_token,
+                )
+                if cancellation_token is not None:
+                    cancellation_token.throw_if_cancellation_requested()
+                if isinstance(record, LibraryConnectionRecord):
+                    return record
+            return None
+        except OperationCancelledError:
+            logger.debug(
+                "library_collection_find_connection_cancelled library_id=%s",
+                stable_id,
+            )
+            raise
 
     @staticmethod
     def _is_supported_source(record: LibraryConnectionRecord) -> bool:

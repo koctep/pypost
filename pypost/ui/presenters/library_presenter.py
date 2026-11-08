@@ -14,6 +14,10 @@ from typing import Dict, List, Optional, Tuple, cast
 
 from PySide6.QtCore import QObject, Signal
 
+from pypost.core.cancellation import (
+    CancellationToken,
+    call_with_cancellation_token,
+)
 from pypost.core.git_service import GitLibraryService
 from pypost.core.library_connection_store import LibraryConnectionStore
 from pypost.core.library_manager_service import LibraryManagerService
@@ -163,12 +167,18 @@ class LibraryPresenter(QObject):
         return self._selected_library_id
 
     def get_connection_record(
-        self, library_id: Optional[str] = None
+        self,
+        library_id: Optional[str] = None,
+        cancellation_token: CancellationToken | None = None,
     ) -> Optional[LibraryConnectionRecord]:
         """Return connection metadata for UI action and confirmation decisions."""
         connection_id = library_id or self._selected_library_id or ""
         if self.manager_service is not None:
-            record = self.manager_service.get_connection(connection_id)
+            record = call_with_cancellation_token(
+                self.manager_service.get_connection,
+                connection_id,
+                cancellation_token=cancellation_token,
+            )
             if record is not None:
                 self._connection_records[connection_id] = record
             return record

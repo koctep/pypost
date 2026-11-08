@@ -205,6 +205,26 @@ unnecessary work:
 make test WORKERS=1 PYTEST_ARGS="tests/test_library_import_cancel_checkpoints_repro.py"
 ```
 
+### Nested cancellation and collaborator duck-typing (PYPOST-1452)
+
+Prior to **PYPOST-1452**, `LibraryCollectionImportService._connections()` and
+`_find_connection()` did not forward outer `cancellation_token` instances to the underlying
+library manager, causing nested connection resolution and manifest loading to execute
+uncancellably. In addition, invoking `list_connections` or `get_connection` directly with
+`cancellation_token` broke legacy test doubles or managers that did not support the keyword.
+
+PYPOST-1452 resolved this via:
+- **Token propagation**: `_connections` and `_find_connection` accept an optional
+  `cancellation_token` and perform cooperative pre- and post-invocation checks.
+- **Duck-typed dispatch**: `_connections` and `_find_connection` call collaborator methods
+  via `call_with_cancellation_token` from `pypost.core.cancellation`, automatically passing
+  `cancellation_token` if supported and safely omitting it when rejected.
+- **Public API forwarding**: `list_entries`, `resolve_entries`, `import_entries`,
+  `resolve_link`, and `refresh_linked_collection` propagate cancellation tokens down to
+  `_connections` and `_find_connection`.
+- **Repro & regression suite**: Verified in
+  `tests/test_forward_cancellation_nested_helpers_repro.py`.
+
 ### Usage and API
 
 The service is injectable and does not require Qt:

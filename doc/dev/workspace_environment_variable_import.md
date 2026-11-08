@@ -474,6 +474,44 @@ If a user rapidly changes the collection dropdown or triggers multiple requests,
   `CancellationToken` abort pattern as `CollectionFetchWorker`, allowing in-flight
   connection listing or manifest retrieval to be interrupted promptly on cancel.
 
+#### Nested Cancellation Propagation & Duck-Typed Dispatch (PYPOST-1452)
+
+While PYPOST-1425 introduced transport abort signals and top-level cooperative checkpoints
+for workers, nested helpers historically dropped outer cancellation tokens. This allowed
+nested `get_connection()` calls to perform uncancellable store reloads or disk scans before
+the next checkpoint was reached. **PYPOST-1452** completes end-to-end token forwarding
+across `LibraryManagerService`, `LibraryCollectionImportService`, and `LibraryPresenter`:
+
+1. **`LibraryManagerService` Nested Token Propagation**:
+   - `get_connection(stable_id, cancellation_token=None)`: Accepts an optional
+     `cancellation_token`, checks for cancellation both before and after listing, forwards
+     the token to `list_connections(cancellation_token=cancellation_token)`, and logs
+     `library_manager_get_connection_cancelled` when interrupted.
+   - `read_manifest(stable_id, cancellation_token=None)`: Accepts `cancellation_token`,
+     checks cooperative cancellation, forwards the token into `self.get_connection(...)`,
+     and logs `library_manager_read_manifest_cancelled` upon cancellation.
+   - `list_manifest_collections(stable_id, cancellation_token=None)`: Forwards
+     `cancellation_token` to `self.get_connection(stable_id, cancellation_token=...)`.
+   - `read_collection(stable_id, relative_path, cancellation_token=None)`: Forwards
+     `cancellation_token` to `self.get_connection(stable_id, cancellation_token=...)`.
+
+2. **`LibraryCollectionImportService` Helper Propagation & Duck-Typing**:
+   - `_connections(cancellation_token=None)`: Accepts `cancellation_token` and invokes
+     `list_connections` via `call_with_cancellation_token(...)`. This duck-typing wrapper
+     safely injects the token when supported while preserving full backward compatibility
+     with legacy test doubles and third-party managers that do not accept keyword arguments.
+   - `_find_connection(stable_id, cancellation_token=None)`: Passes `cancellation_token`
+     to `_connections(...)` and uses `call_with_cancellation_token(...)` when invoking
+     `get_connection(...)`.
+   - Public entry points (`list_entries`, `resolve_entries`, `import_entries`,
+     `resolve_link`, `refresh_linked_collection`): Accept and forward `cancellation_token`
+     through the helper call chain.
+
+3. **`LibraryPresenter` Safe Token Forwarding**:
+   - `get_connection_record(library_id=None, cancellation_token=None)`: Accepts optional
+     `cancellation_token` and safely delegates to `manager_service.get_connection` via
+     `call_with_cancellation_token(...)`.
+
 ---
 
 ### Non-Modal Status Containers, Error Handling, and Retry (PYPOST-1450, PYPOST-1451)
@@ -564,7 +602,7 @@ failure, retry, cancellation, and isolation coverage:
    - **Dialog Teardown & Worker Join**: Dialog close / reject aborts in-flight discovery and
      performs a bounded `wait(1000)` thread join (adaptive non-blocking teardown tracked in
      [PYPOST-1453](https://pypost.atlassian.net/browse/PYPOST-1453); forwarding cancellation
-     tokens into connection providers tracked in
+     tokens into connection providers completed in
      [PYPOST-1452](https://pypost.atlassian.net/browse/PYPOST-1452); large-scale high-concurrency
      discovery tests tracked in [PYPOST-1517](https://pypost.atlassian.net/browse/PYPOST-1517)).
 7. **Flaky network and corrupted manifests (PYPOST-1426)**:
@@ -743,10 +781,23 @@ Automated test coverage is maintained in:
     environment imports succeed normally.
   - **Clean Worker Thread Termination & Bounded Join**: Closes or rejects dialog during
     active or failing discovery; verifies cooperative worker cancellation, bounded
-    `wait(1000)` thread join, and leak-free teardown (follow-ups
-    [PYPOST-1452](https://pypost.atlassian.net/browse/PYPOST-1452),
+    `wait(1000)` thread join, and leak-free teardown (completed in
+    [PYPOST-1452](https://pypost.atlassian.net/browse/PYPOST-1452); follow-ups
     [PYPOST-1453](https://pypost.atlassian.net/browse/PYPOST-1453),
     [PYPOST-1517](https://pypost.atlassian.net/browse/PYPOST-1517)).
+- `tests/test_forward_cancellation_nested_helpers_repro.py` (PYPOST-1452):
+  - **Nested Cancellation in LibraryManagerService**: Asserts `get_connection`, `read_manifest`,
+    `list_manifest_collections`, and `read_collection` forward tokens and abort before store
+    reloads or manifest disk reads.
+  - **Collaborator Duck-Typing in LibraryCollectionImportService**: Asserts `_connections` and
+    `_find_connection` safely interact with legacy managers lacking `cancellation_token` kwargs
+    via `call_with_cancellation_token`.
+  - **Public Import Entry Points**: Asserts `list_entries`, `resolve_entries`, `import_entries`,
+    `resolve_link`, and `refresh_linked_collection` propagate tokens down into nested helpers.
+  - **Presenter Token Forwarding**: Asserts `LibraryPresenter.get_connection_record` forwards
+    cancellation tokens without raising errors on legacy managers.
+  - **Observability Diagnostics**: Asserts structured debug logging for
+    `library_manager_get_connection_cancelled` and `library_manager_read_manifest_cancelled`.
 - `tests/test_async_manifest_discovery_repro.py`:
   - **Non-Blocking Dialog Init**: Asserts `__init__` returns before a slow
     `list_connections` completes, tracks `_active_discovery_worker`, keeps workspace

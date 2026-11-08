@@ -7,7 +7,7 @@ from pathlib import Path
 import shutil
 from typing import Any, Callable, Optional, cast
 
-from pypost.core.cancellation import CancellationToken
+from pypost.core.cancellation import CancellationToken, OperationCancelledError
 from pypost.core.git_service import GitLibraryService, sanitize_git_url
 from pypost.core.library_connection_store import LibraryConnectionStore
 from pypost.core.library_manifest import find_and_read_manifest, validate_manifest_collections
@@ -65,39 +65,73 @@ class LibraryManagerService:
         cancellation_token: CancellationToken | None = None,
     ) -> list[LibraryConnectionRecord]:
         """Load explicit registrations and discover legacy managed clones."""
-        if cancellation_token is not None:
-            cancellation_token.throw_if_cancellation_requested()
-        records = self.connection_store.load(legacy_base_dir=self.git_service.base_dir)
-        if cancellation_token is not None:
-            cancellation_token.throw_if_cancellation_requested()
-        predefined = self.predefined_library.discover() if self.include_predefined else None
-        self.diagnostics = list(self.connection_store.diagnostics)
-        self.diagnostics.extend(self.predefined_library.diagnostics)
-        if cancellation_token is not None:
-            cancellation_token.throw_if_cancellation_requested()
-        if predefined is not None and all(
-            record.stable_id != predefined.stable_id for record in records
-        ):
-            return [predefined, *records]
-        return records
+        try:
+            if cancellation_token is not None:
+                cancellation_token.throw_if_cancellation_requested()
+            records = self.connection_store.load(legacy_base_dir=self.git_service.base_dir)
+            if cancellation_token is not None:
+                cancellation_token.throw_if_cancellation_requested()
+            predefined = self.predefined_library.discover() if self.include_predefined else None
+            self.diagnostics = list(self.connection_store.diagnostics)
+            self.diagnostics.extend(self.predefined_library.diagnostics)
+            if cancellation_token is not None:
+                cancellation_token.throw_if_cancellation_requested()
+            if predefined is not None and all(
+                record.stable_id != predefined.stable_id for record in records
+            ):
+                return [predefined, *records]
+            return records
+        except OperationCancelledError:
+            logger.debug("library_manager_list_connections_cancelled")
+            raise
 
-    def get_connection(self, stable_id: str) -> Optional[LibraryConnectionRecord]:
+    def get_connection(
+        self,
+        stable_id: str,
+        cancellation_token: CancellationToken | None = None,
+    ) -> Optional[LibraryConnectionRecord]:
         """Return the authoritative current record for one connection."""
-        return next(
-            (record for record in self.list_connections() if record.stable_id == stable_id),
-            None,
-        )
+        try:
+            if cancellation_token is not None:
+                cancellation_token.throw_if_cancellation_requested()
+            logger.debug("library_manager_get_connection_lookup stable_id=%s", stable_id)
+            records = self.list_connections(cancellation_token=cancellation_token)
+            if cancellation_token is not None:
+                cancellation_token.throw_if_cancellation_requested()
+            return next(
+                (record for record in records if record.stable_id == stable_id),
+                None,
+            )
+        except OperationCancelledError:
+            logger.debug(
+                "library_manager_get_connection_cancelled stable_id=%s",
+                stable_id,
+            )
+            raise
 
     def resolve_path(self, record: LibraryConnectionRecord) -> Path:
         """Return the record's exact local path without treating it as a library ID."""
         return record.local_path
 
-    def read_manifest(self, stable_id: str):
+    def read_manifest(
+        self,
+        stable_id: str,
+        cancellation_token: CancellationToken | None = None,
+    ):
         """Read the current manifest for a registered connection."""
-        record = self.get_connection(stable_id)
-        if record is None:
-            raise ValueError("library_invalid: selected library is no longer connected")
-        return find_and_read_manifest(self.resolve_path(record))[0]
+        try:
+            if cancellation_token is not None:
+                cancellation_token.throw_if_cancellation_requested()
+            record = self.get_connection(stable_id, cancellation_token=cancellation_token)
+            if record is None:
+                raise ValueError("library_invalid: selected library is no longer connected")
+            return find_and_read_manifest(self.resolve_path(record))[0]
+        except OperationCancelledError:
+            logger.debug(
+                "library_manager_read_manifest_cancelled stable_id=%s",
+                stable_id,
+            )
+            raise
 
     def list_manifest_collections(
         self,
@@ -107,7 +141,7 @@ class LibraryManagerService:
         """Return collection identities with merged manifest/collection metadata."""
         if cancellation_token is not None:
             cancellation_token.throw_if_cancellation_requested()
-        record = self.get_connection(stable_id)
+        record = self.get_connection(stable_id, cancellation_token=cancellation_token)
         if record is None:
             raise ValueError("library_invalid: selected library is no longer connected")
         root = self.resolve_path(record)
@@ -167,7 +201,7 @@ class LibraryManagerService:
             raise ValueError("collection_missing: selected collection is not declared")
         if cancellation_token is not None:
             cancellation_token.throw_if_cancellation_requested()
-        record = self.get_connection(stable_id)
+        record = self.get_connection(stable_id, cancellation_token=cancellation_token)
         assert record is not None
         return read_collection_file(self.resolve_path(record) / relative_path)
 
