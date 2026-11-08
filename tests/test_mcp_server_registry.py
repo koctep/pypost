@@ -305,7 +305,8 @@ def test_failed_bind_clears_server_thread_after_worker_exits():
                 break
             time.sleep(0.02)
 
-        # Desired: worker clears its own ref on exit (asserts worker cleared _server_thread after failed bind).
+        # Desired: worker clears its own ref on exit (asserts worker cleared
+        # _server_thread after failed bind).
         assert manager._server_thread is None
         assert not manager.is_running()
         assert registry.is_running("alpha-server")

@@ -7,6 +7,8 @@ import logging
 import re
 from typing import Any, Iterable, Mapping, Sequence
 
+from pypost.core.json_selector_engine import JsonSelectorEngine
+
 logger = logging.getLogger(__name__)
 
 HIDDEN_PLACEHOLDER = "***"
@@ -84,8 +86,8 @@ def redact_json_response_fields(
     """Recursively redacts configured keys and selector paths in JSON response text."""
     if not body or not hidden_fields:
         return body
-    selectors = {s.strip() for s in hidden_fields if s and s.strip()}
-    if not selectors:
+    engine = JsonSelectorEngine(hidden_fields)
+    if engine.is_empty:
         return body
     try:
         parsed = json.loads(body)
@@ -101,36 +103,16 @@ def redact_json_response_fields(
             type(parsed).__name__,
         )
         return body
-    masked_count = [0]
-    redacted = _redact_node(parsed, [], selectors, placeholder, masked_count)
+    redacted, masked_count = engine.redact_tree(parsed, placeholder=placeholder)
     logger.debug(
         "redact_json_response_fields_completed selectors_count=%d masked_fields_count=%d",
-        len(selectors),
-        masked_count[0],
+        len(engine._raw_selectors),
+        masked_count,
     )
     return json.dumps(redacted, ensure_ascii=False)
 
 
-def format_path_variants(path: list[str], key: str) -> set[str]:
-    tokens = path + [key]
-    full_dot = ".".join(tokens)
-    shorthand_tokens = [t for t in tokens if t != "*"]
-    shorthand_dot = ".".join(shorthand_tokens)
-
-    wildcard_parts: list[str] = []
-    for t in tokens:
-        if t == "*":
-            if wildcard_parts:
-                wildcard_parts[-1] = f"{wildcard_parts[-1]}[*]"
-            else:
-                wildcard_parts.append("[*]")
-        else:
-            wildcard_parts.append(t)
-    wildcard_dot = ".".join(wildcard_parts)
-
-    return {key, full_dot, shorthand_dot, wildcard_dot}
-
-
+format_path_variants = JsonSelectorEngine.format_path_variants
 _format_path_variants = format_path_variants
 
 
@@ -141,26 +123,9 @@ def _redact_node(
     placeholder: str,
     masked_count: list[int] | None = None,
 ) -> Any:
-    if isinstance(node, dict):
-        res: dict[str, Any] = {}
-        for key, val in node.items():
-            key_str = str(key)
-            variants = _format_path_variants(path, key_str)
-            if any(v in selectors for v in variants):
-                res[key] = placeholder
-                if masked_count is not None:
-                    masked_count[0] += 1
-            else:
-                res[key] = _redact_node(
-                    val, path + [key_str], selectors, placeholder, masked_count
-                )
-        return res
-    if isinstance(node, list):
-        return [
-            _redact_node(item, path + ["*"], selectors, placeholder, masked_count)
-            for item in node
-        ]
-    return node
+    engine = JsonSelectorEngine(selectors)
+    mc = masked_count if masked_count is not None else [0]
+    return engine._redact_node(node, path, placeholder, mc)
 
 
 def _redact_hidden_values(
