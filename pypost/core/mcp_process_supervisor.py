@@ -13,11 +13,30 @@ from typing import Any, Callable, Literal
 
 from pypost.core.mcp_worker_ipc import encode_tools, make_message
 from pypost.core.mcp_worker_process import worker_main
-from pypost.models.settings import McpWorkerRestartPolicy
+from pypost.models.settings import McpResourceLimitsPolicy, McpWorkerRestartPolicy
 
 logger = logging.getLogger(__name__)
 
 WorkerState = Literal["starting", "running", "failed", "stopped"]
+
+
+class McpAdmissionError(ValueError):
+    """Raised when an MCP worker spawn or restart request violates admission limits."""
+
+
+def get_process_rss_mb(pid: int) -> float | None:
+    """Sample resident memory in megabytes from /proc/{pid}/status on Linux."""
+    try:
+        with open(f"/proc/{pid}/status", "r", encoding="utf-8") as f:
+            for line in f:
+                if line.startswith("VmRSS:"):
+                    parts = line.split()
+                    if len(parts) >= 2:
+                        return float(parts[1]) / 1024.0
+    except (FileNotFoundError, ProcessLookupError, PermissionError, OSError, ValueError):
+        return None
+    return None
+
 
 # Aligned with adaptive join / evaluation §4.1.
 DEFAULT_STOP_BUDGET_S = 2.0
@@ -59,6 +78,9 @@ class _WorkerRecord:
     next_retry_deadline: float | None = None
     restarting: bool = False
     cancel_event: threading.Event = field(default_factory=threading.Event)
+    last_rss_sample_at: float = 0.0
+    soft_limit_warned: bool = False
+    rss_mb: float | None = None
 
 
 class McpProcessSupervisor:
@@ -71,6 +93,8 @@ class McpProcessSupervisor:
         on_worker_restarting: Callable[[str, int, float, int | None], None] | None = None,
         on_worker_restarted: Callable[[str, int], None] | None = None,
         restart_policy: McpWorkerRestartPolicy | None = None,
+        resource_limits: McpResourceLimitsPolicy | None = None,
+        rss_sampler: Callable[[int], float | None] | None = None,
         stop_budget_s: float = DEFAULT_STOP_BUDGET_S,
     ) -> None:
         self._ctx = multiprocessing.get_context("spawn")
@@ -84,6 +108,14 @@ class McpProcessSupervisor:
             if restart_policy is not None
             else McpWorkerRestartPolicy()
         )
+        self._resource_limits = (
+            resource_limits.model_copy()
+            if resource_limits is not None
+            else McpResourceLimitsPolicy()
+        )
+        self._memory_sampler: Callable[[int], float | None] = (
+            rss_sampler if rss_sampler is not None else get_process_rss_mb
+        )
         self._stop_budget_s = stop_budget_s
         self._monitor_stop = threading.Event()
         self._monitor_thread = threading.Thread(
@@ -96,6 +128,59 @@ class McpProcessSupervisor:
     @property
     def restart_policy(self) -> McpWorkerRestartPolicy:
         return self._restart_policy
+
+    @property
+    def resource_limits(self) -> McpResourceLimitsPolicy:
+        return self._resource_limits
+
+    def _check_admission(self, instance_id: str, is_restart: bool = False) -> None:
+        policy = self._resource_limits
+        with self._lock:
+            # Active workers are those in starting/running states or currently restarting.
+            # When checking admission for a restarting worker, exclude itself.
+            other_active = [
+                r for iid, r in self._workers.items()
+                if iid != instance_id and (r.state in ("starting", "running") or r.restarting)
+            ]
+            active_count = len(other_active) + 1  # including the candidate worker
+
+            if policy.max_process_workers > 0 and active_count > policy.max_process_workers:
+                action = "restart" if is_restart else "spawn"
+                reason = (
+                    f"Cannot {action} worker '{instance_id}': "
+                    f"active worker limit ({policy.max_process_workers}) reached"
+                )
+                if not is_restart:
+                    logger.warning(
+                        "mcp_worker_spawn_admission_rejected instance_id=%s reason=%s",
+                        instance_id,
+                        reason,
+                    )
+                raise McpAdmissionError(reason)
+
+            if policy.max_total_rss_mb > 0.0:
+                # Sum RSS of active workers (or default estimate if not sampled yet)
+                current_rss = 0.0
+                for r in other_active:
+                    if r.rss_mb is not None:
+                        current_rss += r.rss_mb
+                    else:
+                        current_rss += policy.default_worker_rss_estimate_mb
+                projected_mb = current_rss + policy.default_worker_rss_estimate_mb
+                if projected_mb > policy.max_total_rss_mb:
+                    action = "restart" if is_restart else "spawn"
+                    reason = (
+                        f"Cannot {action} worker '{instance_id}': "
+                        f"projected memory budget ({projected_mb:.1f} MB) "
+                        f"exceeds maximum ({policy.max_total_rss_mb:.1f} MB)"
+                    )
+                    if not is_restart:
+                        logger.warning(
+                            "mcp_worker_spawn_admission_rejected instance_id=%s reason=%s",
+                            instance_id,
+                            reason,
+                        )
+                    raise McpAdmissionError(reason)
 
     def is_restarting(self, instance_id: str) -> bool:
         with self._lock:
@@ -147,6 +232,7 @@ class McpProcessSupervisor:
                 raise RuntimeError(
                     f"MCP worker already running for instance {instance_id}"
                 )
+            self._check_admission(instance_id, is_restart=False)
             parent_conn, child_conn = self._ctx.Pipe(duplex=True)
             process = self._ctx.Process(
                 target=worker_main,
@@ -680,6 +766,73 @@ class McpProcessSupervisor:
                                 )
                                 readers_to_stop.append(record)
 
+                    # 4. Periodic memory sampling and ceiling enforcement
+                    if (
+                        record.state == "running"
+                        and not record.restarting
+                        and record.process is not None
+                        and record.process.is_alive()
+                    ):
+                        pid = record.process.pid
+                        if (
+                            pid is not None
+                            and (now - record.last_rss_sample_at)
+                            >= self._resource_limits.memory_sample_interval_s
+                        ):
+                            record.last_rss_sample_at = now
+                            rss = self._memory_sampler(pid)
+                            record.rss_mb = rss
+                            if rss is not None:
+                                if (
+                                    self._resource_limits.soft_memory_limit_mb > 0.0
+                                    and rss >= self._resource_limits.soft_memory_limit_mb
+                                ):
+                                    if not record.soft_limit_warned:
+                                        logger.warning(
+                                            "mcp_worker_memory_warning instance_id=%s pid=%d "
+                                            "rss_mb=%.1f soft_limit_mb=%.1f",
+                                            instance_id,
+                                            pid,
+                                            rss,
+                                            self._resource_limits.soft_memory_limit_mb,
+                                        )
+                                        record.soft_limit_warned = True
+                                elif (
+                                    self._resource_limits.soft_memory_limit_mb > 0.0
+                                    and rss < self._resource_limits.soft_memory_limit_mb
+                                ):
+                                    record.soft_limit_warned = False
+
+                                if (
+                                    self._resource_limits.hard_memory_limit_mb > 0.0
+                                    and rss >= self._resource_limits.hard_memory_limit_mb
+                                ):
+                                    logger.error(
+                                        "mcp_worker_memory_exceeded instance_id=%s pid=%d "
+                                        "rss_mb=%.1f hard_limit_mb=%.1f",
+                                        instance_id,
+                                        pid,
+                                        rss,
+                                        self._resource_limits.hard_memory_limit_mb,
+                                    )
+                                    record.state = "failed"
+                                    record.last_error = "memory_limit_exceeded"
+                                    record.restarting = False
+                                    record.cancel_event.set()
+                                    record.next_retry_deadline = None
+                                    proc_to_kill = record.process
+                                    try:
+                                        if proc_to_kill.is_alive():
+                                            proc_to_kill.terminate()
+                                            proc_to_kill.join(timeout=0.2)
+                                            if proc_to_kill.is_alive():
+                                                proc_to_kill.kill()
+                                                proc_to_kill.join(timeout=0.2)
+                                    except Exception:
+                                        pass
+                                    readers_to_stop.append(record)
+                                    unexpected.append((instance_id, proc_to_kill.exitcode))
+
             # Stop dead readers outside the lock
             for rec in readers_to_stop:
                 self._stop_reader(rec)
@@ -724,6 +877,28 @@ class McpProcessSupervisor:
             return
         spec = record.spec
         if spec is None:
+            return
+
+        try:
+            self._check_admission(instance_id, is_restart=True)
+        except McpAdmissionError as err:
+            logger.error(
+                "mcp_worker_restart_admission_rejected instance_id=%s reason=%s",
+                instance_id,
+                err,
+            )
+            with self._lock:
+                record.state = "failed"
+                record.restarting = False
+                record.last_error = str(err)
+                record.next_retry_deadline = None
+            if self._on_unexpected_exit is not None:
+                try:
+                    self._on_unexpected_exit(instance_id, None)
+                except Exception:
+                    logger.exception(
+                        "mcp_supervisor_unexpected_exit_callback_error"
+                    )
             return
 
         with self._lock:

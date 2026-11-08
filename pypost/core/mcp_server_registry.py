@@ -31,6 +31,7 @@ from pypost.core.template_service import TemplateService
 from pypost.models.library_manager import LibraryConnectionRecord
 from pypost.models.models import Collection, Environment
 from pypost.models.settings import (
+    McpResourceLimitsPolicy,
     McpServerConfiguration,
     McpWorkerRestartPolicy,
 )
@@ -99,6 +100,7 @@ class MCPServerRegistry(QObject):
         builtin_view: BuiltinCollectionView | None = None,
         execution_mode: Literal["thread", "process"] = "thread",
         restart_policy: McpWorkerRestartPolicy | None = None,
+        resource_limits: McpResourceLimitsPolicy | None = None,
     ) -> None:
         super().__init__()
         if execution_mode not in ("thread", "process"):
@@ -118,6 +120,11 @@ class MCPServerRegistry(QObject):
             if restart_policy is not None
             else None
         )
+        self._resource_limits = (
+            resource_limits.model_copy()
+            if resource_limits is not None
+            else McpResourceLimitsPolicy()
+        )
         self._configurations: dict[str, McpServerConfiguration] = {}
         self._managers: dict[str, MCPServerManager] = {}
         self._runners: dict[str, ThreadServerRunner | ProcessServerRunner] = {}
@@ -136,11 +143,16 @@ class MCPServerRegistry(QObject):
                 on_worker_restarting=self._on_worker_restarting,
                 on_worker_restarted=self._on_worker_restarted,
                 restart_policy=self._restart_policy,
+                resource_limits=self._resource_limits,
             )
 
     @property
     def restart_policy(self) -> McpWorkerRestartPolicy | None:
         return self._restart_policy
+
+    @property
+    def resource_limits(self) -> McpResourceLimitsPolicy | None:
+        return self._resource_limits
 
     def get(self, instance_id: str) -> McpServerConfiguration | None:
         """Return the configuration for instance_id, or None if not found."""
@@ -1464,6 +1476,7 @@ class MCPServerRegistry(QObject):
                 on_worker_restarting=self._on_worker_restarting,
                 on_worker_restarted=self._on_worker_restarted,
                 restart_policy=self._restart_policy,
+                resource_limits=self._resource_limits,
             )
         runner = ProcessServerRunner(
             instance_id,
@@ -1590,17 +1603,22 @@ class MCPServerRegistry(QObject):
             None if current is None else current.state,
         )
         runner = self._runners.get(instance_id)
+        last_error = None
         if isinstance(runner, ProcessServerRunner):
-            runner.mark_failed(
-                f"unexpected worker exit (exitcode={exitcode})"
-            )
+            last_error = runner.supervisor.last_error(runner.worker_id)
+            err_msg = last_error or f"unexpected worker exit (exitcode={exitcode})"
+            runner.mark_failed(err_msg)
         if current is not None and current.state == "stopped":
             return
+        failure_msg = (
+            f"{instance_id} on port {port}: {last_error}"
+            if last_error
+            else f"{instance_id} on port {port}: unexpected worker exit (exitcode={exitcode})"
+        )
         self._set_status(
             instance_id,
             "failed",
-            f"{instance_id} on port {port}: unexpected worker exit "
-            f"(exitcode={exitcode})",
+            failure_msg,
         )
 
     def _new_manager(self, instance_id: str, port: int) -> MCPServerManager:

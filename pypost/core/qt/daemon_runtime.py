@@ -129,6 +129,7 @@ class DaemonRuntime(QObject):
                 template_service=TemplateService(metrics),
                 execution_mode=settings.mcp_execution_mode,
                 restart_policy=settings.mcp_restart_policy,
+                resource_limits=settings.mcp_resource_limits,
             )
             for configuration in enabled:
                 registry.upsert(configuration.model_copy(deep=True))
