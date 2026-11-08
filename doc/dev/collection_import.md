@@ -121,6 +121,13 @@ wait. Listing and candidate resolution observe an optional `cancellation_token` 
 checkpoints. See [Teardown lifecycle policy](#teardown-lifecycle-policy-pypost-1264) and
 [Library-backed import](#library-backed-import-pypost-1279).
 
+**PYPOST-1494** introduces dedicated Qt-free unit tests for cooperative cancellation checkpoints
+across the library collection import lifecycle
+(`tests/test_library_import_cancel_checkpoints_repro.py`). The suite operates purely in memory
+with `CancellationTokenSource`, verifying fast (~1.2s), deterministic `OperationCancelledError`
+raising at loop boundaries without initializing Qt or background threads. See [Cancellation
+checkpoints unit testing (PYPOST-1494)](#cancellation-checkpoints-unit-testing-pypost-1494).
+
 ## Library-backed import (PYPOST-1279)
 
 ### Architecture
@@ -158,6 +165,45 @@ zero-arg lambda rejects the kwarg. Cooperative cancel emits `operation_cancelled
 `operation_failed`) and returns the import action to `IDLE`. Cancellation is checkpoint-based:
 a single stuck OS or network call can still miss the bounded final join and yield unclean
 teardown within the caller budget.
+
+### Cancellation checkpoints unit testing (PYPOST-1494)
+
+While PYPOST-1324 established integration-level worker interruption and teardown lifecycle
+contracts, **PYPOST-1494** adds focused, Qt-free unit test coverage for the intermediate
+cooperative cancellation checkpoints in
+`tests/test_library_import_cancel_checkpoints_repro.py`.
+
+Testing operates purely in memory using `CancellationTokenSource` and lightweight test doubles
+(`_FakeLibraryManager`, synchronous `tmp_path` fixtures) without initializing Qt widgets,
+`QApplication`, or background `QThread` workers. The suite runs deterministically in ~1.2s and
+verifies that `OperationCancelledError` is raised promptly at loop boundaries rather than completing
+unnecessary work:
+
+- **`list_entries`**:
+  - *Connection loop pre-cancel*: A pre-cancelled token halts listing immediately before inspecting
+    any connection, without calling `find_and_read_manifest`.
+  - *Connection loop mid-loop cancel*: Cancelling the token during processing of the first library
+    connection halts execution before the second connection is processed.
+  - *Manifest collection paths loop mid-cancel*: Cancelling the token during the first manifest
+    collection path stops before subsequent collection paths are loaded.
+- **`resolve_entries`**:
+  - *Selected entries loop pre-cancel*: A pre-cancelled token halts resolution immediately before
+    reading or parsing any selected entry.
+  - *Selected entries loop mid-loop cancel*: Cancelling the token during resolution of the first
+    entry aborts processing before the second entry is loaded.
+- **`CollectionImportActions._resolve_library_candidates`**:
+  - *Pre-resolution token check*: Pre-cancelled token raises `OperationCancelledError` before
+    calling `service.resolve_entries`.
+  - *Candidate materialization loop mid-cancel*: Cancelling during candidate materialization
+    halts the loop between candidates, ensuring partially materialized lists are discarded and
+    subsequent candidates are not materialized.
+- **Baseline uncancelled operation contract**:
+  - With an uncancelled token, `list_entries`, `resolve_entries`, and `_resolve_library_candidates`
+    run to completion across all connections, entries, and candidates with zero errors.
+
+```bash
+make test WORKERS=1 PYTEST_ARGS="tests/test_library_import_cancel_checkpoints_repro.py"
+```
 
 ### Usage and API
 
@@ -585,6 +631,10 @@ policy; it always uses the actions' default.
 - **`tests/test_library_operation_interrupt_repro.py`** (PYPOST-1324, `timeout(30)`) — teardown
   calls library `cancel()` then bounded final join; cancel-aware op stops cleanly; cancel-
   ignoring op stays within the caller budget.
+- **`tests/test_library_import_cancel_checkpoints_repro.py`** (PYPOST-1494, Qt-free,
+  `timeout(30)`) — isolated in-memory unit tests verifying cooperative cancellation checkpoints
+  in `list_entries`, `resolve_entries`, and `_resolve_library_candidates` without Qt or background
+  threads.
 - **`tests/test_collection_import_teardown_budget_repro.py`** (Step 3 repro, `timeout(30)`) —
   test A (`test_teardown_requested_waits_fit_caller_budget`, spies whose `wait(ms)` really
   sleeps): requested waits sum to at most the budget; test B
@@ -612,7 +662,8 @@ Run the fast modules and the slow measurement through Make:
 make test WORKERS=1 PYTEST_ARGS="tests/test_collection_import_lifecycle_policy.py \
   tests/test_collection_import_teardown_policy.py \
   tests/test_collection_import_teardown_budget_repro.py \
-  tests/test_library_operation_interrupt_repro.py"
+  tests/test_library_operation_interrupt_repro.py \
+  tests/test_library_import_cancel_checkpoints_repro.py"
 make test-slow PYTEST_ARGS="tests/test_collection_import_teardown_latency.py -m slow -s"
 ```
 
@@ -2032,6 +2083,20 @@ Follow-ups from [PYPOST-1264 technical debt](../../ai-tasks/PYPOST-1264/60-tech-
 - **[PYPOST-1327](https://pypost.atlassian.net/browse/PYPOST-1327)** (Low) — public teardown
   observation seam instead of patching `_wait_idle_until`; decide whether `budget_tolerance_ms`
   is checked anywhere.
+
+Follow-ups from [PYPOST-1324 technical debt](../../ai-tasks/PYPOST-1324/60-tech-debt.md):
+
+- **[PYPOST-1494](https://pypost.atlassian.net/browse/PYPOST-1494)** — done: Qt-free unit tests
+  verifying cooperative cancellation checkpoints in `list_entries`, `resolve_entries`, and
+  `_resolve_library_candidates` (`tests/test_library_import_cancel_checkpoints_repro.py`). See
+  [Cancellation checkpoints unit testing
+  (PYPOST-1494)](#cancellation-checkpoints-unit-testing-pypost-1494).
+- **[PYPOST-1495](https://pypost.atlassian.net/browse/PYPOST-1495)** (Low) — type annotation
+  tightening for `cancellation_token` in `CollectionImportActions`.
+- **[PYPOST-1496](https://pypost.atlassian.net/browse/PYPOST-1496)** (Low) — clean up
+  `AttributeError` exception handler in `operation_cancelled.disconnect`.
+- **[PYPOST-1497](https://pypost.atlassian.net/browse/PYPOST-1497)** (Low) — add cooperative
+  cancellation and teardown interrupt support to `LibraryPresenter`.
 
 ### Pre-existing baseline failures
 
