@@ -104,6 +104,7 @@ conventions.
 1. [JSON Syntax Highlighting](json_syntax_highlighting.md)
 1. [Hidden Response Fields Architecture and Decomposition (PYPOST-1312 / PYPOST-1376)](hidden_response_fields.md)
 1. [Unified JSON Selector Path Evaluation Engine (PYPOST-1394)](json_selector_engine.md)
+1. [Background Worker Thread Formatting for Medium JSON Response Masking (PYPOST-1396)](response_mask_worker.md)
 1. [Shared Foldable Plain Text Edit Base Class (PYPOST-1365 / PYPOST-1369)](foldable_plain_text_edit.md)
 1. [Background Folding Scanner for Large Documents (PYPOST-1365 / PYPOST-1370)](background_folding_scanner.md)
 1. [Code Folding Stress and Edge-Case Payload Test Suite (PYPOST-1365 / PYPOST-1371)](folding_stress_and_edge_cases.md)
