@@ -33,7 +33,7 @@ MCPServerRegistry(execution_mode=...)
 
 | Component | Module | Role |
 | --- | --- | --- |
-| Setting | `pypost/models/settings.py` | `mcp_execution_mode`, `mcp_restart_policy` |
+| Setting | `pypost/models/settings.py` | `mcp_execution_mode`, restart, `mcp_resource_limits` |
 | Registry | `pypost/core/mcp_server_registry.py` | Selects runner; routes recovery transitions and exits |
 | Protocol / runners | `pypost/core/mcp_server_runner.py` | `MCPServerRunnerProtocol`, `ThreadServerRunner`, `ProcessServerRunner` |
 | Supervisor | `pypost/core/mcp_process_supervisor.py` | Process table, IPC, STOP→SIGTERM→SIGKILL, backoff |
@@ -106,6 +106,43 @@ registry = MCPServerRegistry(
 
 The restart policy defaults to disabled (`enabled=False`), maintaining backwards-compatible
 immediate crash containment (where child crashes transition directly to `failed`).
+
+### `mcp_resource_limits` (PYPOST-1469)
+
+Isolated process-mode workers support configurable memory ceilings and spawn admission
+control via `AppSettings.mcp_resource_limits`:
+
+| Field | Type | Default | Description |
+| --- | --- | --- | --- |
+| `max_process_workers` | `int` | `0` | Active worker limit (`0` to `100`; `0` is unlimited). |
+| `max_total_rss_mb` | `float` | `0.0` | Total RSS budget in MB (`>= 0.0`; `0.0` is unlimited). |
+| `soft_memory_limit_mb` | `float` | `0.0` | Warning threshold in MB (`>= 0.0`; `0.0` disabled). |
+| `hard_memory_limit_mb` | `float` | `0.0` | Kill threshold in MB (`>= 0.0`; `0.0` disabled). |
+| `memory_sample_interval_s` | `float` | `1.0` | Memory sampling interval in seconds (`> 0.0`). |
+| `default_worker_rss_estimate_mb` | `float` | `50.0` | Estimated RSS for spawns (`> 0.0`). |
+
+```python
+from pypost.models.settings import AppSettings, McpResourceLimitsPolicy
+from pypost.core.mcp_server_registry import MCPServerRegistry
+
+limits = McpResourceLimitsPolicy(
+    max_process_workers=4,
+    max_total_rss_mb=512.0,
+    soft_memory_limit_mb=128.0,
+    hard_memory_limit_mb=256.0,
+    memory_sample_interval_s=1.0,
+    default_worker_rss_estimate_mb=50.0,
+)
+settings = AppSettings(mcp_execution_mode="process", mcp_resource_limits=limits)
+registry = MCPServerRegistry(
+    execution_mode=settings.mcp_execution_mode,
+    resource_limits=settings.mcp_resource_limits,
+)
+```
+
+Cross-field validation enforces `hard_memory_limit_mb >= soft_memory_limit_mb` whenever both
+thresholds are enabled (> 0.0). By default, resource limits are unconstrained (0 / 0.0),
+maintaining backward-compatible operation.
 
 ### Environment gates (test / debug only)
 
@@ -453,6 +490,88 @@ and tool parameter schemas are never logged.
 
 ---
 
+## Resource limits and spawn admission (PYPOST-1469)
+
+Process mode provides host protection via configurable per-worker memory ceilings and
+admission control on `McpProcessSupervisor`. This prevents runaway memory leaks or excess
+spawns from starving peer services or triggering operating system OOM kills.
+
+### Spawn admission gate (`McpAdmissionError`)
+
+Before creating child processes or IPC pipes in `spawn_worker`, the supervisor validates
+available capacity via `_check_admission(instance_id)`:
+
+1. **Active worker count**: Counts all workers currently in `starting`, `running`, or
+   `restarting` states. If `max_process_workers > 0` and active count exceeds the cap,
+   spawn is rejected.
+2. **Projected memory budget**: If `max_total_rss_mb > 0.0`, sums sampled resident memory
+   (`rss_mb`) of all other active workers (using `default_worker_rss_estimate_mb` when not yet
+   sampled) plus `default_worker_rss_estimate_mb` for the candidate. If the projected total
+   exceeds `max_total_rss_mb`, spawn is rejected.
+3. **Actionable failure**: Rejections raise `McpAdmissionError` (a `ValueError` subclass)
+   and log `mcp_worker_spawn_admission_rejected` at `WARNING` level with instance and reason.
+   Active running peers continue serving requests without disruption.
+
+### Periodic Linux procfs memory sampling
+
+The supervisor monitor loop (`_monitor_loop`) periodically samples child resident memory:
+
+- **Linux procfs sampling**: Reads `VmRSS` from `/proc/{pid}/status` in megabytes. Incurs
+  sub-millisecond overhead without forking helper processes or invoking C-extensions.
+- **Fail-safe fallback**: Transient read errors or non-Linux platforms return safe `None`
+  without interrupting the supervisor monitor loop.
+- **Configurable interval**: `memory_sample_interval_s` (default 1.0s) throttles sampling
+  frequency to minimize CPU overhead.
+- **Test injection**: An injectable `rss_sampler` callable allows unit tests to simulate
+  arbitrary memory usage profiles deterministically.
+
+### Soft warnings and hard threshold escalation
+
+The supervisor enforces dual memory thresholds on active workers:
+
+- **Soft warning (`soft_memory_limit_mb`)**:
+  - When worker RSS meets or exceeds `soft_memory_limit_mb`, the supervisor emits
+    `mcp_worker_memory_warning` at `WARNING` level with `instance_id`, `pid`, `rss_mb`,
+    and `soft_limit_mb`.
+  - A stateful hysteresis flag (`soft_limit_warned`) ensures warnings fire exactly once per
+    threshold crossing. The flag resets if RSS drops back below the soft limit.
+  - The worker process continues running and serving requests normally.
+- **Hard threshold escalation (`hard_memory_limit_mb`)**:
+  - When worker RSS meets or exceeds `hard_memory_limit_mb`, the supervisor logs
+    `mcp_worker_memory_exceeded` at `ERROR` level.
+  - The supervisor escalates termination immediately: `process.terminate()` (SIGTERM),
+    joins briefly, and issues `process.kill()` (SIGKILL) if still alive.
+  - Sets worker state to `failed` with reason `memory_limit_exceeded`, cancels pending
+    restarts (`cancel_event.set()`), and notifies the registry via unexpected exit.
+
+### Auto-restart recovery harmonization
+
+Auto-restart and admission control work cooperatively to prevent restart thrashing:
+
+- When an auto-restart backoff delay expires in `_attempt_restart`, the supervisor checks
+  admission (`_check_admission(instance_id, is_restart=True)`) before respawning.
+- If the worker cap or aggregate memory budget is exhausted, `McpAdmissionError` is caught.
+- The supervisor logs `mcp_worker_restart_admission_rejected` at `ERROR` level, cancels
+  further retries (`restarting = False`, `next_retry_deadline = None`), marks the worker
+  `failed` with the admission error message, and invokes `on_unexpected_exit`.
+- This halts exponential backoff cycles gracefully rather than looping indefinitely under
+  resource exhaustion.
+
+### Observability log events
+
+Supervisor resource limit operations emit structured key-value events:
+
+| Event Name | Level | Key Fields | Description |
+| --- | --- | --- | --- |
+| `mcp_worker_spawn_admission_rejected` | WARN | `instance_id` | Spawn admission rejected |
+| `mcp_worker_memory_warning` | WARN | `instance_id`, `pid` | Soft limit warning emitted |
+| `mcp_worker_memory_exceeded` | ERROR | `instance_id`, `pid` | Hard ceiling SIGTERM/KILL |
+| `mcp_worker_restart_admission_rejected` | ERROR | `instance_id` | Restart halted by limits |
+
+Events strictly omit sensitive runtime data (no payload bodies, variables, or tokens).
+
+---
+
 ## Troubleshooting
 
 | Symptom | Likely cause | Resolution |
@@ -467,6 +586,10 @@ and tool parameter schemas are never logged.
 | Crash loop / retries exhausted | Crashes exceeded `max_retries` | Check logs, fix fault, and restart |
 | Startup failure not retried | Fast startup failure (`FR7`) | Verify port free, valid address, and imports |
 | Pending restart delay | Exponential backoff active | Wait for delay or call stop to abort |
+| Spawn rejected (`McpAdmissionError`) | Cap/budget reached | Stop idle servers or raise limits |
+| Memory warning in logs | Worker RSS exceeded soft limit | Inspect memory; recycle or tune limit |
+| Killed: `memory_limit_exceeded` | RSS exceeded hard limit | Killed via SIGKILL; check leak |
+| Restart halted by admission | Limits exceeded in backoff | Resolve pressure; restart when free |
 
 For a rejected live edit, inspect `mcp_registry_process_reconfigure_rejected`: the `phase`,
 `restored`, and `cleaned` fields distinguish startup, reclamation, and restoration outcomes
@@ -485,6 +608,7 @@ make test WORKERS=1 PYTEST_ARGS="tests/test_mcp_process_reconfigure_repro.py -q"
 make test WORKERS=1 PYTEST_ARGS="tests/test_mcp_process_proxy_repro.py -q"
 make test WORKERS=1 PYTEST_ARGS="tests/test_mcp_process_tool_refresh_repro.py -q"
 make test WORKERS=1 PYTEST_ARGS="tests/test_mcp_process_autorestart_repro.py -q"
+make test WORKERS=1 PYTEST_ARGS="tests/test_mcp_process_resource_limits_repro.py -q"
 make test PYTEST_ARGS="tests/test_mcp_multiserver_stress_10x.py"
 ```
 
@@ -512,6 +636,15 @@ verifies the 7 acceptance criteria:
 6. Immediate backoff cancellation upon operator `stop_worker` and supervisor `shutdown`.
 7. Fast startup failure bypass: initial bind errors fail immediately without triggering restart.
 8. Observability structured logging and secret safety assertions verified via `caplog`.
+Resource limits and admission coverage (`tests/test_mcp_process_resource_limits_repro.py`,
+PYPOST-1469) verifies the 7 acceptance criteria:
+1. `AppSettings.mcp_resource_limits` defaults, field bounds, and cross-field validation.
+2. Default unlimited policy allows worker spawns without admission rejection.
+3. Active worker count cap (`max_process_workers`) rejects excess spawns with `McpAdmissionError`.
+4. Aggregate memory budget (`max_total_rss_mb`) rejects excess spawns based on projected RSS.
+5. Soft memory limit emits `mcp_worker_memory_warning` once without killing the worker.
+6. Hard memory limit triggers `SIGTERM` -> `SIGKILL` escalation, setting `memory_limit_exceeded`.
+7. Admission exhaustion during auto-restart backoff halts recovery cycles gracefully.
 
 ---
 
