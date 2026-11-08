@@ -6,16 +6,18 @@ two-way commit/push flows, cloning, and error mapping for desktop UI views.
 from __future__ import annotations
 
 import logging
+import time
 from hashlib import sha256
 from collections.abc import Callable
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple, cast
 
-from PySide6.QtCore import QObject, Signal
+from PySide6.QtCore import QCoreApplication, QObject, Signal
 
 from pypost.core.cancellation import (
     CancellationToken,
+    adaptive_thread_join,
     call_with_cancellation_token,
 )
 from pypost.core.git_service import GitLibraryService
@@ -101,6 +103,8 @@ class LibraryPresenter(QObject):
     operation_started = Signal(str)  # operation name
     operation_completed = Signal(object)  # GitOperationResult
     operation_failed = Signal(object)  # GitDiagnosticError | Exception
+    operation_cancelled = Signal(str)  # operation name
+    operation_cancelled_for_library = Signal(str, str)  # library ID, operation
     operation_state_changed = Signal(str, str, bool)  # library ID, operation, active
     entries_loaded = Signal(list)
     entry_updated = Signal(str, object)
@@ -160,6 +164,12 @@ class LibraryPresenter(QObject):
         self._active_operations: set[tuple[str, str]] = set()
         self._workers: Dict[tuple[str, str], LibraryOperationWorker] = {}
         self._status_cache: Dict[str, object] = {}
+        self._torn_down: bool = False
+
+    @property
+    def is_torn_down(self) -> bool:
+        """Return True if presenter has been torn down."""
+        return self._torn_down
 
     @property
     def selected_library_id(self) -> Optional[str]:
@@ -818,6 +828,16 @@ class LibraryPresenter(QObject):
             type(error).__name__,
         )
 
+    def _operation_cancelled(self, library_id: str, operation: str) -> None:
+        """Record a cancelled operation in metrics and logs without sensitive payload."""
+        safe_id = self._safe_operation_id(library_id)
+        self._metrics.track_gui_library_operation(operation, "cancelled")
+        logger.info(
+            "library_presenter_operation_cancelled library_id=%s operation=%s",
+            safe_id,
+            operation,
+        )
+
     def _operation_rejected(self, library_id: str, operation: str) -> None:
         """Record a rejected operation without exposing rejection details."""
         safe_id = self._safe_operation_id(library_id)
@@ -856,7 +876,7 @@ class LibraryPresenter(QObject):
         **kwargs: object,
     ) -> bool:
         """Run one admitted operation in a worker and report completion on the GUI thread."""
-        if not self.request_operation(library_id, operation):
+        if self._torn_down or not self.request_operation(library_id, operation):
             self._operation_rejected(library_id, operation)
             return False
         key = (library_id, operation)
@@ -869,12 +889,119 @@ class LibraryPresenter(QObject):
             lambda result: self._worker_succeeded(key, result)
         )
         worker.operation_failed.connect(lambda error: self._worker_failed(key, error))
+        worker.operation_cancelled.connect(lambda: self._worker_cancelled(key))
         worker.finished.connect(lambda: self._workers.pop(key, None))
         worker.start()
         return True
 
+    def _worker_cancelled(self, key: tuple[str, str]) -> None:
+        """Handle cooperative cancellation signal from a library operation worker."""
+        self.finish_operation(*key)
+        library_id, operation = key
+        self._operation_cancelled(library_id, operation)
+        self.operation_cancelled.emit(operation)
+        self.operation_cancelled_for_library.emit(library_id, operation)
+
+    def cancel_operation(self, library_id: str, operation: str) -> bool:
+        """Cooperatively cancel one active background library operation.
+
+        Args:
+            library_id: Identifier of the target library.
+            operation: Name of the operation to cancel (e.g., 'pull', 'refresh').
+
+        Returns:
+            True if an active worker was found and cancellation requested;
+            False if no active worker matched the library and operation.
+        """
+        key = (library_id, operation)
+        worker = self._workers.get(key)
+        if worker is not None and worker.isRunning():
+            worker.cancel()
+            safe_id = self._safe_operation_id(library_id)
+            logger.info(
+                "library_presenter_operation_cancelling library_id=%s operation=%s",
+                safe_id,
+                operation,
+            )
+            return True
+        return False
+
+    def cancel_all_operations(self, timeout_ms: int = 1000) -> bool:
+        """Request cooperative cancellation for all active background operations.
+
+        Args:
+            timeout_ms: Maximum total time in milliseconds to wait for active workers
+                to terminate. If timeout_ms <= 0, cancellation is requested asynchronously
+                without waiting.
+
+        Returns:
+            True if all workers terminated cleanly within timeout_ms (or if no workers
+            were active); False if any worker was still running when the timeout elapsed.
+        """
+        running_workers = [
+            (key, worker)
+            for key, worker in list(self._workers.items())
+            if worker.isRunning()
+        ]
+        if not running_workers:
+            return True
+
+        for (lib_id, op), worker in running_workers:
+            worker.cancel()
+            safe_id = self._safe_operation_id(lib_id)
+            logger.info(
+                "library_presenter_operation_cancelling library_id=%s operation=%s",
+                safe_id,
+                op,
+            )
+
+        if timeout_ms <= 0:
+            return all(not worker.isRunning() for _, worker in running_workers)
+
+        deadline = time.monotonic() + (timeout_ms / 1000.0)
+        all_joined = True
+        for _, worker in running_workers:
+            remaining = max(0.0, deadline - time.monotonic())
+            if not adaptive_thread_join(worker, timeout=remaining):
+                all_joined = False
+
+        app = QCoreApplication.instance()
+        if app is not None:
+            app.processEvents()
+
+        return all_joined
+
+    def teardown(self, timeout_ms: int = 1000) -> None:
+        """Tear down presenter, cancelling all background workers and releasing admission state.
+
+        Idempotent: safe to invoke multiple times without error.
+
+        Args:
+            timeout_ms: Maximum milliseconds to wait for in-flight workers to exit.
+        """
+        if self._torn_down:
+            return
+        self._torn_down = True
+        logger.info(
+            "library_presenter_teardown_started timeout_ms=%d active_ops=%d",
+            timeout_ms,
+            len(self._active_operations),
+        )
+        self.cancel_all_operations(timeout_ms=timeout_ms)
+        for lib_id, op in list(self._active_operations):
+            self.operation_state_changed.emit(lib_id, op, False)
+        self._active_operations.clear()
+        self._workers.clear()
+        logger.info("library_presenter_teardown_completed")
+
+    def close(self, timeout_ms: int = 1000) -> None:
+        """Convenience alias for teardown."""
+        self.teardown(timeout_ms=timeout_ms)
+
     def _worker_succeeded(self, key: tuple[str, str], result: object) -> None:
         self.finish_operation(*key)
+        if self._torn_down:
+            return
         library_id, operation = key
         if isinstance(result, LibraryOperationGuard) and result.is_blocked:
             self._operation_blocked(library_id, operation)
@@ -911,6 +1038,8 @@ class LibraryPresenter(QObject):
 
     def _worker_failed(self, key: tuple[str, str], error: object) -> None:
         self.finish_operation(*key)
+        if self._torn_down:
+            return
         self._operation_failed(key[0], key[1], error)
         self._mark_operation_error(key[0], error)
         self.operation_failed.emit(error)

@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any, List, Optional
 
 from PySide6.QtCore import Qt
+from PySide6.QtGui import QCloseEvent
 from PySide6.QtWidgets import (
     QComboBox,
     QDialog,
@@ -701,3 +702,18 @@ class LibraryManagerDialog(QDialog):
         )
         if reply == QMessageBox.StandardButton.Yes:
             self.presenter.delete_library_async(lib_id, confirmed=True)
+
+    def closeEvent(self, event: QCloseEvent) -> None:
+        """Cooperatively tear down presenter and in-flight workers on dialog close."""
+        self._closing = True
+        try:
+            self.presenter.teardown()
+            super().closeEvent(event)
+        finally:
+            self._closing = False
+
+    def reject(self) -> None:
+        """Cooperatively tear down presenter and in-flight workers on dialog dismissal."""
+        if not getattr(self, "_closing", False):
+            self.presenter.teardown()
+        super().reject()
