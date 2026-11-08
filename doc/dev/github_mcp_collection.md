@@ -97,6 +97,30 @@ use `to_json` (PYPOST-1343) so JSON types are preserved without Jinja loops or l
 - `github_cancel_workflow_run` sends a static `{}`. `github_rerun_workflow_run` with no
   arguments renders `{ }`. Both are sent as `json={}`.
 
+### Response field masking (PYPOST-1395)
+
+Request `github-get-authenticated-user` (`GET /user`) configures `hidden_response_fields`:
+
+```json
+"hidden_response_fields": [
+  "email",
+  "two_factor_authentication",
+  "plan.name"
+]
+```
+
+This demonstrates best practices for field-level secret and PII masking across both interactive
+desktop GUI and autonomous MCP tool execution:
+- **Bare keys (`email`, `two_factor_authentication`)**: Mask the user's primary email address
+  and two-factor authentication security status.
+- **Dotted path (`plan.name`)**: Targets the nested billing plan name (`plan.name`) while leaving
+  non-sensitive sibling quota properties unredacted.
+- **Dual-surface safety**: In MCP output, values are irreversibly redacted to `***`. In GUI
+  `ResponseView`, values render with dashed underlines and support click-to-reveal.
+- **Contract verification**: Automated offline assertions run in
+  `tests/test_reference_collection_masking_contract.py`. See
+  [Hidden Response Fields Architecture](hidden_response_fields.md).
+
 ## Empty-body write success (PYPOST-1345)
 
 GitHub documents three Actions writes as success with **no response body**. The MCP runtime
@@ -469,6 +493,7 @@ There is no live GitHub test. Catalog accuracy depends on a person re-reviewing
 
 ## See also
 
+- [Hidden Response Fields Architecture](hidden_response_fields.md)
 - [HTTP Path Segment Rejection](http_path_segment_rejection.md)
 - [GitLab MCP Example Collection](gitlab_mcp_collection.md)
 - [Examples Collection Library & Legacy Fixtures](examples_library_format.md)

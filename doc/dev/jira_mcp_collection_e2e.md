@@ -40,6 +40,19 @@ Committed Jira collection -> MCP server -> RequestService -> HTTPClient
 This is deliberately different from agent UI e2e HTTP stubs, which patch
 `send_request` and therefore do not exercise outbound socket dispatch.
 
+### Response field masking (PYPOST-1395)
+
+Requests in `examples/collections/jira_mcp.json` configure `hidden_response_fields`
+to mask sensitive Atlassian account identity and email PII:
+- `jira-get-current-user` (`GET /rest/api/3/myself`): bare keys `["emailAddress", "accountId"]`
+- `jira-search-assignable-users` (`GET /rest/api/3/user/assignable/search`): root array wildcard
+  paths `["[*].emailAddress", "[*].accountId"]`
+
+In MCP execution, these attributes are irreversibly masked to `***`. In GUI sessions,
+they render with interactive click-to-reveal underlines. Automated contract coverage
+runs in `tests/test_reference_collection_masking_contract.py`. See
+[Hidden Response Fields Architecture](hidden_response_fields.md).
+
 ## Usage
 
 Run the focused pack from the repository root:
@@ -88,3 +101,11 @@ from routine CI and requires protected environment configuration.
 - **Loopback server shutdown fails:** Treat it as a test-fixture lifecycle
   defect. Preserve the context-manager cleanup and bounded thread join rather
   than adding an unbounded wait.
+
+## See also
+
+- [Hidden Response Fields Architecture](hidden_response_fields.md)
+- [Jira MCP critical REST path freshness](jira_mcp_path_freshness.md)
+- [Optional Live Jira MCP Smoke](jira_mcp_live_smoke.md)
+- [GitHub MCP Example Collection](github_mcp_collection.md)
+- [GitLab MCP Example Collection](gitlab_mcp_collection.md)

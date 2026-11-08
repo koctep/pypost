@@ -69,6 +69,27 @@ gitlab_mcp_rest_paths.json  <-- make check-gitlab-mcp-path-freshness (offline co
 - Body templates start with `{ ` (brace and a space) before the first `{% if %}`.
   Without the space, `{{%` would be read as the start of a Jinja expression.
 
+### Response field masking (PYPOST-1395)
+
+Request `gitlab-get-current-user` (`GET /api/v4/user`) configures `hidden_response_fields`:
+
+```json
+"hidden_response_fields": [
+  "email",
+  "commit_email",
+  "public_email"
+]
+```
+
+This configuration protects user identity and email PII across different scopes:
+- **Bare keys (`email`, `commit_email`, `public_email`)**: Masks the primary account email,
+  author commit email, and public profile email returned in GitLab's user profile schema.
+- **Dual-surface safety**: In MCP output, values are irreversibly redacted to `***`. In GUI
+  `ResponseView`, values render with dashed underlines and support click-to-reveal.
+- **Contract verification**: Automated offline assertions run in
+  `tests/test_reference_collection_masking_contract.py`. See
+  [Hidden Response Fields Architecture](hidden_response_fields.md).
+
 ## Surviving template-marker checks (PYPOST-1339)
 
 After a full or minimal render, offline tests assert that URL, header values, query values,
@@ -277,6 +298,7 @@ imported environment or through the `gitlab_com` preset.
 
 ## See also
 
+- [Hidden Response Fields Architecture](hidden_response_fields.md)
 - [HTTP Path Segment Rejection](http_path_segment_rejection.md)
 - [GitHub MCP Example Collection](github_mcp_collection.md)
 - [Examples Collection Library & Legacy Fixtures](examples_library_format.md)

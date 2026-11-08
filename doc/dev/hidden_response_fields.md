@@ -1,4 +1,4 @@
-# Hidden Response Fields Architecture and Decomposition (PYPOST-1312 / PYPOST-1376)
+# Hidden Response Fields Architecture and Decomposition (PYPOST-1312 / PYPOST-1376 / PYPOST-1395)
 
 ## Overview
 
@@ -18,6 +18,9 @@ executing requests in PyPost, these fields pose dual security risks:
 Epic [PYPOST-1312](https://pypost.atlassian.net/browse/PYPOST-1312) addresses these requirements. Planning
 task [PYPOST-1376](https://pypost.atlassian.net/browse/PYPOST-1376) established the architecture, selector
 specifications, security boundaries, and decomposition into four focused child stories scheduled for Sprint 2032.
+Subsequent hardening task [PYPOST-1395](https://pypost.atlassian.net/browse/PYPOST-1395) expanded sample
+masking configurations across the remaining bundled reference collections (GitHub, GitLab, and Jira Cloud)
+with dedicated automated contract verification.
 
 ---
 
@@ -411,9 +414,25 @@ The test suite validates 8 comprehensive integration scenarios covering complex 
 | **Scenario 7** | **Multi-Tab Concurrency Isolation** | `copy_request_for_isolated_tab` deep-copies `hidden_response_fields`. Selector mutations in Tab B do not pollute Tab A or dirty baselines. Concurrent `ResponseView` instances manage independent spans. | `test_scenario_7_multi_tab_concurrency_isolation` |
 | **Scenario 8** | **Reference Collection Fixture** | Validates `examples/collections/google_drive.json` request `gdrive-about-get`. Asserts disk persistence, Pydantic model serialization, and live execution through MCP and GUI masking pipelines. | `test_scenario_8_reference_collection_fixture_validation` |
 
-#### Reference Collection Fixture (`examples/collections/google_drive.json`)
+#### Reference Collection Fixtures & Bundled Catalog Masking Examples (PYPOST-1380 / PYPOST-1395)
 
-To provide developers and users with an authentic, production-grade reference configuration, PyPost includes `gdrive-about-get` in the bundled Google Drive collection:
+To provide developers and users with authentic, production-grade reference configurations,
+PyPost configures `hidden_response_fields` across all bundled example collections in
+`examples/collections/`. These shipped configurations demonstrate best practices for masking
+credentials, security attributes, and Personally Identifiable Information (PII) across both
+interactive desktop GUI sessions and autonomous AI agent tool invocations via MCP.
+
+##### Bundled Collections Masking Overview
+
+| Bundled Collection | Request ID | Endpoint | Selector Patterns | Masked Properties | Target Sensitivity |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **Google Drive** (`google_drive.json`) | `gdrive-about-get` | `GET /about` | Bare keys & dotted path | `emailAddress`, `permissionId`, `user.emailAddress` | User PII & account permission identifier |
+| **GitHub** (`github_mcp.json`) | `github-get-authenticated-user` | `GET /user` | Bare keys & dotted path | `email`, `two_factor_authentication`, `plan.name` | User email, 2FA security status, billing tier |
+| **GitLab** (`gitlab_mcp.json`) | `gitlab-get-current-user` | `GET /api/v4/user` | Bare keys (multi-scope) | `email`, `commit_email`, `public_email` | Primary, commit, and public user email addresses |
+| **Jira Cloud** (`jira_mcp.json`) | `jira-get-current-user` | `GET /rest/api/3/myself` | Bare keys | `emailAddress`, `accountId` | Atlassian account email and unique account ID |
+| **Jira Cloud** (`jira_mcp.json`) | `jira-search-assignable-users` | `GET /rest/api/3/user/assignable/search` | Root array wildcard paths | `[*].emailAddress`, `[*].accountId` | Array of assignable user emails and account IDs |
+
+##### 1. Google Drive Collection (`examples/collections/google_drive.json`)
 
 - **Request ID**: `gdrive-about-get`
 - **Request Name**: `"Get Current User and Storage Quota"`
@@ -426,34 +445,143 @@ To provide developers and users with an authentic, production-grade reference co
     "user.emailAddress"
   ]
   ```
-- **MCP Configuration**:
-  - `expose_as_mcp: true`
-  - `mcp_description`: `"Retrieve Google Drive user identity and storage quota information with masked PII response fields."`
-- **Masking Behavior**:
-  - When executed, Google Drive's response contains sensitive PII (`user.emailAddress` and `user.permissionId`) alongside non-sensitive metadata (`user.displayName` and `storageQuota`).
-  - **In MCP Mode**: `emailAddress` and `permissionId` are permanently redacted to `***`.
-  - **In Desktop GUI Mode**: `emailAddress` and `permissionId` are visually masked with dashed underlines, allowing the developer to click to reveal while keeping the screen safe during demos.
+- **Demonstrated Patterns**: Combines bare key selectors (`emailAddress`, `permissionId`) with
+  qualified dotted path selectors (`user.emailAddress`). When Google Drive returns user profile
+  and quota data, `emailAddress` and `permissionId` are masked while `displayName` and
+  `storageQuota` remain unredacted.
+
+##### 2. GitHub MCP Collection (`examples/collections/github_mcp.json`)
+
+- **Request ID**: `github-get-authenticated-user`
+- **Request Name**: `"GitHub Get Authenticated User"`
+- **Endpoint**: `GET {{ github_api_url }}/user`
+- **Configured `hidden_response_fields`**:
+  ```json
+  "hidden_response_fields": [
+    "email",
+    "two_factor_authentication",
+    "plan.name"
+  ]
+  ```
+- **Demonstrated Patterns**:
+  - `email`: Bare key selector masking top-level and nested email fields.
+  - `two_factor_authentication`: Bare key selector protecting security posture flags (boolean).
+  - `plan.name`: Dotted object path selector targeting the nested billing plan name
+    (`plan: {"name": "pro", ...}`) without redacting non-sensitive sibling billing attributes.
+
+##### 3. GitLab MCP Collection (`examples/collections/gitlab_mcp.json`)
+
+- **Request ID**: `gitlab-get-current-user`
+- **Request Name**: `"GitLab Get Current User"`
+- **Endpoint**: `GET {{ gitlab_base_url }}/api/v4/user`
+- **Configured `hidden_response_fields`**:
+  ```json
+  "hidden_response_fields": [
+    "email",
+    "commit_email",
+    "public_email"
+  ]
+  ```
+- **Demonstrated Patterns**: Multi-scope email masking protecting distinct PII attributes returned
+  in GitLab's user profile schema. Redacts primary account email, author commit email, and public
+  profile email simultaneously while preserving public profile fields (`name`, `username`, `web_url`).
+
+##### 4. Jira Cloud MCP Collection (`examples/collections/jira_mcp.json`)
+
+- **Request ID 1**: `jira-get-current-user`
+  - **Request Name**: `"Jira Get Current User"`
+  - **Endpoint**: `GET {{ jira_base_url }}/rest/api/3/myself`
+  - **Configured `hidden_response_fields`**:
+    ```json
+    "hidden_response_fields": [
+      "emailAddress",
+      "accountId"
+    ]
+    ```
+  - **Demonstrated Patterns**: Direct bare key selectors masking Atlassian account PII (`emailAddress`)
+    and immutable Atlassian user identity GUIDs (`accountId`).
+
+- **Request ID 2**: `jira-search-assignable-users`
+  - **Request Name**: `"Jira Search Assignable Users"`
+  - **Endpoint**: `GET {{ jira_base_url }}/rest/api/3/user/assignable/search`
+  - **Configured `hidden_response_fields`**:
+    ```json
+    "hidden_response_fields": [
+      "[*].emailAddress",
+      "[*].accountId"
+    ]
+    ```
+  - **Demonstrated Patterns**: Root-level array wildcard paths (`[*].field`). Because Jira's assignable
+    user search returns a top-level JSON array of user objects (`[{"accountId": "...", ...}]`),
+    the `[*]` wildcard selector matches each element in the array, masking sensitive attributes
+    across every returned user record while keeping user display names and active statuses visible.
+
+##### Dual-Surface Presentation and Safety Guarantees
+
+Every bundled collection request configured with `hidden_response_fields` enforces strict
+dual-surface safety contracts:
+
+1. **MCP Server Output Sanitization (`MCPServerImpl` / `McpResponseSanitizer`)**:
+   - Irreversible masking: sensitive values matching configured selectors are replaced with `"***"`.
+   - Tool schemas expose zero reveal parameters or bypass options to AI coding agents.
+   - Prevents confidential tokens and user PII from leaking into agent prompt contexts, LLM completions,
+     or persistent MCP logs.
+2. **Desktop GUI Presentation (`ResponseView` / `ResponseMaskController`)**:
+   - Interactive click-to-reveal: values are rendered as masked token spans with dashed underlines (`***`).
+   - Clicking on a masked span toggles between revealed plain text and masked state.
+   - Protects against accidental exposure during screen sharing, demos, and presentations.
+3. **Pristine Data Model Immutability**:
+   - Masking transforms only serialized text representations for presentation and agent egress.
+   - Raw `ResponseData.body` and historical request logs remain intact in memory for test assertions
+     and developer scripting.
+
+##### Automated Contract Verification (`tests/test_reference_collection_masking_contract.py`)
+
+To prevent regressions, ensure schema conformance, and guard against accidental removal of
+sample masking configurations, PyPost executes automated contract tests under
+`tests/test_reference_collection_masking_contract.py` (PYPOST-1395):
+
+- **Collection Model Schema Conformance**: Verifies that `github_mcp.json`, `gitlab_mcp.json`,
+  `jira_mcp.json`, and `google_drive.json` load cleanly via `read_collection_file` into PyPost's
+  Pydantic `Collection` model (`version: "1.0.0"` or `"2.0.0"`).
+- **Exact Field Configuration Assertions**: Asserts the exact presence of configured
+  `hidden_response_fields` on target user-identity and search requests.
+- **Round-Trip Serialization Fidelity**: Asserts that `collection.model_dump_json()` preserves
+  `hidden_response_fields` arrays with exact fidelity across disk and memory round-trips.
+- **MCP Wire Sanitization**: Asserts that executing tools against loopback responses permanently
+  redacts all configured fields to `***` in MCP `TextContent` envelopes.
+- **GUI Token Spans**: Asserts that loading responses into `ResponseView` creates active
+  `MaskedTokenSpan` objects with valid start/end offsets and correct click-to-reveal toggle behavior.
 
 #### Developer Testing and Verification Guide
 
 Developers extending selector syntax, modifying response views, or altering MCP sanitization pipelines should follow this verification workflow:
 
-1. **Run Integration and Edge-Case Tests**:
+1. **Run Reference Collection Masking Contract Tests**:
+   ```bash
+   make test PYTEST_ARGS="tests/test_reference_collection_masking_contract.py"
+   ```
+2. **Run Integration and Edge-Case Tests**:
    ```bash
    make test PYTEST_ARGS="tests/test_hidden_response_fields_integration_edge_cases.py"
    ```
-2. **Run All Related Unit and Component Suites**:
+3. **Run All Related Unit and Component Suites**:
    ```bash
    make test PYTEST_ARGS="tests/test_hidden_response_fields.py tests/test_mcp_response_masking.py tests/test_gui_response_view_click_to_reveal.py"
    ```
-3. **Verify Reference Collection Integrity**:
+4. **Verify Reference Collection Integrity & Path Freshness**:
    ```bash
    make test PYTEST_ARGS="tests/test_collections.py -k test_google_drive"
+   make check-github-mcp-path-freshness
+   make check-gitlab-mcp-path-freshness
+   make check-jira-mcp-path-freshness
    ```
-4. **Execute Static Analysis and Quality Gates**:
+5. **Execute Static Analysis and Quality Gates**:
    ```bash
-   # Run flake8 and markdown documentation linters
+   # Run flake8, documentation linters, and link checks
    make lint
+   make lint-docs
+   make check-docs-links
 
    # Run type checks against baseline
    make typecheck
@@ -500,11 +628,20 @@ For complete API specifications and code examples, see
 ## References
 
 - Unified JSON Selector Engine: [`doc/dev/json_selector_engine.md`](json_selector_engine.md)
+- Reference Collection Masking Contract Tests: [`tests/test_reference_collection_masking_contract.py`](../../tests/test_reference_collection_masking_contract.py)
+- Google Drive Reference Collection Fixture: [`examples/collections/google_drive.json`](../../examples/collections/google_drive.json)
+- GitHub Reference Collection Fixture: [`examples/collections/github_mcp.json`](../../examples/collections/github_mcp.json)
+- GitLab Reference Collection Fixture: [`examples/collections/gitlab_mcp.json`](../../examples/collections/gitlab_mcp.json)
+- Jira Cloud Reference Collection Fixture: [`examples/collections/jira_mcp.json`](../../examples/collections/jira_mcp.json)
+- GitHub MCP Example Collection: [`doc/dev/github_mcp_collection.md`](github_mcp_collection.md)
+- GitLab MCP Example Collection: [`doc/dev/gitlab_mcp_collection.md`](gitlab_mcp_collection.md)
+- Jira MCP Collection E2E: [`doc/dev/jira_mcp_collection_e2e.md`](jira_mcp_collection_e2e.md)
 - Epic Decomposition Notes: [`ai-tasks/PYPOST-1312/decomposition-notes.md`](../../ai-tasks/PYPOST-1312/decomposition-notes.md)
 - Step 2 Architecture Design: [`ai-tasks/PYPOST-1376/20-architecture.md`](../../ai-tasks/PYPOST-1376/20-architecture.md)
+- PYPOST-1395 Architecture Design: [`ai-tasks/PYPOST-1395/20-architecture.md`](../../ai-tasks/PYPOST-1395/20-architecture.md)
 - Sensitive Data Masking Policy: [`doc/dev/sensitive_data_masking_policy.md`](sensitive_data_masking_policy.md)
 - RequestData Copy Policy: [`doc/dev/request_data_copy_policy.md`](request_data_copy_policy.md)
 - MCP Integration Guide: [`doc/dev/mcp_integration.md`](mcp_integration.md)
 - Integration & Edge-Case Tests: [`tests/test_hidden_response_fields_integration_edge_cases.py`](../../tests/test_hidden_response_fields_integration_edge_cases.py)
-- Reference Collection Fixture: [`examples/collections/google_drive.json`](../../examples/collections/google_drive.json)
 - MASK-4 Roadmap & Verification: [`ai-tasks/PYPOST-1380/00-roadmap.md`](../../ai-tasks/PYPOST-1380/00-roadmap.md)
+- PYPOST-1395 Roadmap & Verification: [`ai-tasks/PYPOST-1395/00-roadmap.md`](../../ai-tasks/PYPOST-1395/00-roadmap.md)

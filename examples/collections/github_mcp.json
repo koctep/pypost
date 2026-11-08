@@ -56,7 +56,12 @@
       "expose_as_mcp": true,
       "mcp_description": "Return the GitHub user that owns the configured token.",
       "mcp_params": {},
-      "retry_policy": null
+      "retry_policy": null,
+      "hidden_response_fields": [
+        "email",
+        "two_factor_authentication",
+        "plan.name"
+      ]
     },
     {
       "id": "github-get-repository",
