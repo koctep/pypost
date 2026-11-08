@@ -16,6 +16,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from pypost.core.cancellation import adaptive_thread_join
 from pypost.core.collection_variable_import import (
     ConflictStrategy,
     ImportSummary,
@@ -330,11 +331,39 @@ class ImportCollectionVariablesDialog(QDialog):
             return None
         return text
 
-    def _cancel_discovery_worker(self) -> None:
-        if self._active_discovery_worker is not None:
-            self._active_discovery_worker.cancel()
-            self._active_discovery_worker.wait(1000)
-            self._active_discovery_worker = None
+    def _cancel_and_join_worker(
+        self,
+        worker: Any,
+        name: str = "Worker",
+        timeout: float = 1.0,
+    ) -> bool:
+        """Cancel and adaptively join a background worker thread."""
+        if worker is None:
+            return True
+        try:
+            cancel_fn = getattr(worker, "cancel", None)
+            if callable(cancel_fn):
+                cancel_fn()
+        except Exception:
+            logger.exception("Error requesting cancellation on %s", name)
+        resolved_name = getattr(worker, "name", None) or name
+        return adaptive_thread_join(worker, timeout=timeout, thread_name=resolved_name)
+
+    def _cancel_discovery_worker(self, timeout: float = 1.0) -> None:
+        """Cancel and join the active library manifest discovery worker."""
+        worker = self._active_discovery_worker
+        self._active_discovery_worker = None
+        if worker is not None:
+            name = getattr(worker, "name", None) or "ManifestDiscoveryWorker"
+            self._cancel_and_join_worker(worker, name=name, timeout=timeout)
+
+    def _cancel_fetch_worker(self, timeout: float = 1.0) -> None:
+        """Cancel and join the active remote collection fetch worker."""
+        worker = self._active_fetch_worker
+        self._active_fetch_worker = None
+        if worker is not None:
+            name = getattr(worker, "name", None) or "CollectionFetchWorker"
+            self._cancel_and_join_worker(worker, name=name, timeout=timeout)
 
     def _start_manifest_discovery(self) -> None:
         self._discovery_generation += 1
@@ -445,10 +474,9 @@ class ImportCollectionVariablesDialog(QDialog):
             if self._active_fetch_worker is not None:
                 logger.debug(
                     "collection_variable_fetch_cancelled_by_selection gen=%d",
-                    self._active_fetch_worker.generation_id,
+                    getattr(self._active_fetch_worker, "generation_id", self._fetch_generation),
                 )
-                self._active_fetch_worker.cancel()
-                self._active_fetch_worker = None
+                self._cancel_fetch_worker()
             self.loading_container.setVisible(False)
             self.error_container.setVisible(False)
             self.preset_combo.setEnabled(True)
@@ -461,10 +489,9 @@ class ImportCollectionVariablesDialog(QDialog):
             if self._active_fetch_worker is not None:
                 logger.debug(
                     "collection_variable_fetch_cancelled_by_selection gen=%d",
-                    self._active_fetch_worker.generation_id,
+                    getattr(self._active_fetch_worker, "generation_id", self._fetch_generation),
                 )
-                self._active_fetch_worker.cancel()
-                self._active_fetch_worker = None
+                self._cancel_fetch_worker()
             self.loading_container.setVisible(False)
             self.error_container.setVisible(False)
             self._load_collection_into_view(None)
@@ -476,10 +503,9 @@ class ImportCollectionVariablesDialog(QDialog):
         if self._active_fetch_worker is not None:
             logger.debug(
                 "collection_variable_cancelling_previous_worker gen=%d",
-                self._active_fetch_worker.generation_id,
+                getattr(self._active_fetch_worker, "generation_id", self._fetch_generation),
             )
-            self._active_fetch_worker.cancel()
-            self._active_fetch_worker = None
+            self._cancel_fetch_worker()
 
         logger.info(
             "collection_variable_remote_fetch_started connection_id=%s path=%s gen=%d",
@@ -574,9 +600,7 @@ class ImportCollectionVariablesDialog(QDialog):
             self._fetch_generation,
         )
         self._fetch_generation += 1
-        if self._active_fetch_worker is not None:
-            self._active_fetch_worker.cancel()
-            self._active_fetch_worker = None
+        self._cancel_fetch_worker()
         self.loading_container.setVisible(False)
         self.preset_combo.setEnabled(True)
         self.vars_table.setEnabled(True)
@@ -713,10 +737,7 @@ class ImportCollectionVariablesDialog(QDialog):
     def reject(self) -> None:
         self._discovery_generation += 1
         self._cancel_discovery_worker()
-        if self._active_fetch_worker is not None:
-            self._active_fetch_worker.cancel()
-            self._active_fetch_worker.wait(1000)
-            self._active_fetch_worker = None
+        self._cancel_fetch_worker()
         logger.info(
             "collection_variable_import_dialog_cancelled env_name=%s",
             self.target_environment.name,
@@ -726,19 +747,18 @@ class ImportCollectionVariablesDialog(QDialog):
     def closeEvent(self, event: Any) -> None:
         self._discovery_generation += 1
         self._cancel_discovery_worker()
-        if self._active_fetch_worker is not None:
-            self._active_fetch_worker.cancel()
-            self._active_fetch_worker.wait(1000)
-            self._active_fetch_worker = None
-        super().closeEvent(event)
+        self._cancel_fetch_worker()
+        try:
+            super().closeEvent(event)
+        except TypeError:
+            accept_fn = getattr(event, "accept", None)
+            if callable(accept_fn):
+                accept_fn()
 
     def accept(self) -> None:
         self._discovery_generation += 1
         self._cancel_discovery_worker()
-        if self._active_fetch_worker is not None:
-            self._active_fetch_worker.cancel()
-            self._active_fetch_worker.wait(1000)
-            self._active_fetch_worker = None
+        self._cancel_fetch_worker()
 
         col = self._get_selected_collection()
         if col is None:
