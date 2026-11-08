@@ -11,7 +11,12 @@ from copy import deepcopy
 from dataclasses import dataclass, field
 from typing import Any, Callable, Literal
 
-from pypost.core.mcp_worker_ipc import encode_tools, make_message
+from pypost.core.mcp_worker_ipc import (
+    McpProtocolVersionError,
+    encode_tools,
+    make_message,
+    validate_message_version,
+)
 from pypost.core.mcp_worker_process import worker_main
 from pypost.models.settings import McpResourceLimitsPolicy, McpWorkerRestartPolicy
 
@@ -594,6 +599,28 @@ class McpProcessSupervisor:
 
     def _apply_ipc_message(self, instance_id: str, message: Any) -> None:
         if not isinstance(message, dict):
+            return
+        try:
+            validate_message_version(message)
+        except McpProtocolVersionError as exc:
+            logger.error(
+                "mcp_supervisor_ipc_version_rejected instance_id=%s received_v=%s "
+                "supported=%s error=%s",
+                instance_id,
+                getattr(exc, "received_v", None),
+                getattr(exc, "supported_versions", None),
+                exc,
+            )
+            with self._lock:
+                record = self._workers.get(instance_id)
+                if record is None:
+                    return
+                if record.state == "starting":
+                    record.state = "failed"
+                    record.last_error = (
+                        f"Incompatible IPC protocol version: {exc}"
+                    )
+                    record.started_event.set()
             return
         msg_type = message.get("type")
         with self._lock:
