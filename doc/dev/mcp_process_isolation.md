@@ -750,6 +750,156 @@ ephemeral random hex strings.
 
 ---
 
+## High-density 10x process-mode stress parity (PYPOST-1470)
+
+Standalone MCP servers in process execution mode (`mcp_execution_mode = "process"`) have
+full operational parity with thread-mode servers under high-concurrency workloads. The
+stress suite (`tests/test_mcp_process_stress_10x.py`) exercises multi-process density,
+isolation guarantees, fault recovery, and socket lifecycle management across 10 concurrent
+worker processes.
+
+### 10x barrier synchronization startup
+
+To stress process table allocation, pipe creation, and simultaneous uvicorn initialization:
+
+- **Barrier-synchronized launch**: A `threading.Barrier(10)` synchronizes 10 executor threads,
+  triggering concurrent `registry.start()` calls for 10 isolated process servers at the exact
+  same instant.
+- **Port readiness**: Verifies that all 10 worker processes transition to `running`, bind their
+  respective ephemeral ports, and report active listening status within bounded deadlines.
+- **Concurrent tool discovery**: Immediately dispatches concurrent `_mcp_list_tools` requests
+  across all 10 running processes, ensuring zero deadlocks, race conditions, or supervisor
+  lock contention during startup.
+
+### Concurrent request variable namespace isolation
+
+To ensure complete tenant separation and verify that child processes never share memory:
+
+- **Distinct namespace bindings**: 10 standalone process workers are initialized with identical
+  variable key names bound to unique, server-specific values.
+- **High-throughput load**: A `ThreadPoolExecutor` dispatches 100 parallel tool requests (10
+  concurrent requests per worker across all 10 servers).
+- **Echo gate verification**: Under `PYPOST_MCP_TEST_ECHO_VARS=1`, workers echo runtime variable
+  snapshots back to the caller.
+- **Zero cross-talk**: Asserts 100% data isolation across all 100 responses, verifying that
+  concurrent request processing across OS processes never leaks state or environment variables.
+
+### Abrupt client disconnect and TCP RST resilience
+
+To validate supervisor and worker fault tolerance against broken network connections:
+
+- **TCP RST injection**: Establishes raw TCP client sockets to all 10 running servers, transmits
+  partial HTTP request payloads, and forcefully resets the connection using `SO_LINGER` with a
+  timeout of 0 seconds (`struct.pack("ii", 1, 0)`).
+- **Graceful connection handling**: Confirms that worker asyncio event loops handle connection
+  resets cleanly without crashing or corrupting server state.
+- **Subsequent request continuity**: Validates that all 10 workers remain alive and immediately
+  serve subsequent valid tool calls (`_mcp_call_tool`) without requiring restarts.
+
+### Concurrent teardown and ephemeral port reclamation
+
+To guarantee clean operating system resource hygiene on server termination:
+
+- **Parallel shutdown**: Coordinates concurrent termination of all 10 servers via
+  `registry.stop_all()`.
+- **Bounded termination budget**: All 10 worker processes exit cleanly within the supervisor's
+  stop budget (`DEFAULT_STOP_BUDGET_S = 2.0`).
+- **Zero port collisions**: Uses `EphemeralPortReserve.verify_all_rebound()` to rebind standard
+  TCP listening sockets to all 10 allocated ports immediately after teardown, confirming zero
+  `EADDRINUSE` errors, zero zombie handles, and total socket reclamation.
+
+### Windows stop escalation simulation
+
+To verify stop escalation when a process worker becomes uncooperative:
+
+- **Simulated hang**: Uses `DEBUG_HANG` opcode under `PYPOST_MCP_ALLOW_DEBUG_IPC=1` to simulate a
+  worker process that ignores cooperative `STOP` IPC messages.
+- **Progressive escalation**: Asserts that the supervisor escalates from cooperative `STOP` to
+  `process.terminate()` and `process.kill()` within the allocated stop budget.
+- **Strict budget ceiling**: Validates that shutdown completes within `DEFAULT_STOP_BUDGET_S` plus
+  grace window, without blocking the host application or leaving orphaned processes.
+
+---
+
+## Cross-platform Windows stop escalation and CI workflow (PYPOST-1470)
+
+Operating systems manage process lifecycles and forceful termination differently. Process mode
+provides uniform termination semantics across POSIX and Windows platforms.
+
+### Win32 `TerminateProcess` vs POSIX signals
+
+| Dimension | POSIX (Linux / macOS) | Windows (Win32) |
+| --- | --- | --- |
+| Graceful signal | `SIGTERM` (15) | Not supported (uses IPC `STOP`) |
+| Forceful kill | `SIGKILL` (9) | `TerminateProcess(handle, 1)` |
+| Python API | `process.terminate()`, `kill()` | `process.terminate()`, `kill()` |
+| Exit code | Negative signal (`-15`, `-9`) | Exit code `1` |
+| Signal trapping | `SIGTERM` catchable; `SIGKILL` non-maskable | Neither catchable |
+| Cleanup hooks | `finally` / `atexit` may run on `SIGTERM` | Immediately unmapped; no hooks run |
+| Handle reclamation | Closes file descriptors on exit | Closes object handles on exit |
+
+In `McpProcessSupervisor.stop_worker`:
+
+1. **Cooperative phase**: Dispatches IPC `STOP` message. The worker receives the message, initiates
+   graceful uvicorn shutdown, and exits cooperatively.
+2. **First escalation**: If the worker remains alive after the stop budget, calls
+   `process.terminate()`. On POSIX, this sends `SIGTERM`. On Windows, this invokes
+   `TerminateProcess(handle, 1)`.
+3. **Final escalation**: If still alive after a short bounded wait, calls `process.kill()`. On
+   POSIX, this sends `SIGKILL`. On Windows, this repeats `TerminateProcess(handle, 1)`.
+4. **Platform-agnostic verification**: Tests assert that the process table is cleared and child
+   processes terminate cleanly, accounting for platform-specific exit codes (`1` on Windows,
+   `-SIGTERM` / `-SIGKILL` on POSIX).
+
+### Dedicated `windows-process-stop` GitHub Actions CI workflow
+
+Process lifecycle behavior and handle cleanup on Windows are verified in continuous integration:
+
+- **Workflow job**: `.github/workflows/test.yml` defines the `windows-process-stop` job.
+- **Runner environment**: Runs on `windows-latest` with Python 3.11 and `timeout-minutes: 15`.
+- **Headless configuration**: Sets `QT_QPA_PLATFORM: offscreen` to allow PySide6 / Qt initialization
+  in headless Windows CI runners.
+- **Test execution**: Runs the stress parity and process isolation repro suites:
+  ```powershell
+  python -m pytest tests/test_mcp_process_stress_10x.py `
+    tests/test_mcp_process_isolation_repro.py -v --tb=short
+  ```
+- **Step summary**: Emits markdown report to `$GITHUB_STEP_SUMMARY` logging test suite execution.
+
+### Running tests locally and in CI
+
+#### Local execution (Linux / macOS)
+
+Run the 10x process-mode stress parity suite via the standard Makefile target:
+
+```bash
+make test WORKERS=1 PYTEST_ARGS="tests/test_mcp_process_stress_10x.py -v"
+```
+
+To run both process isolation repro and 10x stress suites together:
+
+```bash
+make test WORKERS=1 \
+  PYTEST_ARGS="tests/test_mcp_process_stress_10x.py \
+  tests/test_mcp_process_isolation_repro.py -v"
+```
+
+#### Local execution (Windows)
+
+On Windows developer machines without `make`, run pytest directly from the virtual environment:
+
+```powershell
+python -m pytest tests/test_mcp_process_stress_10x.py -v --tb=short
+```
+
+#### Continuous integration (CI)
+
+Every pull request and commit to `dev` automatically triggers:
+- Linux test matrix (`ubuntu-latest` with Python 3.11 and 3.13) via `make check`.
+- Windows process stop escalation suite (`windows-latest`) via `windows-process-stop`.
+
+---
+
 ## Troubleshooting
 
 | Symptom | Likely cause | Resolution |
@@ -771,6 +921,9 @@ ephemeral random hex strings.
 | Worker start version mismatch | Incompatible protocol version | Ensure worker and host use `v=1` |
 | Runtime command version rejected | Unsupported message `v` | Discarded as WORKER_ERROR (v=1) |
 | Heartbeat timeout in logs | Worker frozen or deadlocked | Terminated to failed; tune timeout |
+| 10x timeout under load | Port collision or thrashing | Ensure ports free; check host capacity |
+| TCP RST causes crash | Broken pipe unhandled in loop | Verify transport error handling |
+| Windows stop hangs | Handle leak or deadlock | Verify stop budget forces TerminateProcess |
 
 For a rejected live edit, inspect `mcp_registry_process_reconfigure_rejected`: the `phase`,
 `restored`, and `cleaned` fields distinguish startup, reclamation, and restoration outcomes
@@ -792,6 +945,7 @@ make test WORKERS=1 PYTEST_ARGS="tests/test_mcp_process_autorestart_repro.py -q"
 make test WORKERS=1 PYTEST_ARGS="tests/test_mcp_process_resource_limits_repro.py -q"
 make test WORKERS=1 PYTEST_ARGS="tests/test_mcp_ipc_protocol_version_repro.py -q"
 make test WORKERS=1 PYTEST_ARGS="tests/test_mcp_ipc_heartbeat_watchdog_repro.py -q"
+make test WORKERS=1 PYTEST_ARGS="tests/test_mcp_process_stress_10x.py -v"
 make test PYTEST_ARGS="tests/test_mcp_multiserver_stress_10x.py"
 ```
 
@@ -840,6 +994,18 @@ verifies the 6 acceptance criteria:
 4. Disabled watchdog (`enabled=False`) preserves process without termination during freezes.
 5. Watchdog timeout initiates automatic respawn cycles when auto-restart is enabled.
 6. Mismatched or stale heartbeat pong nonces emit warning logs and are safely ignored.
+10x process-mode stress parity and Windows stop escalation coverage
+(`tests/test_mcp_process_stress_10x.py`, PYPOST-1470) verifies the 5 acceptance criteria:
+1. 10x process barrier startup: barrier synchronization across 10 concurrent process workers with
+   active listening status and simultaneous tool discovery.
+2. 10x concurrent namespace isolation: 100 parallel requests across 10 workers with distinct values
+   for identical variable keys with zero state leakage.
+3. 10x abrupt client disconnect resilience: TCP RST mid-payload (`SO_LINGER=0`) fault tolerance
+   preserving worker health and subsequent tool calls.
+4. 10x concurrent teardown and port reclamation: parallel shutdown with immediate socket rebinding
+   (`verify_all_rebound`) and zero `EADDRINUSE` collisions.
+5. Cross-platform Windows stop escalation verification: graceful stop escalating to forceful
+   `TerminateProcess` verified in test simulation and GitHub Actions `windows-latest` CI.
 
 ---
 

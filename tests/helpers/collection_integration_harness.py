@@ -15,7 +15,7 @@ import logging
 from pathlib import Path
 import time
 import types
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Literal
 import pytest
 
 if TYPE_CHECKING:
@@ -271,6 +271,7 @@ class ServerRegistryFixtureMixin:
     registry: MCPServerRegistry
     template_service: TemplateService
     _server_candidates: list[MCPServerManager]
+    execution_mode: Literal["thread", "process"]
 
     def __init__(
         self,
@@ -279,6 +280,7 @@ class ServerRegistryFixtureMixin:
         library_service: Any = None,
         template_service: TemplateService | None = None,
         tmp_path: Path | None = None,
+        execution_mode: Literal["thread", "process"] = "thread",
         **kwargs: Any,
     ) -> None:
         super().__init__(**kwargs)
@@ -287,6 +289,7 @@ class ServerRegistryFixtureMixin:
                 registry=registry,
                 library_service=library_service,
                 template_service=template_service,
+                execution_mode=execution_mode,
             )
 
     def init_server_registry_fixture(
@@ -295,8 +298,10 @@ class ServerRegistryFixtureMixin:
         registry: MCPServerRegistry | None = None,
         library_service: Any = None,
         template_service: TemplateService | None = None,
+        execution_mode: Literal["thread", "process"] = "thread",
     ) -> None:
         """Initialize MCP server registry, candidate tracking, and template service."""
+        self.execution_mode = execution_mode
         self._server_candidates: list[MCPServerManager] = []
         self.template_service = (
             template_service
@@ -315,6 +320,7 @@ class ServerRegistryFixtureMixin:
                 library_service=lib_svc,
                 environment_lookup=lambda _id: None,
                 template_service=self.template_service,
+                execution_mode=execution_mode,
             )
 
     def start_standalone_server(
@@ -355,18 +361,28 @@ class ServerRegistryFixtureMixin:
             self.registry.upsert(config)
             self.registry.start(config.id)
             self.registry.wait_for_state(config.id, "running", timeout=5.0)
-            manager = self.registry._managers.get(config.id)
-            if manager is not None:
+            target: Any = self.registry._managers.get(config.id)
+            if target is None:
+                try:
+                    target = self.registry.runner_for(config.id)
+                except KeyError:
+                    target = None
+            if target is not None:
                 deadline = time.monotonic() + 5.0
                 while time.monotonic() < deadline:
-                    if manager.is_listening or manager.last_start_error:
+                    is_listening = (
+                        target.is_listening()
+                        if callable(target.is_listening)
+                        else target.is_listening
+                    )
+                    if is_listening or target.last_start_error:
                         break
                     time.sleep(0.02)
-                if manager.last_start_error:
+                if target.last_start_error:
                     logger.error(
                         "Standalone MCP server server_id=%s reported startup error: %s",
                         server_id,
-                        manager.last_start_error,
+                        target.last_start_error,
                     )
             status = self.registry.status(config.id).state
             logger.info(
@@ -398,7 +414,10 @@ class ServerRegistryFixtureMixin:
             def _stop_candidate(cand: Any) -> None:
                 logger.debug("Harness teardown stopping candidate manager: %r", cand)
                 try:
-                    cand.stop_server()
+                    if hasattr(cand, "stop_server"):
+                        cand.stop_server()
+                    elif hasattr(cand, "stop"):
+                        cand.stop()
                     logger.debug("Harness teardown candidate manager stopped: %r", cand)
                 except Exception as exc:
                     logger.warning("Error stopping candidate manager during teardown: %s", exc)
@@ -432,6 +451,18 @@ class ServerRegistryFixtureMixin:
                     executor.shutdown(wait=False, cancel_futures=True)
                 else:
                     executor.shutdown(wait=True)
+
+                if registry is not None:
+                    runners = getattr(registry, "_runners", {})
+                    for runner in tuple(runners.values()):
+                        try:
+                            if hasattr(runner, "worker_is_alive") and runner.worker_is_alive():
+                                runner.stop(timeout=min(timeout, 3.0))
+                        except Exception as exc:
+                            logger.warning(
+                                "Error ensuring process runner stopped during teardown: %s",
+                                exc,
+                            )
             except Exception:
                 executor.shutdown(wait=False, cancel_futures=True)
                 raise
@@ -489,6 +520,7 @@ class CollectionVariablesIntegrationHarness(
         *,
         in_memory: bool = False,
         backend: InMemoryVirtualFS | None = None,
+        execution_mode: Literal["thread", "process"] = "thread",
     ) -> None:
         self.in_memory = in_memory or (backend is not None)
         if self.in_memory:
@@ -515,6 +547,7 @@ class CollectionVariablesIntegrationHarness(
         self.init_server_registry_fixture(
             library_service=self.library_service,
             template_service=self.template_service,
+            execution_mode=execution_mode,
         )
         logger.debug(
             "Initialized CollectionVariablesIntegrationHarness at root=%s in_memory=%s",
