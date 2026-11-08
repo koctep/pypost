@@ -512,6 +512,47 @@ across `LibraryManagerService`, `LibraryCollectionImportService`, and `LibraryPr
      `cancellation_token` and safely delegates to `manager_service.get_connection` via
      `call_with_cancellation_token(...)`.
 
+#### Adaptive Worker Teardown & Polymorphic Thread Join (PYPOST-1453)
+
+Prior to PYPOST-1453, dialog cancellation and dismissal (`reject()`, `closeEvent()`, `accept()`)
+as well as collection switching invoked rigid `wait(1000)` blocking calls on background
+`QThread` worker instances (`ManifestDiscoveryWorker` and `CollectionFetchWorker`). Even when
+workers exited immediately (<50ms), or when worker objects adhered to duck-typed thread
+interfaces, rigid joins created unnecessary UI freezing or risked unhandled attribute errors.
+
+**PYPOST-1453** centralizes worker cancellation and teardown using adaptive polling joins:
+
+1. **Polymorphic Thread Duck-Typing in `adaptive_thread_join` (`pypost/core/cancellation.py`)**:
+   - `adaptive_thread_join` accepts polymorphic thread objects, seamlessly supporting both
+     standard library `threading.Thread` instances (using `is_alive()` and `join(timeout=...)`)
+     and PySide6 `QThread` instances (or test doubles implementing `isRunning()` / `is_running()`
+     or inverted `isFinished()`, and `wait(msecs)`).
+   - Private helpers `_is_thread_alive(thread)` and `_slice_join(thread, slice_timeout)` abstract
+     lifecycle queries and slice timeouts, automatically converting fractional seconds into
+     integer milliseconds when calling Qt `wait(msecs)`.
+   - `_resolve_thread_name(thread, thread_name)` resolves human-readable thread identifiers
+     from explicit overrides, `thread.name`, `thread.objectName()`, or `type(thread).__name__`.
+
+2. **Centralized Worker Teardown in `ImportCollectionVariablesDialog`**:
+   - `_cancel_and_join_worker(worker, name="Worker", timeout=1.0)`: Central helper that signals
+     worker cancellation (`worker.cancel()`, `requestInterruption()`) and executes
+     `adaptive_thread_join(worker, timeout=timeout, thread_name=name)`.
+   - `_cancel_discovery_worker(timeout=1.0)`: Clears and adaptively joins `_active_discovery_worker`.
+   - `_cancel_fetch_worker(timeout=1.0)`: Clears and adaptively joins `_active_fetch_worker`.
+   - Replaced all hardcoded `wait(1000)` calls across `reject()`, `closeEvent()`, and `accept()`
+     with centralized teardown helpers.
+   - Guarded collection switches (`_on_collection_changed`, `_start_remote_fetch`) to cancel
+     superseded fetch workers adaptively before spawning new tasks.
+
+3. **Latency Profile and Diagnostic Observability**:
+   - **Fast-Path Return**: Quickly-exiting workers unblock the main UI thread in <50ms.
+   - **Bounded Ceiling**: Unresponsive workers or blocking network I/O are bounded by a 1.0s
+     deadline, preventing application hangs during dialog closure.
+   - **Timeout Warning Diagnostics**: When a worker exceeds the join deadline,
+     `adaptive_thread_join` logs a structured warning (`Thread did not terminate within timeout:
+     thread=%s elapsed=%.3fs timeout=%.3fs is_alive=%s`), facilitating troubleshooting of stuck
+     worker threads.
+
 ---
 
 ### Non-Modal Status Containers, Error Handling, and Retry (PYPOST-1450, PYPOST-1451)
@@ -600,9 +641,9 @@ failure, retry, cancellation, and isolation coverage:
      when discovery errors occur; variable diff inspection, preset switching, strategy selection,
      and imports into the target environment are completely unaffected.
    - **Dialog Teardown & Worker Join**: Dialog close / reject aborts in-flight discovery and
-     performs a bounded `wait(1000)` thread join (adaptive non-blocking teardown tracked in
-     [PYPOST-1453](https://pypost.atlassian.net/browse/PYPOST-1453); forwarding cancellation
-     tokens into connection providers completed in
+     performs an adaptive thread join via `adaptive_thread_join` (elimination of rigid `wait(1000)`
+     blocking calls completed in [PYPOST-1453](https://pypost.atlassian.net/browse/PYPOST-1453);
+     forwarding cancellation tokens into connection providers completed in
      [PYPOST-1452](https://pypost.atlassian.net/browse/PYPOST-1452); large-scale high-concurrency
      discovery tests tracked in [PYPOST-1517](https://pypost.atlassian.net/browse/PYPOST-1517)).
 7. **Flaky network and corrupted manifests (PYPOST-1426)**:
@@ -781,10 +822,16 @@ Automated test coverage is maintained in:
     environment imports succeed normally.
   - **Clean Worker Thread Termination & Bounded Join**: Closes or rejects dialog during
     active or failing discovery; verifies cooperative worker cancellation, bounded
-    `wait(1000)` thread join, and leak-free teardown (completed in
-    [PYPOST-1452](https://pypost.atlassian.net/browse/PYPOST-1452); follow-ups
-    [PYPOST-1453](https://pypost.atlassian.net/browse/PYPOST-1453),
+    adaptive thread join (<50ms fast-path return), and leak-free teardown (completed in
+    [PYPOST-1452](https://pypost.atlassian.net/browse/PYPOST-1452) and
+    [PYPOST-1453](https://pypost.atlassian.net/browse/PYPOST-1453); follow-up
     [PYPOST-1517](https://pypost.atlassian.net/browse/PYPOST-1517)).
+- `tests/test_import_dialog_adaptive_worker_join_repro.py` (PYPOST-1453):
+  - **Fast Return Latency on Worker Exit**: Verifies `_cancel_and_join_worker` unblocks in <50ms when workers exit promptly, avoiding rigid blocking delays.
+  - **Polymorphic Thread Duck-Typing**: Tests `adaptive_thread_join` across standard `threading.Thread`, PySide6 `QThread`, and duck-typed test doubles supporting either `join`/`is_alive` or `wait`/`isRunning`.
+  - **Centralized Teardown on Dialog Actions**: Validates adaptive worker cancellation and teardown during `reject()`, `closeEvent()`, and `accept()`.
+  - **Worker Replacement on Collection Switch**: Asserts superseded fetch workers are cooperatively cancelled and adaptively joined when users change collection selection.
+  - **Bounded Timeout and Diagnostic Logging**: Validates that stuck workers time out gracefully at the 1.0s boundary and emit structured warning diagnostics.
 - `tests/test_forward_cancellation_nested_helpers_repro.py` (PYPOST-1452):
   - **Nested Cancellation in LibraryManagerService**: Asserts `get_connection`, `read_manifest`,
     `list_manifest_collections`, and `read_collection` forward tokens and abort before store

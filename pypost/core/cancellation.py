@@ -177,8 +177,58 @@ class AdaptiveJoinPolicy:
     progress_log_interval: float = 0.500
 
 
+def _is_thread_alive(thread: Any) -> bool:
+    """Polymorphic check whether a thread or QThread worker is still alive."""
+    if thread is None:
+        return False
+    is_alive_fn = getattr(thread, "is_alive", None)
+    if callable(is_alive_fn):
+        return bool(is_alive_fn())
+    is_running_fn = getattr(thread, "isRunning", None) or getattr(thread, "is_running", None)
+    if callable(is_running_fn):
+        return bool(is_running_fn())
+    is_finished_fn = getattr(thread, "isFinished", None)
+    if callable(is_finished_fn):
+        return not bool(is_finished_fn())
+    return False
+
+
+def _slice_join(thread: Any, slice_timeout: float) -> None:
+    """Polymorphic join or wait helper for threading.Thread or QThread workers."""
+    join_fn = getattr(thread, "join", None)
+    if callable(join_fn):
+        join_fn(timeout=slice_timeout)
+        return
+    wait_fn = getattr(thread, "wait", None)
+    if callable(wait_fn):
+        msecs = max(1, int(round(slice_timeout * 1000)))
+        try:
+            wait_fn(msecs)
+        except TypeError:
+            wait_fn(slice_timeout)
+
+
+def _resolve_thread_name(thread: Any, thread_name: str | None = None) -> str:
+    """Resolve thread name using explicit name, attribute, or class name."""
+    if thread_name:
+        return thread_name
+    if thread is None:
+        return "worker-thread"
+    name_attr = getattr(thread, "name", None)
+    if name_attr:
+        return str(name_attr)
+    obj_name_attr = getattr(thread, "objectName", None)
+    if callable(obj_name_attr):
+        obj_name = obj_name_attr()
+        if obj_name:
+            return str(obj_name)
+    elif obj_name_attr:
+        return str(obj_name_attr)
+    return type(thread).__name__
+
+
 def adaptive_thread_join(
-    thread: threading.Thread | None,
+    thread: Any | None,
     timeout: float | None = None,
     *,
     policy: AdaptiveJoinPolicy | None = None,
@@ -187,16 +237,19 @@ def adaptive_thread_join(
 ) -> bool:
     """Join a thread using adaptive backoff polling and deadline enforcement.
 
+    Supports polymorphic duck-typed thread objects (threading.Thread, QThread, or doubles
+    providing is_alive()/join() or isRunning()/wait()).
+
     Returns True if the thread terminated within the timeout, False if it timed out.
     """
     if thread is None:
         return True
-    if not thread.is_alive():
+    if not _is_thread_alive(thread):
         return True
 
     active_policy = policy or AdaptiveJoinPolicy()
     max_timeout = timeout if timeout is not None else active_policy.default_timeout
-    name = thread_name or getattr(thread, "name", "worker-thread")
+    name = _resolve_thread_name(thread, thread_name)
 
     start_time = time.monotonic()
     deadline = start_time + max_timeout
@@ -216,9 +269,9 @@ def adaptive_thread_join(
             slice_timeout,
             remaining,
         )
-        thread.join(timeout=slice_timeout)
+        _slice_join(thread, slice_timeout)
 
-        if not thread.is_alive():
+        if not _is_thread_alive(thread):
             elapsed = time.monotonic() - start_time
             logger.debug(
                 "Adaptive thread join succeeded: thread=%s elapsed=%.3fs timeout=%.3fs",
@@ -247,7 +300,7 @@ def adaptive_thread_join(
         name,
         elapsed,
         max_timeout,
-        thread.is_alive(),
+        _is_thread_alive(thread),
     )
     return False
 
