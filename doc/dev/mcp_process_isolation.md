@@ -325,6 +325,7 @@ Envelopes are dicts with `"v": 1` and `"type": <MsgType>` (`mcp_worker_ipc.make_
 | Child → Host | `ACK` | e.g. `correlating="UPDATE_TOOLS"` or `"UPDATE_VARIABLES"` |
 | Child → Host | `EXITED` | after cooperative STOP |
 | Child → Host | `WORKER_ERROR` | fatal / sanitized command error path |
+| Child → Host | `VERSION_MISMATCH` | unsupported protocol version error reply |
 
 Tools are JSON-safe via `encode_tools` / `decode_tools` (`__mcp_tool_kind__`:
 `http` | `websocket`).
@@ -342,6 +343,62 @@ configuration and resolved inside the owning child process against its own
 `_SnapshotStore`; `START`, `UPDATE_TOOLS`, and `UPDATE_VARIABLES` payloads,
 `upstream_url`, header values, request URLs/descriptions, and variable snapshots
 are never logged.
+
+### IPC protocol versioning and mismatch rejection (PYPOST-1467)
+
+To prevent corrupted IPC states or silent failures caused by version skew between the host
+supervisor and isolated child worker processes, all IPC message envelopes undergo strict version
+validation upon ingress.
+
+#### Envelope contracts
+
+- **Current version**: `MSG_V = 1` (`pypost/core/mcp_worker_ipc.py`).
+- **Supported versions**: `SUPPORTED_MSG_VERSIONS = frozenset({1})`.
+- **Validation helper**: `validate_message_version(message: dict[str, Any]) -> int`.
+  - Enforces that `message` is a dictionary containing a `"v"` key.
+  - Enforces that `"v"` is a strict integer (rejects `bool`, `str`, `float`, `None`, and
+    collections).
+  - Enforces that `"v" in SUPPORTED_MSG_VERSIONS`.
+  - Raises `McpProtocolVersionError` (subclass of `ValueError`) on failure, carrying
+    `received_v` and `supported_versions` diagnostic attributes.
+
+#### Worker ingress rejection semantics
+
+In `mcp_worker_process.worker_main`:
+
+- **Pre-START phase** (`store is None`): When the worker receives an envelope with an invalid or
+  unsupported version before initialization, it logs `mcp_worker_ipc_version_rejected` at
+  `WARNING` level, replies with `START_FAILED` containing the version error description, and
+  exits immediately without starting uvicorn or leaking background threads.
+- **Running phase** (`store is not None`): When a running worker receives an incompatible
+  command (e.g. invalid `UPDATE_TOOLS` or `UPDATE_VARIABLES`), it logs
+  `mcp_worker_ipc_version_rejected` at `WARNING` level, replies with `WORKER_ERROR`, discards
+  the invalid payload, and continues serving without crashing uvicorn.
+
+#### Supervisor ingress rejection semantics
+
+In `mcp_process_supervisor.McpProcessSupervisor._apply_ipc_message`:
+
+- **Starting phase** (`record.state == "starting"`): When the supervisor receives an envelope with
+  an unsupported version from a launching worker, it logs `mcp_supervisor_ipc_version_rejected`
+  at `ERROR` level, marks the worker record as `failed`, records `last_error`, and unblocks
+  waiting callers by signaling `record.started_event`.
+- **Running phase** (`record.state == "running"`): When the supervisor receives an incompatible
+  envelope from an active worker, it logs `mcp_supervisor_ipc_version_rejected` at `ERROR` level,
+  discards the message, and preserves supervisor state without corrupting the worker table.
+
+#### Observability log events
+
+IPC version rejection operations emit structured key-value events with strict secret safety:
+
+| Event | Level | Key Fields | Description |
+| --- | --- | --- | --- |
+| `mcp_worker_ipc_version_rejected` | WARN | `received_v`, `supported` | Mismatch reject |
+| `mcp_supervisor_ipc_version_rejected` | ERROR | `instance_id`, `received_v` | Mismatch reject |
+
+Both events capture `received_v`, `supported_versions`, and the formatted error message, while
+`mcp_supervisor_ipc_version_rejected` additionally records `instance_id`. All events strictly
+omit payload bodies, tool parameters, environment variables, and authentication tokens.
 
 ---
 
@@ -590,6 +647,8 @@ Events strictly omit sensitive runtime data (no payload bodies, variables, or to
 | Memory warning in logs | Worker RSS exceeded soft limit | Inspect memory; recycle or tune limit |
 | Killed: `memory_limit_exceeded` | RSS exceeded hard limit | Killed via SIGKILL; check leak |
 | Restart halted by admission | Limits exceeded in backoff | Resolve pressure; restart when free |
+| Worker start version mismatch | Incompatible protocol version | Ensure worker and host use `v=1` |
+| Runtime command version rejected | Unsupported message `v` | Discarded as WORKER_ERROR (v=1) |
 
 For a rejected live edit, inspect `mcp_registry_process_reconfigure_rejected`: the `phase`,
 `restored`, and `cleaned` fields distinguish startup, reclamation, and restoration outcomes
@@ -609,6 +668,7 @@ make test WORKERS=1 PYTEST_ARGS="tests/test_mcp_process_proxy_repro.py -q"
 make test WORKERS=1 PYTEST_ARGS="tests/test_mcp_process_tool_refresh_repro.py -q"
 make test WORKERS=1 PYTEST_ARGS="tests/test_mcp_process_autorestart_repro.py -q"
 make test WORKERS=1 PYTEST_ARGS="tests/test_mcp_process_resource_limits_repro.py -q"
+make test WORKERS=1 PYTEST_ARGS="tests/test_mcp_ipc_protocol_version_repro.py -q"
 make test PYTEST_ARGS="tests/test_mcp_multiserver_stress_10x.py"
 ```
 
@@ -645,6 +705,10 @@ PYPOST-1469) verifies the 7 acceptance criteria:
 5. Soft memory limit emits `mcp_worker_memory_warning` once without killing the worker.
 6. Hard memory limit triggers `SIGTERM` -> `SIGKILL` escalation, setting `memory_limit_exceeded`.
 7. Admission exhaustion during auto-restart backoff halts recovery cycles gracefully.
+IPC protocol versioning coverage (`tests/test_mcp_ipc_protocol_version_repro.py`, PYPOST-1467)
+verifies strict envelope integer versioning, worker start rejection (`START_FAILED`), runtime
+command rejection (`WORKER_ERROR`), supervisor ingress rejection during starting and running
+states, and secret-safe structured logging via `caplog`.
 
 ---
 

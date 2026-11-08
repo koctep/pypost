@@ -18,9 +18,11 @@ import uvicorn
 from pypost.core.mcp_proxy_server_impl import MCPProxyServerImpl
 from pypost.core.mcp_server_impl import MCPServerImpl
 from pypost.core.mcp_worker_ipc import (
+    McpProtocolVersionError,
     decode_tools,
     make_message,
     message_type,
+    validate_message_version,
 )
 from pypost.core.server_bind import (
     drain_pending_tasks,
@@ -180,6 +182,39 @@ def worker_main(conn: Any) -> None:
 
             if not isinstance(message, dict):
                 continue
+
+            try:
+                validate_message_version(message)
+            except McpProtocolVersionError as exc:
+                logger.warning(
+                    "mcp_worker_ipc_version_rejected received_v=%s supported=%s error=%s",
+                    getattr(exc, "received_v", None),
+                    getattr(exc, "supported_versions", None),
+                    exc,
+                )
+                if store is None:
+                    try:
+                        conn.send(
+                            make_message(
+                                "START_FAILED",
+                                message=f"Incompatible IPC protocol version: {exc}",
+                            )
+                        )
+                    except (BrokenPipeError, OSError, EOFError):
+                        pass
+                    break
+                else:
+                    try:
+                        conn.send(
+                            make_message(
+                                "WORKER_ERROR",
+                                message=f"Incompatible IPC protocol version: {exc}",
+                            )
+                        )
+                    except (BrokenPipeError, OSError, EOFError):
+                        pass
+                    continue
+
             msg_type = message_type(message)
 
             if msg_type == "START":

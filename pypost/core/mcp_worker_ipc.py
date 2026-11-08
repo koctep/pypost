@@ -5,6 +5,55 @@ from __future__ import annotations
 from typing import Any, Literal
 
 MSG_V = 1
+SUPPORTED_MSG_VERSIONS = frozenset({MSG_V})
+
+
+class McpProtocolVersionError(ValueError):
+    """Raised when an IPC message has an invalid or unsupported protocol version."""
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        received_v: Any = None,
+        supported_versions: frozenset[int] | set[int] = SUPPORTED_MSG_VERSIONS,
+    ) -> None:
+        super().__init__(message)
+        self.received_v = received_v
+        self.supported_versions = supported_versions
+
+
+def validate_message_version(message: dict[str, Any]) -> int:
+    """Validate that an IPC envelope has a supported integer protocol version.
+
+    Returns:
+        The validated integer protocol version.
+
+    Raises:
+        McpProtocolVersionError: If "v" is missing, not an int (or is a bool),
+            or not in SUPPORTED_MSG_VERSIONS.
+    """
+    if not isinstance(message, dict) or "v" not in message:
+        raise McpProtocolVersionError(
+            "IPC message missing required 'v' protocol version field",
+            received_v=None,
+            supported_versions=SUPPORTED_MSG_VERSIONS,
+        )
+    v = message["v"]
+    if isinstance(v, bool) or not isinstance(v, int):
+        raise McpProtocolVersionError(
+            f"IPC message version must be an int, got {type(v).__name__}: {v!r}",
+            received_v=v,
+            supported_versions=SUPPORTED_MSG_VERSIONS,
+        )
+    if v not in SUPPORTED_MSG_VERSIONS:
+        raise McpProtocolVersionError(
+            f"Unsupported IPC protocol version {v} (supported: {sorted(SUPPORTED_MSG_VERSIONS)})",
+            received_v=v,
+            supported_versions=SUPPORTED_MSG_VERSIONS,
+        )
+    return int(v)
+
 
 MsgType = Literal[
     "START",
@@ -20,6 +69,7 @@ MsgType = Literal[
     "ACK",
     "WORKER_ERROR",
     "EXITED",
+    "VERSION_MISMATCH",
 ]
 
 
