@@ -7,6 +7,7 @@ import multiprocessing
 import os
 import threading
 import time
+import uuid
 from copy import deepcopy
 from dataclasses import dataclass, field
 from typing import Any, Callable, Literal
@@ -18,7 +19,11 @@ from pypost.core.mcp_worker_ipc import (
     validate_message_version,
 )
 from pypost.core.mcp_worker_process import worker_main
-from pypost.models.settings import McpResourceLimitsPolicy, McpWorkerRestartPolicy
+from pypost.models.settings import (
+    McpHeartbeatPolicy,
+    McpResourceLimitsPolicy,
+    McpWorkerRestartPolicy,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -86,6 +91,10 @@ class _WorkerRecord:
     last_rss_sample_at: float = 0.0
     soft_limit_warned: bool = False
     rss_mb: float | None = None
+    last_heartbeat_sent_at: float = 0.0
+    last_heartbeat_pong_at: float = 0.0
+    pending_heartbeat_nonce: str | None = None
+    pending_heartbeat_sent_at: float = 0.0
 
 
 class McpProcessSupervisor:
@@ -99,6 +108,7 @@ class McpProcessSupervisor:
         on_worker_restarted: Callable[[str, int], None] | None = None,
         restart_policy: McpWorkerRestartPolicy | None = None,
         resource_limits: McpResourceLimitsPolicy | None = None,
+        heartbeat_policy: McpHeartbeatPolicy | None = None,
         rss_sampler: Callable[[int], float | None] | None = None,
         stop_budget_s: float = DEFAULT_STOP_BUDGET_S,
     ) -> None:
@@ -117,6 +127,11 @@ class McpProcessSupervisor:
             resource_limits.model_copy()
             if resource_limits is not None
             else McpResourceLimitsPolicy()
+        )
+        self._heartbeat_policy = (
+            heartbeat_policy.model_copy()
+            if heartbeat_policy is not None
+            else McpHeartbeatPolicy()
         )
         self._memory_sampler: Callable[[int], float | None] = (
             rss_sampler if rss_sampler is not None else get_process_rss_mb
@@ -137,6 +152,10 @@ class McpProcessSupervisor:
     @property
     def resource_limits(self) -> McpResourceLimitsPolicy:
         return self._resource_limits
+
+    @property
+    def heartbeat_policy(self) -> McpHeartbeatPolicy:
+        return self._heartbeat_policy
 
     def _check_admission(self, instance_id: str, is_restart: bool = False) -> None:
         policy = self._resource_limits
@@ -662,6 +681,34 @@ class McpProcessSupervisor:
                     record.process.pid,
                     message.get("message"),
                 )
+            elif msg_type == "HEARTBEAT_PONG":
+                received_nonce = message.get("nonce")
+                if (
+                    record.pending_heartbeat_nonce is not None
+                    and received_nonce == record.pending_heartbeat_nonce
+                ):
+                    now_ts = time.monotonic()
+                    latency_s = (
+                        now_ts - record.pending_heartbeat_sent_at
+                        if record.pending_heartbeat_sent_at > 0.0
+                        else 0.0
+                    )
+                    record.pending_heartbeat_nonce = None
+                    record.pending_heartbeat_sent_at = 0.0
+                    record.last_heartbeat_pong_at = now_ts
+                    logger.debug(
+                        "mcp_worker_heartbeat_pong instance_id=%s pid=%s latency_s=%.4f",
+                        instance_id,
+                        record.process.pid if record.process else None,
+                        latency_s,
+                    )
+                else:
+                    logger.warning(
+                        "mcp_worker_heartbeat_pong_mismatch instance_id=%s expected=%s got=%s",
+                        instance_id,
+                        record.pending_heartbeat_nonce,
+                        received_nonce,
+                    )
 
     def _monitor_loop(self) -> None:
         """Watch child liveness, reset windows, and backoff retries."""
@@ -860,6 +907,112 @@ class McpProcessSupervisor:
                                     readers_to_stop.append(record)
                                     unexpected.append((instance_id, proc_to_kill.exitcode))
 
+                    # 5. Active HEARTBEAT watchdog checks
+                    if (
+                        self._heartbeat_policy.enabled
+                        and record.state == "running"
+                        and not record.restarting
+                        and record.process is not None
+                        and record.process.is_alive()
+                    ):
+                        if (
+                            record.pending_heartbeat_nonce is not None
+                            and (now - record.pending_heartbeat_sent_at)
+                            > self._heartbeat_policy.timeout_s
+                        ):
+                            logger.error(
+                                "mcp_worker_heartbeat_timeout instance_id=%s pid=%s "
+                                "timeout_s=%.2f",
+                                instance_id,
+                                record.process.pid,
+                                self._heartbeat_policy.timeout_s,
+                            )
+                            proc_to_kill = record.process
+                            try:
+                                if proc_to_kill.is_alive():
+                                    proc_to_kill.terminate()
+                                    proc_to_kill.join(timeout=0.2)
+                                    if proc_to_kill.is_alive():
+                                        proc_to_kill.kill()
+                                        proc_to_kill.join(timeout=0.2)
+                            except Exception:
+                                pass
+                            record.pending_heartbeat_nonce = None
+                            record.pending_heartbeat_sent_at = 0.0
+                            record.last_error = (
+                                f"heartbeat timeout ({self._heartbeat_policy.timeout_s}s)"
+                            )
+                            exitcode = proc_to_kill.exitcode
+                            if (
+                                self._restart_policy.enabled
+                                and record.retry_count < self._restart_policy.max_retries
+                            ):
+                                record.retry_count += 1
+                                delay_s = self._restart_policy.backoff_for_attempt(
+                                    record.retry_count
+                                )
+                                record.next_retry_deadline = now + delay_s
+                                record.restarting = True
+                                record.state = "starting"
+                                record.cancel_event.clear()
+                                record.started_event.clear()
+                                logger.info(
+                                    "mcp_worker_restart_scheduled instance_id=%s attempt=%d "
+                                    "max_retries=%d delay_s=%.2f exitcode=%s "
+                                    "reason=heartbeat_timeout",
+                                    instance_id,
+                                    record.retry_count,
+                                    self._restart_policy.max_retries,
+                                    delay_s,
+                                    exitcode,
+                                )
+                                restarting_events.append(
+                                    (
+                                        instance_id,
+                                        record.retry_count,
+                                        delay_s,
+                                        exitcode,
+                                    )
+                                )
+                                readers_to_stop.append(record)
+                            else:
+                                record.state = "failed"
+                                record.restarting = False
+                                record.cancel_event.set()
+                                record.next_retry_deadline = None
+                                if (
+                                    self._restart_policy.enabled
+                                    and record.retry_count >= self._restart_policy.max_retries
+                                ):
+                                    logger.error(
+                                        "mcp_worker_restart_exhausted instance_id=%s "
+                                        "attempts=%d max_retries=%d exitcode=%s",
+                                        instance_id,
+                                        record.retry_count,
+                                        self._restart_policy.max_retries,
+                                        exitcode,
+                                    )
+                                unexpected.append((instance_id, exitcode))
+                                readers_to_stop.append(record)
+                        elif (
+                            record.pending_heartbeat_nonce is None
+                            and (
+                                record.last_heartbeat_sent_at == 0.0
+                                or (now - record.last_heartbeat_sent_at)
+                                >= self._heartbeat_policy.interval_s
+                            )
+                        ):
+                            nonce = uuid.uuid4().hex[:16]
+                            record.pending_heartbeat_nonce = nonce
+                            record.pending_heartbeat_sent_at = now
+                            record.last_heartbeat_sent_at = now
+                            try:
+                                record.parent_conn.send(
+                                    make_message("HEARTBEAT", nonce=nonce)
+                                )
+                            except (BrokenPipeError, OSError, EOFError, ValueError):
+                                pass
+
             # Stop dead readers outside the lock
             for rec in readers_to_stop:
                 self._stop_reader(rec)
@@ -1026,6 +1179,11 @@ class McpProcessSupervisor:
                 record.restarting = False
                 record.started_at = time.monotonic()
                 record.next_retry_deadline = None
+                record.last_error = None
+                record.last_heartbeat_sent_at = 0.0
+                record.last_heartbeat_pong_at = 0.0
+                record.pending_heartbeat_nonce = None
+                record.pending_heartbeat_sent_at = 0.0
                 pid = record.process.pid
                 attempt = record.retry_count
             logger.info(

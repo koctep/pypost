@@ -53,6 +53,20 @@ class McpWorkerRestartPolicy(BaseModel):
         return min(self.max_backoff_s, delay)
 
 
+class McpHeartbeatPolicy(BaseModel):
+    """Active watchdog probe policy for isolated MCP workers."""
+
+    enabled: bool = True
+    interval_s: float = Field(default=2.0, gt=0.0)
+    timeout_s: float = Field(default=5.0, gt=0.0)
+
+    @model_validator(mode="after")
+    def validate_heartbeat_bounds(self) -> "McpHeartbeatPolicy":
+        if self.timeout_s < self.interval_s:
+            raise ValueError("timeout_s cannot be less than interval_s")
+        return self
+
+
 class McpServerConfiguration(BaseModel):
     """One independently managed, persisted MCP endpoint."""
 
@@ -125,6 +139,9 @@ class AppSettings(BaseModel):
     mcp_port: int = 1080
     mcp_host: str = "127.0.0.1"
     mcp_execution_mode: Literal["thread", "process"] = "thread"
+    mcp_heartbeat_policy: McpHeartbeatPolicy = Field(
+        default_factory=McpHeartbeatPolicy
+    )
     mcp_restart_policy: McpWorkerRestartPolicy = Field(
         default_factory=McpWorkerRestartPolicy
     )
