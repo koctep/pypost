@@ -464,6 +464,26 @@ Developers extending selector syntax, modifying response views, or altering MCP 
 
 ---
 
+### 5. Unified JSON Selector Path Evaluation Engine (PYPOST-1394)
+
+To eliminate duplicated AST traversal and pattern matching across `SensitiveTextSanitizer`
+and `ResponseMaskController`, PYPOST-1394 extracted a centralized domain engine:
+`pypost.core.json_selector_engine.JsonSelectorEngine`.
+
+Key capabilities:
+- **Pre-Compiled Rule Partitioning**: Partitions selectors into $O(1)$ bare field lookups (`_bare_keys`)
+  and compiled path matchers (`CompiledPathSelector`), bypassing string allocations for non-matching nodes.
+- **Unified Wildcard Semantics**: Standardizes wildcard handling (`items[*].secret`, `items.*.secret`,
+  `[*].id`) across MCP and GUI pipelines.
+- **Running Offset Tracking**: Replaces $O(M \times N)$ chunk summation in `JsonMaskFormatter` with an
+  incremental $O(1)$ offset counter.
+- **Zero UI Dependencies**: Lives in `pypost/core/` for safe execution in headless daemon and MCP environments.
+
+For complete API specifications and code examples, see
+[Unified JSON Selector Path Evaluation Engine](json_selector_engine.md).
+
+---
+
 ## Comparison: GUI vs MCP Masking
 
 | Dimension | GUI ResponseView | MCP Server Output |
@@ -479,6 +499,7 @@ Developers extending selector syntax, modifying response views, or altering MCP 
 
 ## References
 
+- Unified JSON Selector Engine: [`doc/dev/json_selector_engine.md`](json_selector_engine.md)
 - Epic Decomposition Notes: [`ai-tasks/PYPOST-1312/decomposition-notes.md`](../../ai-tasks/PYPOST-1312/decomposition-notes.md)
 - Step 2 Architecture Design: [`ai-tasks/PYPOST-1376/20-architecture.md`](../../ai-tasks/PYPOST-1376/20-architecture.md)
 - Sensitive Data Masking Policy: [`doc/dev/sensitive_data_masking_policy.md`](sensitive_data_masking_policy.md)

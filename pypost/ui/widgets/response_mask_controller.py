@@ -17,7 +17,7 @@ from PySide6.QtCore import QEvent, QObject, Qt
 from PySide6.QtGui import QColor, QMouseEvent, QTextCharFormat, QTextCursor
 from PySide6.QtWidgets import QTextEdit, QToolTip
 
-from pypost.core.sensitive_text_sanitizer import format_path_variants
+from pypost.core.json_selector_engine import JsonSelectorEngine
 
 if TYPE_CHECKING:
     from pypost.ui.widgets.foldable_code_view import FoldableCodeView
@@ -40,25 +40,25 @@ class MaskedTokenSpan:
 class JsonMaskFormatter:
     """Formats JSON with indentation while detecting and recording masked token spans."""
 
-    def __init__(self, selectors: set[str], indent: int = 2) -> None:
-        self.selectors = {
-            s.strip()
-            for s in selectors
-            if s and s.strip() and not s.strip().lower().startswith("header:")
-        }
+    def __init__(self, selectors: set[str] | Sequence[str], indent: int = 2) -> None:
+        self.engine = JsonSelectorEngine(selectors)
+        self.selectors = set(self.engine._raw_selectors)
         self.indent = indent
         self._chunks: list[str] = []
         self._spans: list[MaskedTokenSpan] = []
+        self._current_pos: int = 0
 
     def _emit(self, text: str) -> None:
         self._chunks.append(text)
+        self._current_pos += len(text)
 
     def _current_offset(self) -> int:
-        return sum(len(c) for c in self._chunks)
+        return self._current_pos
 
     def format(self, node: Any) -> tuple[str, list[MaskedTokenSpan]]:
         self._chunks = []
         self._spans = []
+        self._current_pos = 0
         self._format_value(node, [], 0)
         return "".join(self._chunks), self._spans
 
@@ -80,8 +80,7 @@ class JsonMaskFormatter:
             key_str = str(key)
             self._emit(" " * ((depth + 1) * self.indent))
             self._emit(json.dumps(key_str, ensure_ascii=False) + ": ")
-            variants = format_path_variants(path, key_str)
-            if any(var in self.selectors for var in variants):
+            if self.engine.matches(path, key_str):
                 masked_val = '"***"'
                 raw_val = json.dumps(val, indent=self.indent, ensure_ascii=False)
                 start_pos = self._current_offset()
@@ -94,7 +93,7 @@ class JsonMaskFormatter:
                         raw_value=raw_val,
                         masked_value=masked_val,
                         is_revealed=False,
-                        path=".".join(path + [key_str]),
+                        path=self.engine.canonical_path(path, key_str),
                     )
                 )
             else:
