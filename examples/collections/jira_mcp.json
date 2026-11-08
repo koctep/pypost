@@ -47,7 +47,11 @@
       "expose_as_mcp": true,
       "mcp_description": "Return the authenticated Jira user.",
       "mcp_params": {},
-      "retry_policy": null
+      "retry_policy": null,
+      "hidden_response_fields": [
+        "emailAddress",
+        "accountId"
+      ]
     },
     {
       "id": "jira-search-issues-jql",
@@ -736,7 +740,11 @@
           "default": 0
         }
       },
-      "retry_policy": null
+      "retry_policy": null,
+      "hidden_response_fields": [
+        "[*].emailAddress",
+        "[*].accountId"
+      ]
     }
   ]
 }
