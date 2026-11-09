@@ -1274,6 +1274,31 @@ Troubleshooting import-order lint failures:
   `pytestmark = pytest.mark.timeout(...)`; its position after imports does not change pytest's
   module-level marker behavior.
 
+### Registry test E501 comment wrap (PYPOST-1509)
+
+**Overview.** PYPOST-1509 clears a pre-existing test-lint E501 on an overlong comment in
+`tests/test_mcp_server_registry.py` (`test_failed_bind_clears_server_thread_after_worker_exits`).
+At base `33d5cb1a`, `make lint` failed with
+`tests/test_mcp_server_registry.py:308:101: E501 line too long (111 > 100 characters)`.
+
+**Architecture and scope.** Comment formatting only. Split the Desired-state comment across two
+lines so each physical line stays within the 100-character limit. Assertions, fixtures, and
+MCP registry production code stay unchanged. No `# noqa`, baseline carve-out, or Makefile /
+`.flake8` change belongs to this ticket.
+
+**Usage and validation.**
+
+```bash
+make lint
+```
+
+Success for this finding means `lint-tests` no longer reports that E501. Broader `make lint`
+output may still include unrelated gates; this record covers only the registry comment wrap.
+
+**Troubleshooting.** If E501 returns on that comment, re-wrap at a natural break (for example
+after `cleared`) rather than silencing the code. Prefer fixing the source over editing
+`test-lint-baseline.json` for a trivially wrappable comment.
+
 ### Test-source lint gate (PYPOST-1303)
 
 **Overview and architecture.** `make lint` includes `lint-tests` alongside the existing
