@@ -342,14 +342,18 @@ class MCPServerImpl:
         )
 
     def register_tools(self, requests: Sequence[RequestData | WebSocketConnection]):
-        """Register HTTP requests and WebSocket connections as MCP tools."""
+        """Register HTTP requests and WebSocket connections as MCP tools.
+
+        Builds a fresh map and swaps ``self.tools_map`` in one assignment so
+        concurrent ``list_tools`` / ``call_tool`` never observe a cleared map.
+        Entries keep caller object identity; isolation copies belong at registry
+        or IPC boundaries, not here.
+        """
         new_map: Dict[str, RequestData | WebSocketConnection] = {}
         for item in requests:
             if item.expose_as_mcp:
                 pfx = "ws_" if isinstance(item, WebSocketConnection) else ""
-                copy_fn = getattr(item, "model_copy", None)
-                copied = copy_fn(deep=True) if callable(copy_fn) else item
-                new_map[f"{pfx}{normalize_mcp_tool_name(item.name)}"] = copied
+                new_map[f"{pfx}{normalize_mcp_tool_name(item.name)}"] = item
         self.tools_map = new_map
 
     def _generate_schema(self, req: RequestData) -> dict:
