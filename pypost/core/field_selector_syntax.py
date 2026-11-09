@@ -110,6 +110,10 @@ def validate_field_selector(text: str) -> FieldSelectorSyntaxResult:
             return _invalid(_UNSUPPORTED_MESSAGE)
         return _ok()
 
+    # A written ".." is an empty step. Reject it before collapse turns it into ".".
+    if ".." in cleaned:
+        return _invalid(_UNSUPPORTED_MESSAGE)
+
     normalized = _normalize_wildcards(cleaned)
     # Collapse accidental double dots from adjacent [*] replacements / leading [*]
     while ".." in normalized:

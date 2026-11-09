@@ -116,6 +116,11 @@ the **documented supported vocabulary**, not against every string
 | Path | Identifier / `*` segments joined by `.`; surface `[*]` normalizes to `*` | `auth.token`, `users[*].email`, `[*].id` |
 | Invalid | `$…` JSONPath, filters, numeric indexes, empty `header:`, bad punctuation, etc. | `$.users[0].name`, `header:` |
 
+A written `..` on the stripped path is rejected before wildcard normalization
+([PYPOST-1539](https://pypost.atlassian.net/browse/PYPOST-1539)).
+`users..email` is not ok. `users[*].email` stays ok. The existing unsupported
+message is reused.
+
 Invalid results carry a plain-language `message` plus short `suggestions`
 listing the four supported families.
 
