@@ -93,10 +93,12 @@ def test_ipc_envelope_version_contracts() -> None:
 @pytest.mark.timeout(30)
 def test_worker_start_rejection_on_mismatched_version() -> None:
     """Worker process must reject invalid START envelope version and abort cleanly."""
-    with reserve_ephemeral_ports(1) as (port,):
+    with reserve_ephemeral_ports(1) as ports:
+        port = ports[0]
         ctx = multiprocessing.get_context("spawn")
         parent_conn, child_conn = ctx.Pipe(duplex=True)
         proc = ctx.Process(target=worker_main, args=(child_conn,), daemon=True)
+        ports.release()
         proc.start()
         child_conn.close()
 
@@ -143,10 +145,12 @@ def test_worker_start_rejection_on_mismatched_version() -> None:
 @pytest.mark.timeout(30)
 def test_worker_runtime_command_rejection_on_mismatched_version() -> None:
     """Worker must reject runtime commands with invalid version without crashing."""
-    with reserve_ephemeral_ports(1) as (port,):
+    with reserve_ephemeral_ports(1) as ports:
+        port = ports[0]
         ctx = multiprocessing.get_context("spawn")
         parent_conn, child_conn = ctx.Pipe(duplex=True)
         proc = ctx.Process(target=worker_main, args=(child_conn,), daemon=True)
+        ports.release()
         proc.start()
         child_conn.close()
 

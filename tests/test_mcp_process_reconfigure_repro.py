@@ -65,6 +65,7 @@ def running_pair(tmp_path: Path) -> Iterator[RunningPair]:
             peer = _upsert_standalone(
                 harness, index=2, port=ports[1], prefix="reconfigure", tool_name="peer_tool"
             )
+            reserve.release()
             registry.start(target)
             registry.start(peer)
             assert registry.wait_for_state(target, "running", timeout=15)

@@ -188,6 +188,7 @@ def test_process_mode_refresh_collection_updates_tools_live_add_modify_remove(
             )
             try:
                 registry.upsert(config)
+                ports.release()
                 registry.start(config.id)
                 assert registry.wait_for_state(config.id, "running", timeout=15.0)
                 wait_for_port("127.0.0.1", mcp_port, timeout=15.0)
@@ -409,6 +410,7 @@ def test_process_mode_refresh_collection_updates_collection_variables_and_preser
                 registry.validate_library_candidate(lib_config)
                 registry.upsert(lib_config)
 
+                ports.release()
                 registry.start(ws_config.id)
                 registry.start(lib_config.id)
                 assert registry.wait_for_state(ws_config.id, "running", timeout=15.0)
@@ -609,6 +611,7 @@ def test_process_mode_refresh_collection_isolates_neighbor_and_proxy_servers() -
             )
         )
         try:
+            ports.release()
             registry.start("srv-target")
             registry.start("srv-neighbor")
             registry.start("srv-proxy")
@@ -726,6 +729,7 @@ def test_process_mode_refresh_collection_contains_exited_worker_and_updates_snap
             )
         )
         try:
+            ports.release()
             registry.start("srv-dead")
             registry.start("srv-healthy")
             assert registry.wait_for_state("srv-dead", "running", timeout=15.0)
@@ -827,6 +831,7 @@ def test_shared_mode_refresh_collection_regression_parity() -> None:
             )
             try:
                 registry.upsert(config)
+                ports.release()
                 registry.start(config.id)
                 assert registry.wait_for_state(config.id, "running", timeout=15.0)
                 wait_for_port("127.0.0.1", mcp_port, timeout=15.0)

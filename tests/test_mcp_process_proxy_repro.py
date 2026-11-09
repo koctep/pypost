@@ -81,6 +81,7 @@ def test_process_proxy_forwards_upstream_tools_and_resolved_headers(
             config = _config(port, upstream_url, transport)
             caplog.clear()
             with caplog.at_level(logging.INFO, logger="pypost.core.mcp_process_supervisor"):
+                reserve.release()
                 runner.start(
                     ServerStartSpec(configuration=config, variables={"TOKEN": "owned-token"})
                 )
@@ -116,6 +117,7 @@ def test_process_start_payload_preserves_proxy_settings(monkeypatch: pytest.Monk
     monkeypatch.setattr(supervisor, "_send", capture)
     config = _config(port, "http://127.0.0.1:9/custom/sse", "sse")
     try:
+        reserve.release()
         runner.start(ServerStartSpec(configuration=config, variables={"TOKEN": "payload-token"}))
         assert len(sent) == 1
         start = sent[0]
@@ -150,6 +152,7 @@ def test_registry_process_proxy_reconfigure_changes_upstream(
                 registry.upsert(config)
                 caplog.clear()
                 with caplog.at_level(logging.INFO, logger="pypost.core.mcp_server_registry"):
+                    reserve.release()
                     registry.start(config.id)
                     assert anyio.run(_mcp_list_tools, f"http://127.0.0.1:{ports[0]}/mcp") == [
                         "first_upstream"

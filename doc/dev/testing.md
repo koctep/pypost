@@ -174,18 +174,28 @@ settle helpers
 [ui_wait.md](ui_wait.md). For TCP listen readiness, use
 `wait_for_port` from `tests/helpers/mcp_live_server.py`.
 Ephemeral ports for live MCP / manager tests come from
-`tests/helpers/port_allocation.py` (PYPOST-1178 / PYPOST-1541): cross-process
-`fcntl.flock` + counter file under `PYPOST_TEST_PORT_LOCK` (default
-`/tmp/pypost-test-port.lock`), base 35000, span 25000, `SO_REUSEADDR` bind,
-fallback to port 0. Prefer `allocate_bound_tcp_socket()` when the next step is a
-server listen — it returns an **open bound socket** so the port stays reserved
-until the caller closes it or hands it to uvicorn (`serve(sockets=[sock])`).
-`LiveMCPServer` uses that held-socket path plus a bounded bind retry loop.
+`tests/helpers/port_allocation.py` (PYPOST-1178 / PYPOST-1541 / PYPOST-1546):
+cross-process `fcntl.flock` + counter file under `PYPOST_TEST_PORT_LOCK`
+(default `/tmp/pypost-test-port.lock`), base 35000, span 25000, fallback to
+port 0. Prefer `allocate_bound_tcp_socket()` when the next step is an
+in-process server listen — it returns an **open bound socket** (default
+`SO_REUSEADDR`) so the port stays reserved until the caller closes it or
+hands it to uvicorn (`serve(sockets=[sock])`). `LiveMCPServer` uses that
+held-socket path plus a bounded bind retry loop.
+
+For **process-mode** suites that pass integer ports into child workers, use
+`reserve_ephemeral_ports` / `EphemeralPortReserve` (PYPOST-1546). They allocate
+with **exclusive** binds (`reuse_addr=False`) so parallel workers cannot steal
+ports during setup. Call `ports.release()` / `reserve.release()`
+**immediately before** `registry.start` / runner start so the child can bind;
+the context-manager `finally` releases any leftovers. Contract test:
+`tests/test_ephemeral_port_reserve_hold_repro.py`.
+
 `free_port()` / `allocate_tcp_port()` remain for call sites that only need an
 integer; they close the probe socket before return (allocate-then-release
 TOCTOU). Prefer them over ad-hoc `bind(..., 0)` under parallel workers, and
-prefer the bound-socket helper over the integer helpers when starting a real
-listener.
+prefer the bound-socket / exclusive-reserve helpers over the integer helpers
+when starting a real listener.
 
 To drive pytest **yield fixtures** outside a request (e.g. mocked packaging caplog proofs),
 use `tests/helpers/fixture_drive.py` (`unwrap_yield_fixture`, `run_yield_fixture`,

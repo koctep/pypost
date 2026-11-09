@@ -193,7 +193,8 @@ def test_normal_worker_heartbeats_roundtrip_successfully(
     )
     col, env = _make_dummy_collection_and_env("hb-roundtrip")
 
-    with reserve_ephemeral_ports(1) as (port,):
+    with reserve_ephemeral_ports(1) as ports:
+        port = ports[0]
         registry = MCPServerRegistry(
             collection_lookup=lambda cid: col if cid == col.id else None,
             environment_lookup=lambda eid: env if eid == env.id else None,
@@ -214,6 +215,7 @@ def test_normal_worker_heartbeats_roundtrip_successfully(
                         enabled=True,
                     )
                 )
+                ports.release()
                 registry.start("srv-hb-normal")
                 assert registry.wait_for_state(
                     "srv-hb-normal", "running", timeout=15.0
@@ -263,7 +265,8 @@ def test_hung_worker_times_out_and_is_terminated_to_failed(
     )
     col, env = _make_dummy_collection_and_env("hb-hung")
 
-    with reserve_ephemeral_ports(1) as (port,):
+    with reserve_ephemeral_ports(1) as ports:
+        port = ports[0]
         registry = MCPServerRegistry(
             collection_lookup=lambda cid: col if cid == col.id else None,
             environment_lookup=lambda eid: env if eid == env.id else None,
@@ -282,6 +285,7 @@ def test_hung_worker_times_out_and_is_terminated_to_failed(
                 )
             )
             with caplog.at_level(logging.ERROR, logger="pypost.core.mcp_process_supervisor"):
+                ports.release()
                 registry.start("srv-hb-hung")
                 assert registry.wait_for_state("srv-hb-hung", "running", timeout=15.0)
                 runner = registry.runner_for("srv-hb-hung")
@@ -330,7 +334,8 @@ def test_disabled_watchdog_does_not_terminate_hung_worker(
     )
     col, env = _make_dummy_collection_and_env("hb-disabled")
 
-    with reserve_ephemeral_ports(1) as (port,):
+    with reserve_ephemeral_ports(1) as ports:
+        port = ports[0]
         registry = MCPServerRegistry(
             collection_lookup=lambda cid: col if cid == col.id else None,
             environment_lookup=lambda eid: env if eid == env.id else None,
@@ -349,6 +354,7 @@ def test_disabled_watchdog_does_not_terminate_hung_worker(
                 )
             )
             with caplog.at_level(logging.ERROR, logger="pypost.core.mcp_process_supervisor"):
+                ports.release()
                 registry.start("srv-hb-disabled")
                 assert registry.wait_for_state("srv-hb-disabled", "running", timeout=15.0)
                 runner = registry.runner_for("srv-hb-disabled")
@@ -393,7 +399,8 @@ def test_heartbeat_timeout_interplay_with_auto_restart(
     )
     col, env = _make_dummy_collection_and_env("hb-restart")
 
-    with reserve_ephemeral_ports(1) as (port,):
+    with reserve_ephemeral_ports(1) as ports:
+        port = ports[0]
         registry = MCPServerRegistry(
             collection_lookup=lambda cid: col if cid == col.id else None,
             environment_lookup=lambda eid: env if eid == env.id else None,
@@ -413,6 +420,7 @@ def test_heartbeat_timeout_interplay_with_auto_restart(
                 )
             )
             with caplog.at_level(logging.ERROR, logger="pypost.core.mcp_process_supervisor"):
+                ports.release()
                 registry.start("srv-hb-restart")
                 assert registry.wait_for_state("srv-hb-restart", "running", timeout=15.0)
                 runner = registry.runner_for("srv-hb-restart")

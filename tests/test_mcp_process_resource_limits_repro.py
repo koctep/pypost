@@ -174,7 +174,8 @@ def test_default_policy_unlimited_allows_spawns_without_rejection() -> None:
     assert policy.max_total_rss_mb == pytest.approx(0.0)
 
     col, env = _make_dummy_collection_and_env("unlimited")
-    with reserve_ephemeral_ports(2) as (port1, port2):
+    with reserve_ephemeral_ports(2) as ports:
+        port1, port2 = ports[0], ports[1]
         registry = MCPServerRegistry(
             collection_lookup=lambda cid: col if cid == col.id else None,
             environment_lookup=lambda eid: env if eid == env.id else None,
@@ -193,6 +194,7 @@ def test_default_policy_unlimited_allows_spawns_without_rejection() -> None:
                         enabled=True,
                     )
                 )
+                ports.release()
                 registry.start(srv_id)
                 assert registry.wait_for_state(srv_id, "running", timeout=15.0)
 
@@ -214,7 +216,8 @@ def test_spawn_admission_worker_count_limit_rejects_excess_spawns(
     policy = policy_cls(max_process_workers=2)
     col, env = _make_dummy_collection_and_env("worker-cap")
 
-    with reserve_ephemeral_ports(3) as (port1, port2, port3):
+    with reserve_ephemeral_ports(3) as ports:
+        port1, port2, port3 = ports[0], ports[1], ports[2]
         registry = MCPServerRegistry(
             collection_lookup=lambda cid: col if cid == col.id else None,
             environment_lookup=lambda eid: env if eid == env.id else None,
@@ -234,6 +237,7 @@ def test_spawn_admission_worker_count_limit_rejects_excess_spawns(
                         enabled=True,
                     )
                 )
+                ports.release()
                 registry.start(srv_id)
                 assert registry.wait_for_state(srv_id, "running", timeout=15.0)
 
@@ -315,7 +319,8 @@ def test_spawn_admission_total_rss_budget_rejects_excess_spawns(
     )
     col, env = _make_dummy_collection_and_env("rss-budget")
 
-    with reserve_ephemeral_ports(3) as (port1, port2, port3):
+    with reserve_ephemeral_ports(3) as ports:
+        port1, port2, port3 = ports[0], ports[1], ports[2]
         registry = MCPServerRegistry(
             collection_lookup=lambda cid: col if cid == col.id else None,
             environment_lookup=lambda eid: env if eid == env.id else None,
@@ -334,6 +339,7 @@ def test_spawn_admission_total_rss_budget_rejects_excess_spawns(
                         enabled=True,
                     )
                 )
+                ports.release()
                 registry.start(srv_id)
                 assert registry.wait_for_state(srv_id, "running", timeout=15.0)
 
@@ -389,7 +395,8 @@ def test_soft_memory_limit_emits_warning_without_killing_worker(
         assert pid > 0
         return simulated_rss
 
-    with reserve_ephemeral_ports(1) as (port1,):
+    with reserve_ephemeral_ports(1) as ports:
+        port1 = ports[0]
         registry = MCPServerRegistry(
             collection_lookup=lambda cid: col if cid == col.id else None,
             environment_lookup=lambda eid: env if eid == env.id else None,
@@ -413,6 +420,7 @@ def test_soft_memory_limit_emits_warning_without_killing_worker(
             )
 
             with caplog.at_level(logging.WARNING, logger="pypost.core.mcp_process_supervisor"):
+                ports.release()
                 registry.start("srv-soft")
                 assert registry.wait_for_state("srv-soft", "running", timeout=15.0)
 
@@ -457,7 +465,8 @@ def test_hard_memory_limit_escalates_and_terminates_runaway_worker(
     )
     col, env = _make_dummy_collection_and_env("hard-mem")
 
-    with reserve_ephemeral_ports(2) as (port_healthy, port_runaway):
+    with reserve_ephemeral_ports(2) as ports:
+        port_healthy, port_runaway = ports[0], ports[1]
         registry = MCPServerRegistry(
             collection_lookup=lambda cid: col if cid == col.id else None,
             environment_lookup=lambda eid: env if eid == env.id else None,
@@ -493,6 +502,7 @@ def test_hard_memory_limit_escalates_and_terminates_runaway_worker(
             )
 
             # Start healthy worker
+            ports.release()
             registry.start("srv-healthy")
             assert registry.wait_for_state("srv-healthy", "running", timeout=15.0)
             runner_healthy = registry.runner_for("srv-healthy")
@@ -555,7 +565,8 @@ def test_admission_exhaustion_halts_autorestart_backoff_cycle(
     )
     col, env = _make_dummy_collection_and_env("restart-halt")
 
-    with reserve_ephemeral_ports(2) as (port1, _port2):
+    with reserve_ephemeral_ports(2) as ports:
+        port1 = ports[0]
         registry = MCPServerRegistry(
             collection_lookup=lambda cid: col if cid == col.id else None,
             environment_lookup=lambda eid: env if eid == env.id else None,
@@ -574,6 +585,7 @@ def test_admission_exhaustion_halts_autorestart_backoff_cycle(
                     enabled=True,
                 )
             )
+            ports.release()
             registry.start("srv-restart-halt")
             assert registry.wait_for_state("srv-restart-halt", "running", timeout=15.0)
 

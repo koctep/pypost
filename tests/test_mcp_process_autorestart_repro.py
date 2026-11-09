@@ -296,6 +296,7 @@ def test_default_policy_disabled_fails_immediately_without_retry(
                         enabled=True,
                     )
                 )
+                ports.release()
                 registry.start(srv_id)
                 assert registry.wait_for_state(srv_id, "running", timeout=15.0)
                 wait_for_port("127.0.0.1", port, timeout=15.0)
@@ -398,6 +399,7 @@ def test_auto_restart_recovers_crashed_worker_with_exponential_backoff_and_lates
             )
             try:
                 registry.upsert(config)
+                ports.release()
                 registry.start(config.id)
                 assert registry.wait_for_state(config.id, "running", timeout=15.0)
                 wait_for_port("127.0.0.1", mcp_port, timeout=15.0)
@@ -575,6 +577,7 @@ def test_auto_restart_exhaustion_transitions_to_failed_after_max_retries(
         )
         try:
             registry.upsert(config)
+            ports.release()
             registry.start(config.id)
             assert registry.wait_for_state(config.id, "running", timeout=15.0)
             wait_for_port("127.0.0.1", mcp_port, timeout=15.0)
@@ -693,6 +696,7 @@ def test_healthy_reset_window_resets_retry_counter_for_later_crash(
         )
         try:
             registry.upsert(config)
+            ports.release()
             registry.start(config.id)
             assert registry.wait_for_state(config.id, "running", timeout=15.0)
             wait_for_port("127.0.0.1", mcp_port, timeout=15.0)
@@ -811,6 +815,7 @@ def test_operator_stop_and_shutdown_cancel_pending_backoff_immediately(
                         enabled=True,
                     )
                 )
+                ports.release()
                 registry.start(srv_id)
                 assert registry.wait_for_state(srv_id, "running", timeout=15.0)
                 wait_for_port("127.0.0.1", port, timeout=15.0)
@@ -935,6 +940,7 @@ def test_initial_start_failure_does_not_trigger_auto_restart() -> None:
         blocker.listen(1)
         try:
             registry.upsert(config)
+            ports.release()
             registry.start(config.id)
             assert registry.status(config.id).state == "failed"
 
