@@ -15,6 +15,7 @@ __all__ = ["FieldSelectorSyntaxResult", "validate_field_selector"]
 
 _BRACKET_WILDCARD_RE = re.compile(r"\[\*\]")
 _IDENTIFIER_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_-]*$")
+_NUMERIC_INDEX_RE = re.compile(r"\[-?\d+\]")
 
 _SUGGESTIONS = (
     "Supported forms: simple key (token), dotted path (auth.token), "
@@ -25,6 +26,18 @@ _SUGGESTIONS = (
 _UNSUPPORTED_MESSAGE = (
     "Unsupported or invalid field selector syntax. "
     "This expression is not accepted by response masking."
+)
+_DOLLAR_MESSAGE = (
+    "This field selector uses a JSONPath dollar. "
+    "A dollar sign is not a supported field name."
+)
+_INDEX_MESSAGE = (
+    "This field selector uses a numeric index. "
+    "A number in brackets is not a supported field name."
+)
+_FILTER_MESSAGE = (
+    "This field selector uses a filter. "
+    "A condition in brackets is not a supported field name."
 )
 
 
@@ -65,25 +78,41 @@ def _is_valid_segment(segment: str) -> bool:
     return segment == "*" or bool(_IDENTIFIER_RE.match(segment))
 
 
-def _validate_path(text: str) -> FieldSelectorSyntaxResult:
+def _message_for_draft(draft: str) -> str:
+    """Return the kind sentence, or the generic warning."""
+    shapes: list[str] = []
+    if "[?" in draft:
+        shapes.append(_FILTER_MESSAGE)
+    if draft.startswith("$"):
+        shapes.append(_DOLLAR_MESSAGE)
+    if _NUMERIC_INDEX_RE.search(draft) is not None:
+        shapes.append(_INDEX_MESSAGE)
+    if len(shapes) == 1:
+        return shapes[0]
+    return _UNSUPPORTED_MESSAGE
+
+
+def _validate_path(text: str, draft: str) -> FieldSelectorSyntaxResult:
+    # Normalization can rewrite the path. The message comes from the draft.
+    message = _message_for_draft(draft)
     if " " in text or "\t" in text:
-        return _invalid(_UNSUPPORTED_MESSAGE)
+        return _invalid(message)
     if "$" in text or "?" in text or "(" in text or ")" in text:
-        return _invalid(_UNSUPPORTED_MESSAGE)
+        return _invalid(message)
     if text.startswith(".") or text.endswith("."):
-        return _invalid(_UNSUPPORTED_MESSAGE)
+        return _invalid(message)
     if ".." in text:
-        return _invalid(_UNSUPPORTED_MESSAGE)
+        return _invalid(message)
 
     # Reject any remaining brackets that are not the [*] wildcard (already normalized).
     if "[" in text or "]" in text:
-        return _invalid(_UNSUPPORTED_MESSAGE)
+        return _invalid(message)
 
     segments = text.split(".")
     if not segments or any(segment == "" for segment in segments):
-        return _invalid(_UNSUPPORTED_MESSAGE)
+        return _invalid(message)
     if not all(_is_valid_segment(segment) for segment in segments):
-        return _invalid(_UNSUPPORTED_MESSAGE)
+        return _invalid(message)
     return _ok()
 
 
@@ -105,9 +134,9 @@ def validate_field_selector(text: str) -> FieldSelectorSyntaxResult:
 
     if "." not in cleaned and "[" not in cleaned and "]" not in cleaned:
         if "$" in cleaned or " " in cleaned or "\t" in cleaned:
-            return _invalid(_UNSUPPORTED_MESSAGE)
+            return _invalid(_message_for_draft(cleaned))
         if not _IDENTIFIER_RE.match(cleaned):
-            return _invalid(_UNSUPPORTED_MESSAGE)
+            return _invalid(_message_for_draft(cleaned))
         return _ok()
 
     # A written ".." is an empty step. Reject it before collapse turns it into ".".
@@ -119,4 +148,4 @@ def validate_field_selector(text: str) -> FieldSelectorSyntaxResult:
     while ".." in normalized:
         normalized = normalized.replace("..", ".")
     normalized = normalized.strip(".")
-    return _validate_path(normalized)
+    return _validate_path(normalized, cleaned)
