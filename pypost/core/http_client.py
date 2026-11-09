@@ -48,12 +48,16 @@ TEMPLATE_ERROR_LOG_URL_PLACEHOLDER = "[invalid-url]"
 def _assert_no_dot_path_segments(url: str) -> None:
     """Raise ExecutionError for blank, '.', or '..' rendered URL path segments.
 
-    The synthetic empty piece from an absolute path's leading ``/`` is ignored.
-    Any other empty segment (mid-path ``//`` or a trailing blank) is rejected
-    (PYPOST-1332). Whole-segment ``.`` / ``..`` remain rejected (PYPOST-1346).
+    An empty path (no path component after the authority) has no segments to
+    inspect and is allowed (PYPOST-1534). The synthetic empty piece from an
+    absolute path's leading ``/`` is ignored. Any other empty segment
+    (mid-path ``//`` or a trailing blank) is rejected (PYPOST-1332).
+    Whole-segment ``.`` / ``..`` remain rejected (PYPOST-1346).
     Percent-encoded lookalikes such as ``%2e`` stay out of scope.
     """
     path = urlsplit(url).path
+    if path == "":
+        return
     for index, segment in enumerate(path.split("/")):
         if segment == "":
             if index == 0 and path.startswith("/"):
