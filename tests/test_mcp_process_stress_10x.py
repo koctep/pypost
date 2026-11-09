@@ -140,6 +140,7 @@ def test_mcp_process_10x_parallel_startup_barrier_synchronization(
                 )
                 server_configs.append((srv_id, port))
 
+            ports.release()
             barrier = threading.Barrier(10)
 
             def _parallel_starter(srv_id: str) -> None:
@@ -255,6 +256,7 @@ def test_mcp_process_10x_variable_namespace_isolation_under_concurrent_load(
             )
             harness.registry.validate_library_candidate(config)
             harness.registry.upsert(config)
+            reserve.release()
             harness.registry.start(server_id)
             server_configs.append((server_id, port, secret))
 
@@ -317,6 +319,7 @@ def test_mcp_process_10x_abrupt_client_disconnect_rst_resilience(
                     prefix="prst",
                     tool_name=f"tool_prst_{i}",
                 )
+                ports.release()
                 harness.registry.start(srv_id)
                 server_configs.append((srv_id, port))
 
@@ -399,6 +402,7 @@ def test_mcp_process_10x_concurrent_teardown_and_socket_reclamation(
                 prefix="ptear",
                 tool_name=f"tool_ptear_{i}",
             )
+            reserve.release()
             harness.registry.start(srv_id)
             server_ids.append(srv_id)
 
@@ -455,6 +459,7 @@ def test_mcp_process_windows_stop_escalation_simulate_terminate_to_kill(
             prefix="winhang",
             tool_name="tool_winhang",
         )
+        reserve.release()
         harness.registry.start(server_id)
         assert harness.registry.wait_for_state(
             server_id, "running", timeout=15.0

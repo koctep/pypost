@@ -115,6 +115,7 @@ def test_mcp_10x_parallel_startup_barrier_synchronization(tmp_path: Path) -> Non
                 harness.registry.upsert(config)
                 server_configs.append((server_id, port))
 
+            ports.release()
             barrier = threading.Barrier(10)
 
             def _parallel_starter(srv_id: str) -> None:
@@ -193,6 +194,7 @@ def test_mcp_10x_variable_namespace_isolation_under_concurrent_load(
             )
             harness.registry.validate_library_candidate(config)
             harness.registry.upsert(config)
+            reserve.release()
             harness.registry.start(server_id)
             server_configs.append((server_id, port, srv_val))
 
@@ -249,6 +251,8 @@ def test_mcp_10x_abrupt_client_disconnect_rst_resilience(tmp_path: Path) -> None
                     is_legacy_manifest=False,
                     collections_data={f"{col_id}.json": col_data},
                 )
+                if i == 1:
+                    ports.release()
                 srv_id, port, status = harness.start_standalone_server(
                     manifest_id=lib_id,
                     collection_id=col_id,
@@ -321,6 +325,8 @@ def test_mcp_10x_concurrent_teardown_and_socket_reclamation(tmp_path: Path) -> N
                 is_legacy_manifest=False,
                 collections_data={f"{col_id}.json": col_data},
             )
+            if i == 1:
+                reserve.release()
             srv_id, port, status = harness.start_standalone_server(
                 manifest_id=lib_id,
                 collection_id=col_id,

@@ -212,6 +212,7 @@ def test_process_mode_crash_isolation_peer_servers_survive(
                 prefix="crash",
                 tool_name="tool_crash_b",
             )
+            ports.release()
             harness.registry.start(server_a)
             harness.registry.start(server_b)
             assert harness.registry.wait_for_state(
@@ -312,6 +313,7 @@ def test_process_mode_variable_isolation_under_concurrent_load(
             )
             harness.registry.validate_library_candidate(config)
             harness.registry.upsert(config)
+            reserve.release()
             harness.registry.start(server_id)
             server_configs.append((server_id, port, secret))
 
@@ -378,6 +380,7 @@ def test_process_mode_bounded_stop_with_unresponsive_worker(
             prefix="hang",
             tool_name="tool_hang",
         )
+        reserve.release()
         harness.registry.start(server_id)
         assert harness.registry.wait_for_state(
             server_id, "running", timeout=15.0
@@ -428,6 +431,8 @@ def test_thread_mode_regression_still_passes_10x_barrier_startup(
                 server_configs.append((server_id, port))
 
             barrier = threading.Barrier(10)
+
+            ports.release()
 
             def _parallel_starter(srv_id: str) -> None:
                 barrier.wait(timeout=10.0)
