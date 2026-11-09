@@ -320,7 +320,7 @@ When writing or extending tests for background workers:
 ## Related Documentation & Cross-References
 
 - [Hidden Response Fields Architecture & Decomposition](hidden_response_fields.md): Overall architecture of response masking in desktop GUI and MCP agents (Epic PYPOST-1312).
-- [Unified JSON Selector Path Evaluation Engine](json_selector_engine.md): AST selector evaluation engine matching sensitive keys (PYPOST-1394).
+- [Unified JSON Selector Path Evaluation Engine](json_selector_engine.md): AST selector evaluation engine matching sensitive keys (PYPOST-1394 / PYPOST-1388 trie + breadcrumbs).
 - [Background Folding Scanner for Large Documents](background_folding_scanner.md): Reference implementation for asynchronous `QThread` document scanning and generation tracking (PYPOST-1370).
 - [Shared Foldable Plain Text Edit Base Class](foldable_plain_text_edit.md): Gutter, font metrics, and viewport architecture for `FoldableCodeView`.
 - [Testing Guidelines](testing.md): PyPost test execution standards, GUI fixtures, and timeout constraints.

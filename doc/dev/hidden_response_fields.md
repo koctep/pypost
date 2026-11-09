@@ -624,15 +624,21 @@ Developers extending selector syntax, modifying response views, or altering MCP 
 
 ---
 
-### 5. Unified JSON Selector Path Evaluation Engine (PYPOST-1394)
+### 5. Unified JSON Selector Path Evaluation Engine (PYPOST-1394 / PYPOST-1388)
 
 To eliminate duplicated AST traversal and pattern matching across `SensitiveTextSanitizer`
 and `ResponseMaskController`, PYPOST-1394 extracted a centralized domain engine:
-`pypost.core.json_selector_engine.JsonSelectorEngine`.
+`pypost.core.json_selector_engine.JsonSelectorEngine`. PYPOST-1388 keeps the public API frozen
+and replaces linear hierarchical scans with a segment trie plus mutable path breadcrumbs.
 
 Key capabilities:
 - **Pre-Compiled Rule Partitioning**: Partitions selectors into $O(1)$ bare field lookups (`_bare_keys`)
-  and compiled path matchers (`CompiledPathSelector`), bypassing string allocations for non-matching nodes.
+  and hierarchical rules indexed in `PathSelectorTrie` (exact + `*` edges), bypassing string
+  allocations for non-matching nodes.
+- **Depth-Bounded Hierarchical Lookup**: Steady-state `matches` walks the trie in
+  $O(\mathrm{depth})$ rather than scanning all hierarchical rules per key.
+- **Mutable Path Breadcrumbs**: `redact_tree` and `JsonMaskFormatter` share one `list[str]` with
+  `append` / `pop` instead of allocating `path + [seg]` per descent.
 - **Unified Wildcard Semantics**: Standardizes wildcard handling (`items[*].secret`, `items.*.secret`,
   `[*].id`) across MCP and GUI pipelines.
 - **Running Offset Tracking**: Replaces $O(M \times N)$ chunk summation in `JsonMaskFormatter` with an

@@ -1,4 +1,4 @@
-# Unified JSON Selector Path Evaluation Engine (PYPOST-1394)
+# Unified JSON Selector Path Evaluation Engine (PYPOST-1394 / PYPOST-1388)
 
 ## Overview
 
@@ -20,11 +20,15 @@ string generation, and wildcard matching logic. `JsonSelectorEngine` consolidate
 logic into a domain engine located in `pypost/core/json_selector_engine.py` with zero UI
 dependencies, optimized $O(1)$ bare key lookup partitioning, and AST-based path evaluation.
 
+PYPOST-1388 keeps that public API frozen and replaces the hierarchical match path with a
+**segment trie** (`PathSelectorTrie`) plus **mutable path breadcrumbs** during redaction and GUI
+formatting, so match cost scales with path depth rather than hierarchical rule count.
+
 ---
 
 ## Architecture
 
-The unified engine is built around two primary classes in `pypost/core/json_selector_engine.py`:
+The unified engine lives in `pypost/core/json_selector_engine.py`:
 
 ```
 +--------------------------------------------------------------+
@@ -37,39 +41,47 @@ The unified engine is built around two primary classes in `pypost/core/json_sele
 |                    JsonSelectorEngine                        |
 |                                                              |
 |   +--------------------------+  +--------------------------+ |
-|   |   _bare_keys (set[str])  |  | _path_selectors (list)   | |
-|   |   e.g. {'token', 'ssn'}  |  | CompiledPathSelector     | |
-|   |   $O(1)$ direct lookup   |  | e.g. items.*.secret      | |
+|   |   _bare_keys (set[str])  |  | PathSelectorTrie         | |
+|   |   e.g. {'token', 'ssn'}  |  | exact + '*' edges        | |
+|   |   $O(1)$ direct lookup   |  | terminals = mask field   | |
 |   +--------------------------+  +--------------------------+ |
 |                                                              |
 |   - matches(path, key) -> bool                               |
 |   - redact_tree(node, placeholder) -> (redacted, count)      |
+|   - mutable breadcrumb (append / pop) during redact_tree     |
 +------------------------------+-------------------------------+
             |                                      |
             v                                      v
 +-----------------------+              +-----------------------+
 | SensitiveTextSanitizer|              | ResponseMaskController|
-| (MCP irreversible)    |              | (GUI click-to-reveal) |
+| (MCP irreversible)    |              | JsonMaskFormatter     |
+|                       |              | (same breadcrumb)     |
 +-----------------------+              +-----------------------+
 ```
 
 ### Components
 
+- **`PathSelectorTrie`** (PYPOST-1388):
+  Prefix trie over hierarchical selector token sequences. Each node holds exact-token children
+  plus an optional `*` edge. Terminals mark “mask this field.” Steady-state `matches` walks the
+  trie in $O(\mathrm{depth})$ (with branching only on wildcards); it does **not** scan the full
+  hierarchical rule catalog per key.
 - **`CompiledPathSelector`**:
   Parses hierarchical path strings (such as `user.profile.token` or `items[*].secret`) into
-  normalized token tuples (`('items', '*', 'secret')`). Evaluates candidate path tokens in linear
-  time with wildcard support (`*` matches any object key or array index).
+  normalized token tuples (`('items', '*', 'secret')`). `_parse_tokens` remains the single
+  normalization path that feeds trie inserts at compile time. The instance `matches` helper is
+  retained for older unit coverage; the engine hot path uses the trie.
 - **`JsonSelectorEngine`**:
   The central facade that normalizes and compiles raw selector strings, partitions them into
-  fast bare keys and compiled path selectors, determines whether an AST node matches, and executes
-  immutable tree redaction.
+  fast bare keys and trie-indexed path selectors, determines whether an AST node matches, and
+  executes immutable tree redaction with a shared mutable path breadcrumb.
 - **`SensitiveTextSanitizer` Integration**:
   MCP response redaction delegates `redact_json_response_fields()` directly to
   `JsonSelectorEngine.redact_tree()`, returning a sanitized deep-copy tree and serialization.
 - **`ResponseMaskController` (`JsonMaskFormatter`) Integration**:
   Interactive GUI formatting instantiates `JsonSelectorEngine` to query `engine.matches(path, key)`
   during streaming token formatting, recording character offset spans with an incremental $O(1)$
-  offset counter.
+  offset counter. Descent uses the same push/pop breadcrumb pattern as engine redaction.
 
 ---
 
@@ -96,7 +108,8 @@ Located in `pypost.core.json_selector_engine`.
 
 #### `__init__(selectors: Iterable[str] | None = None)`
 Initializes the engine and compiles the given selector rules. Blank entries, whitespace, and
-non-body selectors (e.g. `header:*`) are safely ignored during compilation.
+non-body selectors (e.g. `header:*`) are safely ignored during compilation. Hierarchical rules
+are inserted into `PathSelectorTrie`; bare keys go into `_bare_keys`.
 
 ```python
 from pypost.core.json_selector_engine import JsonSelectorEngine
@@ -105,16 +118,16 @@ engine = JsonSelectorEngine(["token", "user.secret", "header:Authorization"])
 ```
 
 #### `is_empty -> bool`
-Returns `True` if no valid body selectors are compiled, allowing consumers to short-circuit
-traversal and formatting immediately.
+Returns `True` if no valid body selectors are compiled (no bare keys and an empty trie),
+allowing consumers to short-circuit traversal and formatting immediately.
 
 #### `matches(path: Sequence[str], key: str) -> bool`
 Evaluates whether a dictionary key at the specified parent path matches any compiled rule.
 - If `key` is present in `_bare_keys`, returns `True` immediately in $O(1)$ time.
-- Otherwise, constructs the candidate path sequence (`[*path, key]`) and tests against
-  `_path_selectors`.
-- Includes shorthand dot fallback compatibility (e.g., matching `items.secret` against
-  an `items.*.secret` rule).
+- Otherwise, walks `PathSelectorTrie` over `path` then `key` via `matches_path_and_key`
+  (no combined candidate list allocation on the hot path).
+- Includes shorthand dot fallback: when the candidate path contains `*`, a second trie walk
+  strips those segments (e.g. matching rule `items.secret` against path `items.*.secret`).
 
 ```python
 # Bare key match at any depth
@@ -131,6 +144,10 @@ Recursively redacts matching dictionary keys in arbitrary JSON structures (dicti
 lists). Returns a 2-tuple `(redacted_tree, masked_count)` containing the new sanitized data
 structure and the total number of redacted leaf values. Non-container inputs are returned
 unmodified.
+
+Internally, `_redact_node` shares one mutable `list[str]` breadcrumb: object keys are
+`append` / `pop`’d on descent/ascent; array elements push `"*"`. Callers still receive an
+immutable redacted copy of the tree (inputs are never mutated).
 
 ```python
 payload = {
@@ -153,21 +170,45 @@ bare key, `full_dot`, `shorthand_dot`, and `wildcard_dot`.
 
 ---
 
-### 2. `CompiledPathSelector`
+### 2. `PathSelectorTrie`
+
+Located in `pypost.core.json_selector_engine`.
+
+#### `insert(tokens: Sequence[str]) -> None`
+Indexes one hierarchical token sequence. Duplicate terminals do not inflate `size`.
+
+#### `size -> int`
+Number of distinct terminal hierarchical paths (also emitted as `trie_size` on the
+`json_selector_engine_compiled` DEBUG log).
+
+#### `matches_path_and_key(path, key) -> bool`
+Primary hot-path matcher: walk `path` tokens then `key` without allocating a combined list.
+
+#### `matches_shorthand_path_and_key(path, key) -> bool`
+Shorthand fallback: skips `*` segments in the candidate path, then walks the remainder + key.
+
+#### `matches_tokens(tokens) -> bool`
+Sequence-oriented helper (same walk as a combined token list). Available for callers/docs;
+production `JsonSelectorEngine.matches` prefers `matches_path_and_key`.
+
+---
+
+### 3. `CompiledPathSelector`
 
 Located in `pypost.core.json_selector_engine`.
 
 #### `__init__(raw: str)`
 Compiles a raw path selector string. Normalizes bracket wildcards `[*]` to `.*.` and parses
-into token segments.
+into token segments used for trie insert.
 
 #### `matches(candidate_tokens: Sequence[str]) -> bool`
 Checks whether a sequence of tokens matches the compiled pattern length and elements. The `*`
-wildcard matches any token segment.
+wildcard matches any token segment. Not used by the engine steady-state match path (trie
+owns that); retained for tokenizer parity and older unit tests.
 
 ---
 
-### 3. MCP Redaction Integration (`SensitiveTextSanitizer`)
+### 4. MCP Redaction Integration (`SensitiveTextSanitizer`)
 
 Located in `pypost.core.sensitive_text_sanitizer`.
 
@@ -181,11 +222,13 @@ sanitized = redact_json_response_fields(raw_body, hidden_fields=["user.apiKey"])
 
 ---
 
-### 4. GUI Masking Integration (`ResponseMaskController`)
+### 5. GUI Masking Integration (`ResponseMaskController`)
 
 Located in `pypost.ui.widgets.response_mask_controller`.
 
-`JsonMaskFormatter` uses `JsonSelectorEngine` to detect masked keys during text indentation:
+`JsonMaskFormatter` uses `JsonSelectorEngine` to detect masked keys during text indentation.
+Like `redact_tree`, format descent shares one mutable path list (`append` / `pop` for object
+keys and `"*"` for array elements) instead of allocating `path + [seg]` per level.
 
 ```python
 from pypost.ui.widgets.response_mask_controller import JsonMaskFormatter
@@ -205,10 +248,18 @@ formatted_text, spans = formatter.format(response_dict)
    Selectors without `.` or `[` are partitioned into `_bare_keys: set[str]`. In typical API
    responses, >80% of selectors are simple key names (`token`, `password`, `key`). These match in
    $O(1)$ time without string concatenation or tuple allocations.
-2. **Zero-Allocation Non-Matches**:
-   If no path selectors are defined and a key is not in `_bare_keys`, `matches()` returns `False`
+2. **Segment Trie Hierarchical Lookup (PYPOST-1388)**:
+   Hierarchical rules are indexed in `PathSelectorTrie` at compile time. Steady-state
+   `matches` walks exact/`*` edges bounded by path depth, not by scanning all $R$ hierarchical
+   rules. A `_path_selectors` list is still built for DEBUG `path_selectors_count` and the
+   FR-2 regression probe; it is not iterated on the hot path.
+3. **Mutable Path Breadcrumbs (PYPOST-1388)**:
+   `redact_tree` and `JsonMaskFormatter` reuse one `list[str]` across recursion with
+   `append` / `pop`, avoiding per-level `path + [seg]` allocations.
+4. **Zero-Allocation Non-Matches**:
+   If the trie is empty and a key is not in `_bare_keys`, `matches()` returns `False`
    immediately without allocating path lists or string objects.
-3. **Incremental Span Offset Calculation**:
+5. **Incremental Span Offset Calculation**:
    `JsonMaskFormatter` maintains `self._current_pos += len(text)` on chunk emission rather than
    summing chunk lengths on each match, reducing token span calculation complexity from
    $O(M \times N)$ to $O(1)$.
@@ -251,3 +302,7 @@ Example in collection JSON persistence:
 - **Non-dict/non-list payloads**:
   If the response body is raw plain text or invalid JSON, `redact_json_response_fields()` safely
   returns the original text unmodified without raising an exception.
+- **Large hierarchical catalogs feel slow**:
+  Confirm rules are hierarchical (contain `.` or `[`); bare keys already match in $O(1)$.
+  PYPOST-1388 trie lookup should keep non-bare misses proportional to nesting depth. Check
+  DEBUG `json_selector_engine_compiled` for `trie_size` vs `path_selectors_count`.
