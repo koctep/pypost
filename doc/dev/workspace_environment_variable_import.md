@@ -924,9 +924,13 @@ Automated test coverage is maintained in:
   - **Observability Diagnostics**: Asserts structured debug logging for
     `library_manager_get_connection_cancelled` and `library_manager_read_manifest_cancelled`.
 - `tests/test_async_manifest_discovery_repro.py`:
-  - **Non-Blocking Dialog Init**: Asserts `__init__` returns before a slow
-    `list_connections` completes, tracks `_active_discovery_worker`, keeps workspace
-    items immediately, and appends remote entries after bounded event-loop wait.
+  - **Non-Blocking Dialog Init** (PYPOST-1424 / PYPOST-1536): Asserts `__init__`
+    returns without joining on `list_connections` by gating the mock behind a
+    `threading.Event` released only after construction returns (avoids false
+    wall-clock failures under parallel CI load). Also asserts
+    `_active_discovery_worker` is a `QThread`, `list_connections` runs off the UI
+    thread, workspace items appear immediately, and remote entries append after a
+    bounded event-loop wait.
 - `tests/test_collection_fetch_transport_abort_repro.py`:
   - **Transport Abort on Cancel**: Asserts `CollectionFetchWorker` /
     `ManifestDiscoveryWorker.cancel()` fires `CancellationToken` abort callbacks and
