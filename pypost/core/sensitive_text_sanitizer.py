@@ -7,6 +7,7 @@ import logging
 import re
 from typing import Any, Iterable, Mapping, Sequence
 
+from pypost.core.header_selector_prefix import header_selector_name
 from pypost.core.json_selector_engine import JsonSelectorEngine
 
 logger = logging.getLogger(__name__)
@@ -65,8 +66,9 @@ def sanitize_headers(
     extra_hidden: set[str] = set()
     if hidden_response_fields:
         for field in hidden_response_fields:
-            if field.lower().startswith("header:"):
-                extra_hidden.add(field[7:].strip().lower())
+            name = header_selector_name(field)
+            if name is not None:
+                extra_hidden.add(name.strip().lower())
     result: dict[str, str] = {}
     for key, value in headers.items():
         if key.lower() in _SENSITIVE_HEADER_NAMES or key.lower() in extra_hidden:

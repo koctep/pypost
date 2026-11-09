@@ -111,7 +111,7 @@ the **documented supported vocabulary**, not against every string
 | Outcome | Rule | Examples |
 | --- | --- | --- |
 | Empty | `""` / whitespace → `ok=True`, `is_empty=True` | trailing blank row |
-| Header | `(?i)^header:(.+)$` with non-empty name | `header:Authorization` |
+| Header | Shared prefix `HEADER_SELECTOR_PREFIX` via `header_selector_name`, case-insensitive, non-empty name ([PYPOST-1538](https://pypost.atlassian.net/browse/PYPOST-1538)) | `header:Authorization` |
 | Simple key | Single identifier segment | `token`, `api_key` |
 | Path | Identifier / `*` segments joined by `.`; surface `[*]` normalizes to `*` | `auth.token`, `users[*].email`, `[*].id` |
 | Invalid | `$…` JSONPath, filters, numeric indexes, empty `header:`, bad punctuation, etc. | `$.users[0].name`, `header:` |

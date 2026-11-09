@@ -9,9 +9,10 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 
+from pypost.core.header_selector_prefix import header_selector_name
+
 __all__ = ["FieldSelectorSyntaxResult", "validate_field_selector"]
 
-_HEADER_RE = re.compile(r"(?i)^header:(.*)$")
 _BRACKET_WILDCARD_RE = re.compile(r"\[\*\]")
 _IDENTIFIER_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_-]*$")
 
@@ -92,10 +93,9 @@ def validate_field_selector(text: str) -> FieldSelectorSyntaxResult:
     if not cleaned:
         return _ok(is_empty=True)
 
-    header_match = _HEADER_RE.match(cleaned)
-    if header_match is not None:
-        name = header_match.group(1).strip()
-        if not name:
+    name = header_selector_name(cleaned)
+    if name is not None:
+        if not name.strip():
             return _invalid(
                 "Header selector requires a non-empty name after 'header:'. "
                 "This form is not accepted.",
