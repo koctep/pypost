@@ -78,6 +78,12 @@ flowchart TD
     RV -->|"set_masked_spans(spans)"| MC
 ```
 
+When `set_masked_spans` runs after an async medium-doc format (including indent
+reformat with `preserve_reveal_state=True`),
+[`ResponseMaskController`](file:///home/src/pypost/ui/widgets/response_mask_controller.py)
+restores path-keyed reveal choices from `_reveal_state`
+([PYPOST-1392](https://pypost.atlassian.net/browse/PYPOST-1392)).
+
 ### Core Components
 
 #### 1. `ResponseMaskWorker` ([`response_mask_worker.py`](file:///home/src/pypost/ui/widgets/response_mask_worker.py#L19-L141))
@@ -157,6 +163,7 @@ sequenceDiagram
         UI->>UI: body_view.setPlaceholderText("")
         UI->>UI: body_view.setText(formatted_text)
         UI->>UI: mask_controller.set_masked_spans(spans)
+        Note over UI: PYPOST-1392 restores path-keyed reveal state when present
         UI->>UI: track_hidden_value_mask_applied("gui_response")
     else Stale Generation
         UI->>UI: Ignore stale emission, log debug
