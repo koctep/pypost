@@ -254,6 +254,9 @@ or filename)—while skipping proxy servers (`server_type == "proxy"`) and unrel
      invokes `MCPServerImpl.register_tools(tools)` (which atomically replaces `self.tools_map`
      with a freshly constructed dict so concurrent `list_tools` / `call_tool` coroutines never
      observe a partially cleared map), and replies with `ACK(correlating="UPDATE_TOOLS")`.
+     Registered entries keep the caller-supplied object identity (no second `model_copy` inside
+     `register_tools`); isolation copies remain at registry refresh and IPC decode boundaries
+     (PYPOST-1535).
    - When collection or environment variables are present, `runner.update_variables(...)`
      follows with `UPDATE_VARIABLES`. Both updates preserve the existing worker PID and
      listening socket with zero downtime and synchronize `runner._spec` (`start_snapshot`).
