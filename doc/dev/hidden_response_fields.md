@@ -1,4 +1,4 @@
-# Hidden Response Fields Architecture and Decomposition (PYPOST-1312 / PYPOST-1376 / PYPOST-1395 / PYPOST-1396)
+# Hidden Response Fields Architecture and Decomposition (PYPOST-1312 / PYPOST-1376 / PYPOST-1386 / PYPOST-1395 / PYPOST-1396)
 
 ## Overview
 
@@ -23,7 +23,11 @@ masking configurations across the remaining bundled reference collections (GitHu
 with dedicated automated contract verification. Performance optimization task
 [PYPOST-1396](https://pypost.atlassian.net/browse/PYPOST-1396) introduced asynchronous background worker thread
 formatting for medium-sized (50 KB – 100 KB) payloads ([`ResponseMaskWorker`](response_mask_worker.md))
-to maintain a fluid 60 FPS UI experience without freezes.
+to maintain a fluid 60 FPS UI experience without freezes. Editor scalability task
+[PYPOST-1386](https://pypost.atlassian.net/browse/PYPOST-1386) refactored the Request Editor
+[`HiddenFieldsTable`](hidden_fields_table.md) from `QTableWidget` to a virtualized
+`QAbstractTableModel` + `QTableView` stack so large selector catalogs (>1,000 paths) stay
+responsive with minimal per-row memory.
 
 ---
 
@@ -102,18 +106,34 @@ The configuration of which response fields to hide lives as part of the canonica
   Ensures that mutable list instances of `hidden_response_fields` are completely detached across tabs. Modifying field selectors in an isolated tab draft never mutates the original request or sibling tabs.
 
 #### `HiddenFieldsTable` Component API (`pypost/ui/widgets/hidden_fields_table.py`)
-A specialized single-column `QTableWidget` component designed for managing list-based string selectors:
+
+Virtualized single-column selector editor ([PYPOST-1386](https://pypost.atlassian.net/browse/PYPOST-1386)).
+Full Model/View details, facades, observability, and troubleshooting:
+[Virtualized Hidden Fields Table](hidden_fields_table.md).
+
+- **Architecture**:
+  - View: `HiddenFieldsTable(QTableView)` in `pypost/ui/widgets/hidden_fields_table.py`.
+  - Model: `HiddenFieldsTableModel(QAbstractTableModel)` in
+    `pypost/ui/models/hidden_fields_table_model.py` (also re-exported from the widget module).
+  - Rows are lightweight `HiddenFieldRecord` dataclasses; the view requests `DisplayRole` /
+    `EditRole` only for visible cells (no per-row `QTableWidgetItem` allocations).
 - **Widget Identification**: Registered with `REQUEST_HIDDEN_FIELDS_TABLE = "request_hidden_fields_table"` via `set_widget_id()`.
 - **Table Structure**: Single column labeled `"Field Selector"`, configured with `QHeaderView.ResizeMode.Stretch`.
-- **Auto-Expanding Trailing Row**: Always maintains a trailing empty row. Editing the trailing empty row automatically appends a new empty row, matching the interaction pattern of PyPost's `KeyValueTable`.
-- **Public API**:
+- **Auto-Expanding Trailing Row**: Model invariant keeps exactly one blank trailing record.
+  Committing non-empty text on that row inserts a new blank trailer (same interaction pattern as
+  PyPost's `KeyValueTable` / `EmptyRowKeyValueTable`).
+- **Public API** (unchanged for `RequestEditor` and existing tests):
   - `set_data(data: list[str]) -> None`: Populates the table with existing non-empty selectors, filtering out whitespace, and appends a trailing empty row.
   - `get_data() -> list[str]`: Extracts all non-empty selector strings in row order, omitting trailing or intermediate blank rows.
   - `add_row(selector: str = "") -> None`: Appends a selector row or focuses and edits the trailing empty row if currently blank.
   - `remove_selected_rows() -> None`: Deletes highlighted rows (preserving the trailing empty row structure) and emits change signals.
+- **Compatibility Facades** (legacy `QTableWidget`-style introspection):
+  - `rowCount() -> int` / `columnCount() -> int` forward to the model.
+  - `item(row, col)` returns `_TableItemFacade` with `.text() -> str` (not a full `QTableWidgetItem`).
 - **Signals**:
   - `data_changed = Signal()`
   - `changed = Signal()`
+  - Forwarded from the model so dirty tracking in `RequestEditor` is unchanged.
 - **User Interactions**:
   - Context menu (`QContextMenuEvent`): Provides "Add Selector" and "Remove Selected" actions.
   - Keyboard shortcuts (`QKeyEvent`): Pressing `Delete` or `Backspace` outside cell edit mode deletes selected rows.
@@ -615,6 +635,34 @@ For complete API specifications and code examples, see
 
 ---
 
+### 6. Virtualized Hidden Fields Editor Table (PYPOST-1386)
+
+Enterprise requests can configure hundreds or thousands of masking selectors. The original
+`HiddenFieldsTable` subclassed `QTableWidget` and allocated a concrete item per row, which
+slowed initial load and scrolling for large catalogs.
+
+PYPOST-1386 moved the editor to Qt Model/View virtualization:
+
+- **`HiddenFieldsTableModel`**: Owns `list[HiddenFieldRecord]`, trailing blank-row expansion,
+  batch `set_data` / `remove_rows`, and DEBUG structured logs (counts only; never selector text).
+- **`HiddenFieldsTable(QTableView)`**: Viewport-virtualized presentation with preserved public
+  API and lightweight `item(row, col).text()` facades for existing UI tests.
+- **Caller contract**: `RequestEditor` still uses `set_data` / `get_data` / `add_row` /
+  `remove_selected_rows` and the dual `data_changed` / `changed` signals — persistence and
+  masking pipelines are untouched.
+
+Verification:
+
+```bash
+make test PYTEST_ARGS="tests/test_hidden_fields_virtualization_repro.py"
+make test PYTEST_ARGS="tests/test_request_hidden_fields_model_and_ui.py"
+```
+
+For architecture diagrams, API reference, and troubleshooting, see
+[Virtualized Hidden Fields Table](hidden_fields_table.md).
+
+---
+
 ## Comparison: GUI vs MCP Masking
 
 | Dimension | GUI ResponseView | MCP Server Output |
@@ -630,9 +678,12 @@ For complete API specifications and code examples, see
 
 ## References
 
+- Virtualized Hidden Fields Table: [`doc/dev/hidden_fields_table.md`](hidden_fields_table.md)
 - Unified JSON Selector Engine: [`doc/dev/json_selector_engine.md`](json_selector_engine.md)
 - Background Worker Thread Formatting for Medium JSON Responses: [`doc/dev/response_mask_worker.md`](response_mask_worker.md)
 - ResponseMaskWorker Test Suite: [`tests/test_response_mask_worker.py`](../../tests/test_response_mask_worker.py)
+- Hidden Fields Virtualization Repro: [`tests/test_hidden_fields_virtualization_repro.py`](../../tests/test_hidden_fields_virtualization_repro.py)
+- PYPOST-1386 Architecture Design: [`ai-tasks/PYPOST-1386/20-architecture.md`](../../ai-tasks/PYPOST-1386/20-architecture.md)
 - Reference Collection Masking Contract Tests: [`tests/test_reference_collection_masking_contract.py`](../../tests/test_reference_collection_masking_contract.py)
 - Google Drive Reference Collection Fixture: [`examples/collections/google_drive.json`](../../examples/collections/google_drive.json)
 - GitHub Reference Collection Fixture: [`examples/collections/github_mcp.json`](../../examples/collections/github_mcp.json)
