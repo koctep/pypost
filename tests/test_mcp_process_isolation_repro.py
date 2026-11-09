@@ -313,9 +313,13 @@ def test_process_mode_variable_isolation_under_concurrent_load(
             )
             harness.registry.validate_library_candidate(config)
             harness.registry.upsert(config)
-            reserve.release()
-            harness.registry.start(server_id)
             server_configs.append((server_id, port, secret))
+
+        # Hold exclusive ports through all upserts; one release before starts
+        # (PYPOST-1508 — early release inside the loop reopened TOCTOU).
+        reserve.release()
+        for srv_id, port, _ in server_configs:
+            harness.registry.start(srv_id)
 
         for srv_id, port, _ in server_configs:
             assert harness.registry.wait_for_state(
