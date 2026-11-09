@@ -10,7 +10,9 @@ from __future__ import annotations
 
 import json
 import logging
+from bisect import bisect_right
 from dataclasses import dataclass
+from operator import attrgetter
 from typing import TYPE_CHECKING, Any, Sequence
 
 from PySide6.QtCore import QEvent, QObject, Qt
@@ -178,10 +180,21 @@ class ResponseMaskController(QObject):
         return self._spans
 
     def span_at(self, char_pos: int) -> MaskedTokenSpan | None:
-        """Finds the token span containing the specified character position."""
-        for span in self._spans:
-            if span.start_pos <= char_pos <= span.end_pos:
-                return span
+        """Finds the token span containing the specified character position.
+
+        Uses ``bisect_right`` on ascending ``start_pos`` so that
+        ``idx - 1`` is the rightmost span with ``start_pos <= char_pos``
+        (including exact start hits). Coverage remains inclusive on both
+        ends: ``start_pos <= char_pos <= end_pos``.
+        """
+        if not self._spans:
+            return None
+        idx = bisect_right(self._spans, char_pos, key=attrgetter("start_pos"))
+        if idx == 0:
+            return None
+        candidate = self._spans[idx - 1]
+        if char_pos <= candidate.end_pos:
+            return candidate
         return None
 
     def handle_click(self, char_pos: int) -> bool:
