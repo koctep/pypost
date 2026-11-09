@@ -1,4 +1,4 @@
-# HTTP Path Segment Rejection (`.`, `..`, blank) — PYPOST-1346 / PYPOST-1332
+# HTTP Path Segment Rejection (`.`, `..`, blank) — PYPOST-1346 / PYPOST-1332 / PYPOST-1534
 
 ## Overview
 
@@ -8,6 +8,12 @@ functions), `HTTPClient` rejects any request whose path contains:
 - a segment that is exactly `.` or exactly `..` ([PYPOST-1346](https://pypost.atlassian.net/browse/PYPOST-1346)), or
 - a **blank** segment other than the synthetic empty piece from an absolute path’s leading
   `/` ([PYPOST-1332](https://pypost.atlassian.net/browse/PYPOST-1332)).
+
+An **empty path** (no path component after the authority, e.g. `http://example.test`) is
+allowed: there are no segments to inspect
+([PYPOST-1534](https://pypost.atlassian.net/browse/PYPOST-1534)). That is distinct from a
+trailing blank on a non-empty path (e.g. `http://example.test/projects/`), which remains
+rejected.
 
 The failure is fail-closed: no `session.request` call is made, and callers (GUI, inbound MCP
 tools, collection offline `_prepare` helpers) receive an `ExecutionError` with
@@ -33,17 +39,19 @@ TemplateService.render_string(url)
         ▼
 HTTPClient._prepare_request_kwargs
         │
-        ├─ _assert_no_dot_path_segments(url)   ← PYPOST-1346 + PYPOST-1332
+        ├─ _assert_no_dot_path_segments(url)   ← PYPOST-1346 + PYPOST-1332 + PYPOST-1534
         │         │
+        │         ├─ empty path → allow (no segments)
         │         └─ on reject: ERROR log + re-raise ExecutionError(TEMPLATE)
         │
         └─ build headers / params / body → session.request(**kwargs)
 ```
 
 - **`_assert_no_dot_path_segments(url)`** (`pypost/core/http_client.py`): module-level helper.
-  Splits `urlsplit(url).path` on `/`. Skips only the synthetic empty at index `0` when the
-  path starts with `/`. Raises for any other empty segment, and for non-empty segments that
-  are exactly `.` or `..`.
+  If `urlsplit(url).path` is empty (origin-only URL, no path component), returns immediately
+  (PYPOST-1534). Otherwise splits the path on `/`. Skips only the synthetic empty at index
+  `0` when the path starts with `/`. Raises for any other empty segment, and for non-empty
+  segments that are exactly `.` or `..`.
 - **`HTTPClient._prepare_request_kwargs`**: calls the helper on the final rendered URL
   before headers, params, or body work. Catches `ExecutionError`, emits
   `blank_path_segment_rejected` or `dot_path_segment_rejected`, then re-raises.
@@ -53,11 +61,12 @@ HTTPClient._prepare_request_kwargs
 ```mermaid
 flowchart LR
   A[Rendered URL] --> B{_assert_no_dot_path_segments}
+  B -->|empty path| E[session.request]
   B -->|blank segment| C1[ExecutionError TEMPLATE]
   B -->|segment . or ..| C2[ExecutionError TEMPLATE]
   C1 --> D1[blank_path_segment_rejected ERROR]
   C2 --> D2[dot_path_segment_rejected ERROR]
-  B -->|OK| E[session.request]
+  B -->|OK| E
 ```
 
 ## API / Usage
@@ -66,10 +75,11 @@ flowchart LR
 
 Private helper used by `HTTPClient`. Not part of the public package API; documented for
 maintainers and offline tests that exercise `_prepare_request_kwargs`. Name retained from
-PYPOST-1346; behaviour now also covers blank segments (PYPOST-1332).
+PYPOST-1346; behaviour now also covers blank segments (PYPOST-1332) and explicitly allows
+an empty path component (PYPOST-1534).
 
 - **url**: Fully rendered request URL (scheme/host/path already substituted).
-- **Returns**: `None` when every inspected path segment is allowed.
+- **Returns**: `None` when the path is empty or every inspected path segment is allowed.
 - **Raises**: `ExecutionError` with `category=ErrorCategory.TEMPLATE`,
   `message="Rejected request URL path segment."`, and `detail` either
   `Blank path segment is not allowed.` or naming the offending `.` / `..` segment.
@@ -89,6 +99,7 @@ PYPOST-1346; behaviour now also covers blank segments (PYPOST-1332).
 | `.` | Rejected |
 | `..` | Rejected |
 | Mid-path empty (`//`) or trailing blank (`/projects/`) | Rejected |
+| Empty path (no path component, e.g. `http://example.test`) | Allowed (PYPOST-1534; no segments) |
 | Synthetic leading empty from absolute `/…` | Ignored (not a missing variable) |
 | `ci.yml`, `foo.bar`, `.github` | Allowed (not whole-segment `.` / `..`) |
 | `../x` after `urlencode` → `..%2Fx` | Allowed (segment is `..%2Fx`, not `..`) |
@@ -121,7 +132,8 @@ See [Logging Event Naming](logging.md) and [Test Log Guardrails](test_log_guardr
 Offline coverage (no network, no credentials):
 
 - `tests/test_http_client.py` — `TestHTTPClientDotPathSegmentRejection`,
-  `TestHTTPClientBlankPathSegmentRejection` (core prepare / send paths, log assertions).
+  `TestHTTPClientBlankPathSegmentRejection` (core prepare / send paths, log assertions,
+  empty-path allow control).
 - `tests/test_github_mcp_collection.py` — representative owner / repo / workflow dot rejects;
   blank owner/repo rejects; `ci.yml` allow control.
 - `tests/test_gitlab_mcp_collection.py` — representative project / file / branch / sha-style
@@ -140,6 +152,7 @@ make test PYTEST_ARGS='tests/test_http_client.py::TestHTTPClientDotPathSegmentRe
 | --- | --- | --- |
 | MCP / send fails with "Rejected request URL path segment" and `.` / `..` detail | A path placeholder rendered to `.` or `..` | Pass a real segment value (owner, repo, file path, …) |
 | MCP / send fails with "Blank path segment is not allowed" | A path placeholder rendered empty (`//` or trailing blank) | Set a non-empty default or pass the path argument |
+| Origin-only URL (`http://host`) rejected as blank | Over-broad guard (fixed in PYPOST-1534) | Empty path must be allowed; mid-path / trailing blanks still reject |
 | Expected reject but request went out | Guard only sees **whole** segments after render | Confirm the URL path (not query) and encoding |
 | `%2e` segment not rejected | Percent-encoded lookalikes intentionally allowed | Documented debt; see `ai-tasks/PYPOST-1346/60-tech-debt.md` |
 

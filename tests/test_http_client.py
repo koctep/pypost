@@ -1133,6 +1133,14 @@ class TestHTTPClientBlankPathSegmentRejection(unittest.TestCase):
         )
         self.assertEqual(kwargs["url"], resolved.url)
 
+    def test_empty_path_origin_url_still_prepares(self):
+        """PYPOST-1534: empty path (no segments) is not a blank path segment."""
+        req = RequestData(method="GET", url="http://example.test")
+        kwargs, resolved = self.client._prepare_request_kwargs(req, {})
+        self.assertEqual("http://example.test", kwargs["url"])
+        self.assertEqual(kwargs["url"], resolved.url)
+        self.mock_session.request.assert_not_called()
+
 
 if __name__ == "__main__":
     unittest.main()
