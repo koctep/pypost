@@ -11,6 +11,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from pypost.ui.delegates.field_selector_delegate import FieldSelectorDelegate
 from pypost.ui.models.hidden_fields_table_model import HiddenFieldsTableModel
 from pypost.ui.widget_ids import REQUEST_HIDDEN_FIELDS_TABLE, set_widget_id
 
@@ -44,6 +45,7 @@ class HiddenFieldsTable(QTableView):
         set_widget_id(self, REQUEST_HIDDEN_FIELDS_TABLE)
         self._model = HiddenFieldsTableModel(self)
         self.setModel(self._model)
+        self.setItemDelegate(FieldSelectorDelegate(self))
         self.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         self.setSelectionBehavior(QTableView.SelectionBehavior.SelectRows)
         self.setSelectionMode(QTableView.SelectionMode.ExtendedSelection)
