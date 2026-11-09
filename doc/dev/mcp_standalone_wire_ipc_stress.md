@@ -529,15 +529,18 @@ constraints:
      is registered in `self._responses` under its request ID, appended to `self._messages`, and
      waiters are notified via the condition variable.
    - `_stderr_worker`: Consumes `process.stderr.readline` line-by-line, decoding text with
-     `errors="replace"` and recording it to `self._stderr_lines` under `self._stderr_lock`.
+     `errors="replace"` and recording it to `self._stderr_lines` under `self._stderr_lock`, then
+     notifies the shared condition (outside the stderr lock) so waiters wake immediately
+     ([PYPOST-1493](https://pypost.atlassian.net/browse/PYPOST-1493)).
 
 2. **Monitor Condition Variable Synchronization**:
    To avoid inefficient busy-waiting or thread polling loops, `McpStdioHarness` coordinates worker
    threads and test consumers through a monitor pattern using `threading.Condition` bound to an
    underlying re-entrant lock (`threading.RLock`). Whenever `_stdout_worker` decodes a message or
-   response, it acquires the condition and executes `notify_all()`. Test caller threads waiting on
-   `wait_for_response()`, `wait_for_responses()`, or `wait_for_predicate()` block on
-   `self._condition.wait(remaining)` and wake up immediately upon response arrival.
+   response, or `_stderr_worker` appends a drained line, it acquires the condition and executes
+   `notify_all()`. Test caller threads waiting on `wait_for_response()`, `wait_for_responses()`,
+   `wait_for_stderr()`, or `wait_for_predicate()` block on `self._condition.wait(remaining)` and
+   wake up immediately upon response or stderr arrival.
 
 3. **OS Pipe Deadlock Prevention**:
    Standard OS kernel pipe buffers have limited capacity (typically 64KB on Linux, with atomic
@@ -671,7 +674,20 @@ Thread-safe snapshot copy of all collected JSON-RPC responses keyed by request I
 Thread-safe ordered list copy of all received JSON-RPC messages (both responses and notifications).
 
 ##### `get_stderr() -> str`
-Thread-safe snapshot of all captured stderr text emitted by the child process.
+Thread-safe **immediate** snapshot of all captured stderr text emitted by the child process.
+Does not wait for the async drain thread — prefer `wait_for_stderr` when asserting that
+specific diagnostics must already be present.
+
+##### `wait_for_stderr(substring: str, timeout: float = 5.0) -> str`
+Blocks until captured stderr contains `substring` or `timeout` expires. Wakes when the stderr
+worker appends drained lines (condition notify). Use this after `wait_for_response` when the
+child may emit diagnostics concurrently or after the JSON-RPC response
+([PYPOST-1493](https://pypost.atlassian.net/browse/PYPOST-1493)).
+- **`substring`** (`str`): Text that must appear in the accumulated stderr snapshot.
+- **`timeout`** (`float`, default `5.0`): Maximum wait time in seconds.
+- **Returns** (`str`): Full stderr snapshot once `substring` is present.
+- **Raises**: `TimeoutError` including captured stderr if `substring` does not appear within
+  `timeout` seconds.
 
 ##### `wait_for_response(request_id: Any, timeout: float = 5.0) -> dict[str, Any]`
 Blocks until the response matching `request_id` is received or `timeout` expires.
@@ -782,10 +798,25 @@ with McpStdioHarness(server_cmd) as harness:
         timeout=5.0,
     )
 
-    # Inspect captured stderr diagnostics safely
-    stderr_log = harness.get_stderr()
+    # Wait for expected diagnostics (avoids racing the async stderr drain)
+    stderr_log = harness.wait_for_stderr("ready", timeout=5.0)
     assert "FATAL" not in stderr_log
+    # get_stderr() remains available for non-blocking snapshots
+    assert harness.get_stderr() == stderr_log
 ```
+
+### Troubleshooting: empty stderr after `wait_for_response`
+
+**Symptom:** A test calls `wait_for_response` then immediately `get_stderr()` and sometimes
+sees `""` under parallel `make test` workers, even though the child flushed diagnostics.
+
+**Cause:** The stdout worker can notify response waiters before the stderr worker has appended
+drained lines to `_stderr_lines`.
+
+**Fix:** Call `wait_for_stderr(expected_substring, timeout=...)` (or
+`wait_for_predicate(lambda h: expected in h.get_stderr(), ...)`) instead of asserting on a bare
+`get_stderr()` snapshot. Do not paper over the race with fixed `time.sleep`.
+
 
 ---
 

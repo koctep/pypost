@@ -179,9 +179,38 @@ def test_harness_stderr_collection() -> None:
         harness.send_raw('{"id": 10}\n')
         harness.wait_for_response(10, timeout=5.0)
 
-        stderr_output = harness.get_stderr()
+        stderr_output = harness.wait_for_stderr("diagnostic error: line 2", timeout=5.0)
         assert "diagnostic error: line 1" in stderr_output
         assert "diagnostic error: line 2" in stderr_output
+
+
+def test_harness_stderr_visible_when_emitted_after_response() -> None:
+    """Stderr emitted after a correlated response must still be observable.
+
+    PYPOST-1493: wait_for_response can return before the stderr worker appends
+    lines. wait_for_stderr synchronizes on drain notify so post-response
+    diagnostics are visible under parallel workers.
+    """
+    script = textwrap.dedent("""
+        import sys, json, time
+        line = sys.stdin.readline()
+        res = {"jsonrpc": "2.0", "id": 10, "result": "ok"}
+        sys.stdout.write(json.dumps(res) + "\\n")
+        sys.stdout.flush()
+        time.sleep(0.05)
+        sys.stderr.write("post-response diagnostic\\n")
+        sys.stderr.flush()
+    """)
+    cmd = [sys.executable, "-c", script]
+
+    with McpStdioHarness(cmd) as harness:
+        harness.send_raw('{"id": 10}\n')
+        harness.wait_for_response(10, timeout=5.0)
+        stderr_output = harness.wait_for_stderr(
+            "post-response diagnostic",
+            timeout=5.0,
+        )
+        assert "post-response diagnostic" in stderr_output
 
 
 def test_harness_forceful_kill_hung_process() -> None:

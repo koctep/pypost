@@ -10,11 +10,14 @@ Architecture: ai-tasks/PYPOST-1429/20-architecture.md
 from __future__ import annotations
 
 import json
+import logging
 from pathlib import Path
 import subprocess
 import threading
 import time
 from typing import Any, Callable, Sequence
+
+logger = logging.getLogger(__name__)
 
 
 class McpStdioHarness:
@@ -331,6 +334,56 @@ class McpStdioHarness:
         with self._stderr_lock:
             return "".join(self._stderr_lines)
 
+    def wait_for_stderr(
+        self,
+        substring: str,
+        timeout: float = 5.0,
+    ) -> str:
+        """Wait until captured stderr contains ``substring`` or timeout expires.
+
+        Wakes when the stderr worker appends drained lines (condition notify).
+        Prefer this over an immediate :meth:`get_stderr` snapshot after
+        :meth:`wait_for_response` to avoid racing the async drain thread.
+
+        Args:
+            substring: Text that must appear in the accumulated stderr snapshot.
+            timeout: Maximum wait time in seconds.
+
+        Returns:
+            The full stderr snapshot once ``substring`` is present.
+
+        Raises:
+            TimeoutError: If ``substring`` does not appear within ``timeout``.
+        """
+        deadline = time.time() + timeout
+        with self._condition:
+            while True:
+                stderr = self.get_stderr()
+                if substring in stderr:
+                    logger.debug(
+                        "mcp_stdio_harness_stderr_ready substring=%r bytes=%d",
+                        substring,
+                        len(stderr),
+                    )
+                    return stderr
+                remaining = deadline - time.time()
+                if remaining <= 0:
+                    break
+                self._condition.wait(timeout=remaining)
+
+        stderr = self.get_stderr()
+        logger.warning(
+            "mcp_stdio_harness_stderr_wait_timeout substring=%r timeout=%s "
+            "stderr_bytes=%d",
+            substring,
+            timeout,
+            len(stderr),
+        )
+        raise TimeoutError(
+            f"Waiting for stderr containing {substring!r} timed out after "
+            f"{timeout}s. Stderr: {stderr}"
+        )
+
     def wait_for_response(
         self,
         request_id: Any,
@@ -463,3 +516,7 @@ class McpStdioHarness:
             text = raw_line.decode("utf-8", errors="replace")
             with self._stderr_lock:
                 self._stderr_lines.append(text)
+            # Notify outside _stderr_lock to avoid lock-order deadlock with
+            # waiters that hold _condition (_lock) and call get_stderr().
+            with self._condition:
+                self._condition.notify_all()
