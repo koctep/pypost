@@ -290,6 +290,7 @@ make test PYTEST_ARGS="tests/test_request_hidden_fields_model_and_ui.py"
 make test PYTEST_ARGS="tests/test_field_selector_syntax.py"
 make test PYTEST_ARGS="tests/test_hidden_fields_syntax_validation_repro.py"
 make test PYTEST_ARGS="tests/test_hidden_fields_selector_only_repro.py"
+make test PYTEST_ARGS="tests/test_hidden_fields_event_paths.py"
 ```
 
 Virtualization suite covers hierarchy, 1,000-row `set_data` budget, trailing
@@ -298,6 +299,41 @@ validator contract and model `BackgroundRole` / `ToolTipRole` guidance after
 `set_data` (`pytestmark` timeout 30).
 The selector-only regression verifies unsupported check-state reads and writes for populated
 and trailing rows, preserving selector data and change signals.
+
+### Keyboard and context-menu event paths (PYPOST-1531)
+
+[PYPOST-1531](https://pypost.atlassian.net/browse/PYPOST-1531) adds regression
+coverage for the keyboard and context-menu paths that already exist on
+`HiddenFieldsTable`. Production behavior did not change. The suite is
+[`tests/test_hidden_fields_event_paths.py`](../../tests/test_hidden_fields_event_paths.py).
+
+The tests send Qt events to the real view. They do not call `keyPressEvent`,
+`contextMenuEvent`, or `remove_selected_rows` directly.
+
+- **Keyboard.** [`QTest.keyClick`](https://doc.qt.io/qt-6/qtest.html) delivers
+  Delete and Backspace to the table after the selection model selects rows.
+  `QTest.keyClicks` types into the open `QLineEdit`. `QTest.keyClick` sends
+  Escape or Return to that editor.
+- **Context menu.** The suite builds a
+  [`QContextMenuEvent`](https://doc.qt.io/qtforpython-6/PySide6/QtGui/QContextMenuEvent.html)
+  with `Reason.Mouse` and sends it with `QCoreApplication.sendEvent` to
+  `table.viewport()`. The real `contextMenuEvent` still creates Add Selector
+  and Remove Selected.
+- **Menu stand-in.** Shiboken resolves `QMenu.exec` on the instance, so a
+  class-level patch does not run and the real modal loop would block the
+  test. The helper patches `QMenu.__init__` and assigns `exec` on that menu
+  instance. The stand-in checks the live action titles and enabled state,
+  then returns Add Selector, Remove Selected, or cancellation (`None`).
+- **Commit flush.** Return queues the commit and `closeEditor` so the editor
+  is not destroyed while the key event is still on the stack. The
+  add-and-commit test calls `QCoreApplication.processEvents()` once, then
+  reads `get_data()`.
+
+The module checks nonadjacent Delete and Backspace removal (remaining order,
+the trailing blank, and `data_changed` / `changed`), those keys on the
+trailing row and during editing, menu removal, Remove Selected disabled
+without a selection, cancellation, and Add Selector followed by typing into
+the real editor and committing.
 
 ## References
 
@@ -311,3 +347,5 @@ and trailing rows, preserving selector data and change signals.
 - Model: [`pypost/ui/models/hidden_fields_table_model.py`](../../pypost/ui/models/hidden_fields_table_model.py)
 - Delegate: [`pypost/ui/delegates/field_selector_delegate.py`](../../pypost/ui/delegates/field_selector_delegate.py)
 - View: [`pypost/ui/widgets/hidden_fields_table.py`](../../pypost/ui/widgets/hidden_fields_table.py)
+- Event-path tests:
+  [`tests/test_hidden_fields_event_paths.py`](../../tests/test_hidden_fields_event_paths.py)
