@@ -188,8 +188,13 @@ For **process-mode** suites that pass integer ports into child workers, use
 with **exclusive** binds (`reuse_addr=False`) so parallel workers cannot steal
 ports during setup. Call `ports.release()` / `reserve.release()`
 **immediately before** `registry.start` / runner start so the child can bind;
-the context-manager `finally` releases any leftovers. Contract test:
-`tests/test_ephemeral_port_reserve_hold_repro.py`.
+the context-manager `finally` releases any leftovers. For multi-server setups
+(N upserts then N starts), keep holders open through **all** upserts and call
+`release()` **once** after the last upsert — do not release inside the upsert
+loop (PYPOST-1508; early release reopens TOCTOU for ports still awaiting
+start). Contract tests:
+`tests/test_ephemeral_port_reserve_hold_repro.py`,
+`tests/test_mcp_process_isolation_port_hold_repro.py`.
 
 `free_port()` / `allocate_tcp_port()` remain for call sites that only need an
 integer; they close the probe socket before return (allocate-then-release
