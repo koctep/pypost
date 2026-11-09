@@ -98,6 +98,10 @@ Selectors configured in `RequestData.hidden_response_fields` support the followi
 | **Nested Array Wildcards** | `matrix[*][*].value` | Matches elements inside multi-dimensional nested arrays. |
 | **Header Selectors** | `header:Authorization` | Applies exclusively to HTTP response headers. Automatically ignored by JSON body evaluation. |
 
+Body selection ignores a header selector by calling the same shared prefix helper
+(`header_selector_name`) used by validation and header sanitization
+([PYPOST-1538](https://pypost.atlassian.net/browse/PYPOST-1538)).
+
 ---
 
 ## API & Usage

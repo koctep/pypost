@@ -6,11 +6,12 @@ import logging
 import re
 from typing import Any, Iterable, Sequence
 
+from pypost.core.header_selector_prefix import header_selector_name
+
 logger = logging.getLogger(__name__)
 
 HIDDEN_PLACEHOLDER: str = "***"
 
-_HEADER_PREFIX = "header:"
 _BRACKET_WILDCARD_RE = re.compile(r"\[\*\]")
 
 
@@ -148,7 +149,7 @@ class JsonSelectorEngine:
             if not s or not isinstance(s, str):
                 continue
             cleaned = s.strip()
-            if not cleaned or cleaned.lower().startswith(_HEADER_PREFIX):
+            if not cleaned or header_selector_name(cleaned) is not None:
                 continue
             self._raw_selectors.add(cleaned)
             if "." not in cleaned and "[" not in cleaned:
