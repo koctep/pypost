@@ -276,6 +276,7 @@ masking/save counters stay on the response/MCP paths.
 | Delete removes nothing while editing a cell | Delete/Backspace only remove rows when not in `EditingState` |
 | Tab not dirty after edit | Wire both `data_changed` and `changed` (or one) to `on_data_changed` |
 | Scroll lag with huge lists | Confirm view is `QTableView` with model set; do not reintroduce per-row widgets |
+| `set_data` of 1,000 selectors fails `elapsed < 0.1` | Hard CI gate in `tests/test_hidden_fields_virtualization_repro.py` (PYPOST-1532). Leave the 100 ms budget and the assert in place until that exact check flakes in CI. Structural guards stay hard. No flake of this check is claimed. |
 | Invalid selector has no highlight after commit | Inspect `model.data(index, BackgroundRole)` and cached `record.syntax`; confirm delegate is installed |
 | Hover tooltip is only the static help string | Invalid rows must get `ToolTipRole` with errorish wording **and** a supported-form example (not just `"dot"`) |
 | Live typing shows no red editor | `FieldSelectorDelegate` styles the `QLineEdit` only while editing; committed cells use model `BackgroundRole` |
@@ -293,12 +294,39 @@ make test PYTEST_ARGS="tests/test_hidden_fields_selector_only_repro.py"
 make test PYTEST_ARGS="tests/test_hidden_fields_event_paths.py"
 ```
 
-Virtualization suite covers hierarchy, 1,000-row `set_data` budget, trailing
-expand, batch delete, signals, and facades. Syntax suite covers the pure
-validator contract and model `BackgroundRole` / `ToolTipRole` guidance after
-`set_data` (`pytestmark` timeout 30).
+Virtualization suite covers hierarchy, the 1,000-selector `set_data` hard gate
+below, trailing expand, batch delete, signals, and facades. Syntax suite covers
+the pure validator contract and model `BackgroundRole` / `ToolTipRole` guidance
+after `set_data` (`pytestmark` timeout 30).
 The selector-only regression verifies unsupported check-state reads and writes for populated
 and trailing rows, preserving selector data and change signals.
+
+### Large-list timing gate (PYPOST-1532)
+
+[PYPOST-1532](https://pypost.atlassian.net/browse/PYPOST-1532) keeps the
+1,000-selector load check as a hard CI gate. Production code and the test are
+unchanged. No flake of this check is claimed.
+
+The check is
+`test_model_virtualization_1000_selectors_zero_qtablewidgetitem_allocations`
+in
+[`tests/test_hidden_fields_virtualization_repro.py`](../../tests/test_hidden_fields_virtualization_repro.py):
+
+- **Structural guards** stay hard. The table is a `QTableView` (not a
+  `QTableWidget`). `item()` is a lightweight facade and not a
+  `QTableWidgetItem`. `rowCount()` is 1,001 (1,000 selectors plus one trailing
+  blank). Selector text matches the first, last, and trailing rows.
+- **Duration** stays `elapsed < 0.1` around `HiddenFieldsTable.set_data` of
+  those 1,000 selectors (`time.perf_counter`). A sample of 100 ms or longer
+  fails the run.
+
+The 100 ms budget is not raised, and the timing check is not soft or
+benchmark-only, until that exact check flakes in CI. A known risk that a busy
+shared runner can miss 100 ms is not that flake. The module timeout stays
+`pytestmark = pytest.mark.timeout(30)`.
+
+Decision record:
+[`ai-tasks/PYPOST-1532/20-architecture.md`](../../ai-tasks/PYPOST-1532/20-architecture.md).
 
 ### Keyboard and context-menu event paths (PYPOST-1531)
 
