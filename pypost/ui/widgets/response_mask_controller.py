@@ -59,7 +59,8 @@ class JsonMaskFormatter:
         self._chunks = []
         self._spans = []
         self._current_pos = 0
-        self._format_value(node, [], 0)
+        path: list[str] = []
+        self._format_value(node, path, 0)
         return "".join(self._chunks), self._spans
 
     def _format_value(self, node: Any, path: list[str], depth: int) -> None:
@@ -97,7 +98,11 @@ class JsonMaskFormatter:
                     )
                 )
             else:
-                self._format_value(val, path + [key_str], depth + 1)
+                path.append(key_str)
+                try:
+                    self._format_value(val, path, depth + 1)
+                finally:
+                    path.pop()
             if idx < len(items) - 1:
                 self._emit(",")
             self._emit("\n")
@@ -110,7 +115,11 @@ class JsonMaskFormatter:
         self._emit("[\n")
         for idx, item in enumerate(node):
             self._emit(" " * ((depth + 1) * self.indent))
-            self._format_value(item, path + ["*"], depth + 1)
+            path.append("*")
+            try:
+                self._format_value(item, path, depth + 1)
+            finally:
+                path.pop()
             if idx < len(node) - 1:
                 self._emit(",")
             self._emit("\n")

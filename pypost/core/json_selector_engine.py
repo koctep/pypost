@@ -39,6 +39,95 @@ class CompiledPathSelector:
         return True
 
 
+class _TrieNode:
+    """Node in a segment trie: exact-token children plus optional ``*`` edge."""
+
+    __slots__ = ("children", "is_terminal")
+
+    def __init__(self) -> None:
+        self.children: dict[str, _TrieNode] = {}
+        self.is_terminal: bool = False
+
+
+class PathSelectorTrie:
+    """Prefix trie over hierarchical selector token sequences (exact + ``*``)."""
+
+    def __init__(self) -> None:
+        self._root = _TrieNode()
+        self._size = 0
+
+    @property
+    def is_empty(self) -> bool:
+        return self._size == 0
+
+    @property
+    def size(self) -> int:
+        """Number of distinct terminal hierarchical paths indexed in the trie."""
+        return self._size
+
+    def insert(self, tokens: Sequence[str]) -> None:
+        node = self._root
+        for token in tokens:
+            child = node.children.get(token)
+            if child is None:
+                child = _TrieNode()
+                node.children[token] = child
+            node = child
+        if not node.is_terminal:
+            node.is_terminal = True
+            self._size += 1
+
+    @staticmethod
+    def _step(nodes: list[_TrieNode], token: str) -> list[_TrieNode]:
+        next_nodes: list[_TrieNode] = []
+        seen: set[int] = set()
+        for node in nodes:
+            for edge in (token, "*"):
+                child = node.children.get(edge)
+                if child is None:
+                    continue
+                child_id = id(child)
+                if child_id in seen:
+                    continue
+                seen.add(child_id)
+                next_nodes.append(child)
+        return next_nodes
+
+    def matches_tokens(self, tokens: Sequence[str]) -> bool:
+        nodes: list[_TrieNode] = [self._root]
+        for token in tokens:
+            nodes = self._step(nodes, str(token))
+            if not nodes:
+                return False
+        return any(node.is_terminal for node in nodes)
+
+    def matches_path_and_key(self, path: Sequence[str], key: str) -> bool:
+        nodes: list[_TrieNode] = [self._root]
+        for token in path:
+            nodes = self._step(nodes, str(token))
+            if not nodes:
+                return False
+        nodes = self._step(nodes, key)
+        if not nodes:
+            return False
+        return any(node.is_terminal for node in nodes)
+
+    def matches_shorthand_path_and_key(self, path: Sequence[str], key: str) -> bool:
+        """Match with ``*`` segments stripped from the candidate path (shorthand)."""
+        nodes: list[_TrieNode] = [self._root]
+        for token in path:
+            token_str = str(token)
+            if token_str == "*":
+                continue
+            nodes = self._step(nodes, token_str)
+            if not nodes:
+                return False
+        nodes = self._step(nodes, key)
+        if not nodes:
+            return False
+        return any(node.is_terminal for node in nodes)
+
+
 class JsonSelectorEngine:
     """Evaluates JSON selector path rules and performs data redaction."""
 
@@ -46,12 +135,13 @@ class JsonSelectorEngine:
         self._raw_selectors: set[str] = set()
         self._bare_keys: set[str] = set()
         self._path_selectors: list[CompiledPathSelector] = []
+        self._trie = PathSelectorTrie()
         if selectors:
             self._compile(selectors)
 
     @property
     def is_empty(self) -> bool:
-        return not self._bare_keys and not self._path_selectors
+        return not self._bare_keys and self._trie.is_empty
 
     def _compile(self, selectors: Iterable[str]) -> None:
         for s in selectors:
@@ -64,12 +154,16 @@ class JsonSelectorEngine:
             if "." not in cleaned and "[" not in cleaned:
                 self._bare_keys.add(cleaned)
             else:
-                self._path_selectors.append(CompiledPathSelector(cleaned))
+                compiled = CompiledPathSelector(cleaned)
+                self._path_selectors.append(compiled)
+                self._trie.insert(compiled.tokens)
         logger.debug(
-            "json_selector_engine_compiled raw_count=%d bare_keys_count=%d path_selectors_count=%d",
+            "json_selector_engine_compiled raw_count=%d bare_keys_count=%d "
+            "path_selectors_count=%d trie_size=%d",
             len(self._raw_selectors),
             len(self._bare_keys),
             len(self._path_selectors),
+            self._trie.size,
         )
 
     def matches(self, path: Sequence[str], key: str) -> bool:
@@ -79,20 +173,16 @@ class JsonSelectorEngine:
         key_str = str(key)
         if key_str in self._bare_keys:
             return True
-        if not self._path_selectors:
+        if self._trie.is_empty:
             return False
 
-        candidate_tokens = [str(t) for t in path] + [key_str]
-        for rule in self._path_selectors:
-            if rule.matches(candidate_tokens):
-                return True
+        if self._trie.matches_path_and_key(path, key_str):
+            return True
 
-        # Shorthand dot fallback compatibility (e.g. items.secret matching items.*.secret)
-        shorthand_tokens = [t for t in candidate_tokens if t != "*"]
-        if shorthand_tokens != candidate_tokens:
-            for rule in self._path_selectors:
-                if rule.matches(shorthand_tokens):
-                    return True
+        # Shorthand dot fallback (e.g. items.secret matching items.*.secret path)
+        if any(str(t) == "*" for t in path):
+            if self._trie.matches_shorthand_path_and_key(path, key_str):
+                return True
 
         return False
 
@@ -105,7 +195,8 @@ class JsonSelectorEngine:
         if self.is_empty or not isinstance(node, (dict, list)):
             return node, 0
         masked_count = [0]
-        redacted = self._redact_node(node, [], placeholder, masked_count)
+        path: list[str] = []
+        redacted = self._redact_node(node, path, placeholder, masked_count)
         logger.debug(
             "json_selector_engine_redact_tree_completed masked_count=%d",
             masked_count[0],
@@ -127,15 +218,25 @@ class JsonSelectorEngine:
                     res[key] = placeholder
                     masked_count[0] += 1
                 else:
-                    res[key] = self._redact_node(
-                        val, path + [key_str], placeholder, masked_count
-                    )
+                    path.append(key_str)
+                    try:
+                        res[key] = self._redact_node(
+                            val, path, placeholder, masked_count
+                        )
+                    finally:
+                        path.pop()
             return res
         if isinstance(node, list):
-            return [
-                self._redact_node(item, path + ["*"], placeholder, masked_count)
-                for item in node
-            ]
+            result: list[Any] = []
+            for item in node:
+                path.append("*")
+                try:
+                    result.append(
+                        self._redact_node(item, path, placeholder, masked_count)
+                    )
+                finally:
+                    path.pop()
+            return result
         return node
 
     @staticmethod
