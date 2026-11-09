@@ -29,16 +29,6 @@ class CompiledPathSelector:
         tokens = [t for t in normalized.split(".") if t]
         return tuple(tokens)
 
-    def matches(self, candidate_tokens: Sequence[str]) -> bool:
-        if len(self.tokens) != len(candidate_tokens):
-            return False
-        for expected, actual in zip(self.tokens, candidate_tokens):
-            if expected == "*":
-                continue
-            if expected != actual:
-                return False
-        return True
-
 
 class _TrieNode:
     """Node in a segment trie: exact-token children plus optional ``*`` edge."""
@@ -93,14 +83,6 @@ class PathSelectorTrie:
                 seen.add(child_id)
                 next_nodes.append(child)
         return next_nodes
-
-    def matches_tokens(self, tokens: Sequence[str]) -> bool:
-        nodes: list[_TrieNode] = [self._root]
-        for token in tokens:
-            nodes = self._step(nodes, str(token))
-            if not nodes:
-                return False
-        return any(node.is_terminal for node in nodes)
 
     def matches_path_and_key(self, path: Sequence[str], key: str) -> bool:
         nodes: list[_TrieNode] = [self._root]

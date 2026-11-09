@@ -46,17 +46,19 @@ def test_selector_normalization_and_filtering() -> None:
 
 
 def test_compiled_path_selector_tokenization_and_matching() -> None:
-    """Validates CompiledPathSelector tokenization and wildcard matching semantics."""
+    """Validates compile segments and the same cases on the live mask decision."""
     selector = CompiledPathSelector("items[*].secret")
     assert selector.tokens == ("items", "*", "secret")
-    assert selector.matches(["items", "*", "secret"])
-    assert not selector.matches(["items", "0", "other"])
-    assert not selector.matches(["items", "secret"])
+    items = JsonSelectorEngine(["items[*].secret"])
+    assert items.matches(["items", "*"], "secret")
+    assert not items.matches(["items", "0"], "other")
+    assert not items.matches(["items"], "secret")
 
     multi_wildcard = CompiledPathSelector("matrix[*][*].value")
     assert multi_wildcard.tokens == ("matrix", "*", "*", "value")
-    assert multi_wildcard.matches(["matrix", "*", "*", "value"])
-    assert not multi_wildcard.matches(["matrix", "*", "value"])
+    matrix = JsonSelectorEngine(["matrix[*][*].value"])
+    assert matrix.matches(["matrix", "*", "*"], "value")
+    assert not matrix.matches(["matrix", "*"], "value")
 
 
 def test_bare_key_matching_at_any_depth() -> None:

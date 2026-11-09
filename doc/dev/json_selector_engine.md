@@ -69,8 +69,7 @@ The unified engine lives in `pypost/core/json_selector_engine.py`:
 - **`CompiledPathSelector`**:
   Parses hierarchical path strings (such as `user.profile.token` or `items[*].secret`) into
   normalized token tuples (`('items', '*', 'secret')`). `_parse_tokens` remains the single
-  normalization path that feeds trie inserts at compile time. The instance `matches` helper is
-  retained for older unit coverage; the engine hot path uses the trie.
+  normalization path that feeds trie inserts at compile time.
 - **`JsonSelectorEngine`**:
   The central facade that normalizes and compiles raw selector strings, partitions them into
   fast bare keys and trie-indexed path selectors, determines whether an AST node matches, and
@@ -191,10 +190,6 @@ Primary hot-path matcher: walk `path` tokens then `key` without allocating a com
 #### `matches_shorthand_path_and_key(path, key) -> bool`
 Shorthand fallback: skips `*` segments in the candidate path, then walks the remainder + key.
 
-#### `matches_tokens(tokens) -> bool`
-Sequence-oriented helper (same walk as a combined token list). Available for callers/docs;
-production `JsonSelectorEngine.matches` prefers `matches_path_and_key`.
-
 ---
 
 ### 3. `CompiledPathSelector`
@@ -204,11 +199,6 @@ Located in `pypost.core.json_selector_engine`.
 #### `__init__(raw: str)`
 Compiles a raw path selector string. Normalizes bracket wildcards `[*]` to `.*.` and parses
 into token segments used for trie insert.
-
-#### `matches(candidate_tokens: Sequence[str]) -> bool`
-Checks whether a sequence of tokens matches the compiled pattern length and elements. The `*`
-wildcard matches any token segment. Not used by the engine steady-state match path (trie
-owns that); retained for tokenizer parity and older unit tests.
 
 ---
 
