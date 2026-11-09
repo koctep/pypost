@@ -196,6 +196,12 @@ appends one trailing blank row, emits `data_changed` and `changed`.
 Non-empty selectors in row order (trailing/blank rows omitted). Invalid
 selectors are included as authored — validation does not filter them out.
 
+Duplicate selector text is kept
+([PYPOST-1533](https://pypost.atlassian.net/browse/PYPOST-1533)).
+Values are trimmed, blanks dropped, order and case preserved, and exactly
+one unsaved trailing blank remains. This records the existing behavior; it is
+not a new product change.
+
 ### `add_row(selector: str = "") -> None`
 
 Reuses or fills the trailing blank row; focuses the row and opens the editor when
