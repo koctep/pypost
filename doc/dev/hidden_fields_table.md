@@ -37,7 +37,7 @@ Selector matching at mask time is documented in
 | Component | Module | Role |
 | --- | --- | --- |
 | `validate_field_selector` | `pypost/core/field_selector_syntax.py` | Pure vocabulary check (no Qt); returns `FieldSelectorSyntaxResult` |
-| `HiddenFieldRecord` | `pypost/ui/models/hidden_fields_table_model.py` | Dataclass row (`selector`, optional dormant `enabled`, cached `syntax`) |
+| `HiddenFieldRecord` | `pypost/ui/models/hidden_fields_table_model.py` | Selector and cached syntax |
 | `HiddenFieldsTableModel` | same | Virtualized data source, trailing-row expand, batch mutate, role surfacing, DEBUG logs |
 | `FieldSelectorDelegate` | `pypost/ui/delegates/field_selector_delegate.py` | Advisory live editor styling/tooltip; always commits typed text |
 | `HiddenFieldsTable` | `pypost/ui/widgets/hidden_fields_table.py` | `QTableView` view, installs delegate, menus/shortcuts, API + facades |
@@ -239,8 +239,11 @@ assert "Supported forms" in model.data(bad, Qt.ItemDataRole.ToolTipRole)
 ## Configuration
 
 No environment variables. Column header is `"Field Selector"` with stretch
-resize; default vertical section size is `26` px. Checkbox/`enabled` roles exist
-on the model for future use but are not shown in the view.
+resize; default vertical section size is `26` px. Configuration remains an ordered
+`list[str]`; every configured selector participates in masking, with no per-row activation state.
+Rows are enabled, selectable, and editable, without checkbox controls. Following
+[PYPOST-1530](https://pypost.atlassian.net/browse/PYPOST-1530), `CheckStateRole` is unsupported:
+reads return `None`, and writes return `False` without changing selectors or emitting signals.
 
 Highlight colors come from UI tokens:
 
@@ -277,6 +280,7 @@ masking/save counters stay on the response/MCP paths.
 | Hover tooltip is only the static help string | Invalid rows must get `ToolTipRole` with errorish wording **and** a supported-form example (not just `"dot"`) |
 | Live typing shows no red editor | `FieldSelectorDelegate` styles the `QLineEdit` only while editing; committed cells use model `BackgroundRole` |
 | Expected save to reject bad selectors | By design advisory — `get_data()` returns invalid strings; fix UX, do not hard-block |
+| Check-state write returns `False` | Rows store selectors only; use `EditRole` to edit a selector |
 
 ## Tests
 
@@ -285,12 +289,15 @@ make test PYTEST_ARGS="tests/test_hidden_fields_virtualization_repro.py"
 make test PYTEST_ARGS="tests/test_request_hidden_fields_model_and_ui.py"
 make test PYTEST_ARGS="tests/test_field_selector_syntax.py"
 make test PYTEST_ARGS="tests/test_hidden_fields_syntax_validation_repro.py"
+make test PYTEST_ARGS="tests/test_hidden_fields_selector_only_repro.py"
 ```
 
 Virtualization suite covers hierarchy, 1,000-row `set_data` budget, trailing
 expand, batch delete, signals, and facades. Syntax suite covers the pure
 validator contract and model `BackgroundRole` / `ToolTipRole` guidance after
 `set_data` (`pytestmark` timeout 30).
+The selector-only regression verifies unsupported check-state reads and writes for populated
+and trailing rows, preserving selector data and change signals.
 
 ## References
 

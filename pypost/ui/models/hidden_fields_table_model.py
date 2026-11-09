@@ -46,16 +46,14 @@ class HiddenFieldRecord:
     """Internal record representing a single row in the hidden fields table."""
 
     selector: str = ""
-    enabled: bool = True
     syntax: FieldSelectorSyntaxResult = field(
         default_factory=lambda: validate_field_selector("")
     )
 
 
-def _make_record(selector: str = "", enabled: bool = True) -> HiddenFieldRecord:
+def _make_record(selector: str = "") -> HiddenFieldRecord:
     return HiddenFieldRecord(
         selector=selector,
-        enabled=enabled,
         syntax=_syntax_for(selector),
     )
 
@@ -149,14 +147,6 @@ class HiddenFieldsTableModel(QAbstractTableModel):
             if record.selector.strip():
                 return TOOLTIP
             return None
-        if role == Qt.ItemDataRole.CheckStateRole:
-            if row == len(self._records) - 1:
-                return None
-            return (
-                Qt.CheckState.Checked
-                if record.enabled
-                else Qt.CheckState.Unchecked
-            )
         return None
 
     def setData(
@@ -170,20 +160,6 @@ class HiddenFieldsTableModel(QAbstractTableModel):
         row = index.row()
         if row < 0 or row >= len(self._records):
             return False
-
-        if role == Qt.ItemDataRole.CheckStateRole:
-            if row == len(self._records) - 1:
-                return False
-            checked = (
-                value == Qt.CheckState.Checked
-                or value == Qt.CheckState.Checked.value
-                or value is True
-            )
-            self._records[row].enabled = checked
-            self.dataChanged.emit(index, index, [Qt.ItemDataRole.CheckStateRole])
-            self.data_changed.emit()
-            self.changed.emit()
-            return True
 
         if role not in (Qt.ItemDataRole.EditRole, Qt.ItemDataRole.DisplayRole):
             return False
