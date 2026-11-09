@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
 from PySide6.QtCore import (
@@ -14,13 +14,31 @@ from PySide6.QtCore import (
     Qt,
     Signal,
 )
+from PySide6.QtGui import QBrush
+
+from pypost.core.field_selector_syntax import (
+    FieldSelectorSyntaxResult,
+    validate_field_selector,
+)
+from pypost.ui.styles.ui_tokens import VALIDATION_LINE_BACKGROUND
 
 __all__ = ["HiddenFieldRecord", "HiddenFieldsTableModel"]
 
 HEADER = "Field Selector"
 TOOLTIP = "Response field selector or dot-notation path"
+_ERROR_BACKGROUND = QBrush(VALIDATION_LINE_BACKGROUND)
+_DATA_ROLES = [
+    Qt.ItemDataRole.DisplayRole,
+    Qt.ItemDataRole.EditRole,
+    Qt.ItemDataRole.BackgroundRole,
+    Qt.ItemDataRole.ToolTipRole,
+]
 
 logger = logging.getLogger(__name__)
+
+
+def _syntax_for(selector: str) -> FieldSelectorSyntaxResult:
+    return validate_field_selector(selector)
 
 
 @dataclass
@@ -29,6 +47,32 @@ class HiddenFieldRecord:
 
     selector: str = ""
     enabled: bool = True
+    syntax: FieldSelectorSyntaxResult = field(
+        default_factory=lambda: validate_field_selector("")
+    )
+
+
+def _make_record(selector: str = "", enabled: bool = True) -> HiddenFieldRecord:
+    return HiddenFieldRecord(
+        selector=selector,
+        enabled=enabled,
+        syntax=_syntax_for(selector),
+    )
+
+
+def _syntax_counts(records: list[HiddenFieldRecord]) -> tuple[int, int, int]:
+    """Return (ok_count, invalid_count, empty_count) for cached syntax results."""
+    ok_count = 0
+    invalid_count = 0
+    empty_count = 0
+    for record in records:
+        if record.syntax.is_empty:
+            empty_count += 1
+        elif record.syntax.ok:
+            ok_count += 1
+        else:
+            invalid_count += 1
+    return ok_count, invalid_count, empty_count
 
 
 class HiddenFieldsTableModel(QAbstractTableModel):
@@ -39,7 +83,7 @@ class HiddenFieldsTableModel(QAbstractTableModel):
 
     def __init__(self, parent: QObject | None = None) -> None:
         super().__init__(parent)
-        self._records: list[HiddenFieldRecord] = [HiddenFieldRecord(selector="")]
+        self._records: list[HiddenFieldRecord] = [_make_record()]
 
     def rowCount(
         self,
@@ -95,8 +139,16 @@ class HiddenFieldsTableModel(QAbstractTableModel):
         record = self._records[row]
         if role in (Qt.ItemDataRole.DisplayRole, Qt.ItemDataRole.EditRole):
             return record.selector
+        if role == Qt.ItemDataRole.BackgroundRole:
+            if not record.syntax.ok and not record.syntax.is_empty:
+                return _ERROR_BACKGROUND
+            return None
         if role == Qt.ItemDataRole.ToolTipRole:
-            return TOOLTIP
+            if not record.syntax.ok and not record.syntax.is_empty:
+                return f"{record.syntax.message} {record.syntax.suggestions}".strip()
+            if record.selector.strip():
+                return TOOLTIP
+            return None
         if role == Qt.ItemDataRole.CheckStateRole:
             if row == len(self._records) - 1:
                 return None
@@ -142,16 +194,22 @@ class HiddenFieldsTableModel(QAbstractTableModel):
             return False
 
         self._records[row].selector = text
-        self.dataChanged.emit(
-            index,
-            index,
-            [Qt.ItemDataRole.DisplayRole, Qt.ItemDataRole.EditRole],
+        syntax = _syntax_for(text)
+        self._records[row].syntax = syntax
+        self.dataChanged.emit(index, index, list(_DATA_ROLES))
+        logger.debug(
+            "hidden_fields_table_model_set_data_cell "
+            "row=%d selector_len=%d ok=%s is_empty=%s",
+            row,
+            len(text),
+            syntax.ok,
+            syntax.is_empty,
         )
 
         if is_trailing and text:
             insert_at = len(self._records)
             self.beginInsertRows(QModelIndex(), insert_at, insert_at)
-            self._records.append(HiddenFieldRecord(selector=""))
+            self._records.append(_make_record())
             self.endInsertRows()
             logger.debug(
                 "hidden_fields_table_model_trailing_row_expanded "
@@ -178,15 +236,20 @@ class HiddenFieldsTableModel(QAbstractTableModel):
         input_count = len(selectors)
         self.beginResetModel()
         valid = [str(s).strip() for s in selectors if str(s).strip()]
-        self._records = [HiddenFieldRecord(selector=s) for s in valid]
-        self._records.append(HiddenFieldRecord(selector=""))
+        self._records = [_make_record(s) for s in valid]
+        self._records.append(_make_record())
         self.endResetModel()
+        ok_count, invalid_count, empty_count = _syntax_counts(self._records)
         logger.debug(
             "hidden_fields_table_model_set_data input_count=%d "
-            "valid_count=%d row_count=%d",
+            "valid_count=%d row_count=%d ok_count=%d invalid_count=%d "
+            "empty_count=%d",
             input_count,
             len(valid),
             len(self._records),
+            ok_count,
+            invalid_count,
+            empty_count,
         )
         self.data_changed.emit()
         self.changed.emit()
@@ -200,32 +263,36 @@ class HiddenFieldsTableModel(QAbstractTableModel):
             if text:
                 index = self.index(last, 0)
                 self.setData(index, text, Qt.ItemDataRole.EditRole)
+            syntax_ok = self._records[last].syntax.ok if text else True
             logger.debug(
                 "hidden_fields_table_model_add_row mode=%s "
-                "focus_row=%d has_text=%s row_count=%d",
+                "focus_row=%d has_text=%s ok=%s row_count=%d",
                 mode,
                 last,
                 bool(text),
+                syntax_ok,
                 len(self._records),
             )
             return last
 
         insert_at = len(self._records)
         self.beginInsertRows(QModelIndex(), insert_at, insert_at)
-        self._records.append(HiddenFieldRecord(selector=text))
+        self._records.append(_make_record(text))
         self.endInsertRows()
         if text:
             blank_at = len(self._records)
             self.beginInsertRows(QModelIndex(), blank_at, blank_at)
-            self._records.append(HiddenFieldRecord(selector=""))
+            self._records.append(_make_record())
             self.endInsertRows()
         self.data_changed.emit()
         self.changed.emit()
+        syntax_ok = self._records[insert_at].syntax.ok if text else True
         logger.debug(
             "hidden_fields_table_model_add_row mode=insert "
-            "focus_row=%d has_text=%s row_count=%d",
+            "focus_row=%d has_text=%s ok=%s row_count=%d",
             insert_at,
             bool(text),
+            syntax_ok,
             len(self._records),
         )
         return insert_at
@@ -263,12 +330,12 @@ class HiddenFieldsTableModel(QAbstractTableModel):
 
         if not self._records:
             self.beginInsertRows(QModelIndex(), 0, 0)
-            self._records.append(HiddenFieldRecord(selector=""))
+            self._records.append(_make_record())
             self.endInsertRows()
         elif self._records[-1].selector.strip():
             insert_at = len(self._records)
             self.beginInsertRows(QModelIndex(), insert_at, insert_at)
-            self._records.append(HiddenFieldRecord(selector=""))
+            self._records.append(_make_record())
             self.endInsertRows()
 
         logger.debug(
