@@ -298,6 +298,7 @@ make test PYTEST_ARGS="tests/test_field_selector_syntax.py"
 make test PYTEST_ARGS="tests/test_hidden_fields_syntax_validation_repro.py"
 make test PYTEST_ARGS="tests/test_hidden_fields_selector_only_repro.py"
 make test PYTEST_ARGS="tests/test_hidden_fields_event_paths.py"
+make test PYTEST_ARGS="tests/test_hidden_fields_open_edit.py"
 ```
 
 Virtualization suite covers hierarchy, the 1,000-selector `set_data` hard gate
@@ -368,6 +369,13 @@ the trailing blank, and `data_changed` / `changed`), those keys on the
 trailing row and during editing, menu removal, Remove Selected disabled
 without a selection, cancellation, and Add Selector followed by typing into
 the real editor and committing.
+
+### Open edit (PYPOST-1537)
+
+[PYPOST-1537](https://pypost.atlassian.net/browse/PYPOST-1537) covers the open
+edit: `$.secret` shows the validation stylesheet and a tooltip, `token` clears
+both, and finishing keeps `$.secret`. This is coverage of existing behavior,
+not a product change.
 
 ## References
 
