@@ -282,11 +282,28 @@ display_response(response, hidden_fields)
 
 #### ResponseMaskController Lifecycle & Visual Styling
 `ResponseMaskController` (`QObject`) manages span tracking and user interactions for `FoldableCodeView`:
+- **Hit-testing (`span_at`) — O(log N) bisect** ([PYPOST-1390](https://pypost.atlassian.net/browse/PYPOST-1390)):
+  - `_spans` stay non-overlapping and ordered by ascending `start_pos` for the lifetime of a
+    span set (formatter emission order; `handle_click` shifts later intervals in place without
+    reordering the list).
+  - Lookup uses stdlib `bisect_right(self._spans, char_pos, key=attrgetter("start_pos"))`, then
+    takes candidate `idx - 1` (rightmost span with `start_pos <= char_pos`) and returns it iff
+    `char_pos <= candidate.end_pos`. Empty list, index `0`, or failed end check → `None`.
+  - Coverage is inclusive on both endpoints (`start_pos <= char_pos <= end_pos`), matching the
+    pre-bisect linear scan (including the formatter’s exclusive write-cursor recorded as
+    `end_pos` still counting as a hit).
+  - Hover (`MouseMove`) and click (`handle_click`) share the same `span_at` path so targeting
+    cannot diverge.
+  - Regression: `tests/test_pypost_1390_failing_repro.py` locks oracle parity (including
+    post-toggle) and asserts high-N query work stays logarithmic vs a full `_spans` scan.
+  - Later-span offset shifting on toggle remains a linear walk (separate debt
+    [PYPOST-1547](https://pypost.atlassian.net/browse/PYPOST-1547)); optional MouseMove
+    throttling is [PYPOST-1548](https://pypost.atlassian.net/browse/PYPOST-1548).
 - **Viewport Event Filtering**:
   - Installs an event filter on `FoldableCodeView.viewport()` and enables `setMouseTracking(True)`.
   - On `QEvent.Type.MouseMove`:
     - Maps coordinate to character index via `code_view.cursorForPosition(pos).position()`.
-    - Hit-tests against tracked spans via `span_at(char_pos)`.
+    - Hit-tests against tracked spans via `span_at(char_pos)` (bisect above).
     - If hovering over a span: updates cursor to `Qt.CursorShape.PointingHandCursor` and displays a tooltip via `QToolTip.showText` (`"Click to reveal"` or `"Click to re-mask"`).
     - If hovering outside all spans: restores `Qt.CursorShape.IBeamCursor` and hides tooltips via `QToolTip.hideText()`.
   - On `QEvent.Type.Leave`: restores `IBeamCursor` and dismisses tooltips.
@@ -601,14 +618,20 @@ Developers extending selector syntax, modifying response views, or altering MCP 
    ```bash
    make test PYTEST_ARGS="tests/test_hidden_response_fields.py tests/test_mcp_response_masking.py tests/test_gui_response_view_click_to_reveal.py"
    ```
-4. **Verify Reference Collection Integrity & Path Freshness**:
+4. **Run High-N Hit-Testing Regression (PYPOST-1390)**:
+   ```bash
+   make test PYTEST_ARGS="tests/test_pypost_1390_failing_repro.py -v"
+   ```
+   Confirms inclusive `span_at` oracle parity (including post-toggle) and logarithmic visit
+   budget under high span counts.
+5. **Verify Reference Collection Integrity & Path Freshness**:
    ```bash
    make test PYTEST_ARGS="tests/test_collections.py -k test_google_drive"
    make check-github-mcp-path-freshness
    make check-gitlab-mcp-path-freshness
    make check-jira-mcp-path-freshness
    ```
-5. **Execute Static Analysis and Quality Gates**:
+6. **Execute Static Analysis and Quality Gates**:
    ```bash
    # Run flake8, documentation linters, and link checks
    make lint
