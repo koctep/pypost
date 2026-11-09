@@ -319,8 +319,41 @@ display_response(response, hidden_fields)
     - Underline: dotted underline (`QTextCharFormat.UnderlineStyle.DotLine`).
     - Tooltip: `"Click to re-mask"`.
 - **Lifecycle Cleanup**:
-  - `clear()` empties tracked spans, clears extra selections, restores `IBeamCursor`, and hides active tooltips.
-  - Automatically invoked on `clear_body()` and prior to new response rendering in `display_response()`.
+  - `clear()` empties tracked spans, **wipes path-keyed reveal memory** (`_reveal_state`),
+    clears extra selections, restores `IBeamCursor`, and hides active tooltips.
+  - `clear_spans()` empties tracked spans and visuals only, **keeping** `_reveal_state`
+    for presentation re-renders of the same response
+    ([PYPOST-1392](https://pypost.atlassian.net/browse/PYPOST-1392)).
+  - `display_response(..., preserve_reveal_state=False)` (default) calls `clear()` —
+    used for new responses and presenter arrivals.
+  - `display_response(..., preserve_reveal_state=True)` calls `clear_spans()` —
+    used by `set_indent_size()` when re-showing `_last_response`.
+  - `clear_body()` always performs a full `clear()` and drops `_last_response` caches.
+
+#### Reveal-State Preservation Across Reformatting ([PYPOST-1392](https://pypost.atlassian.net/browse/PYPOST-1392))
+
+Presentation-only re-renders (JSON indent changes, and other same-response refreshes that
+opt into `preserve_reveal_state=True`) must not discard the user’s click-to-reveal choices:
+
+- **`_reveal_state: dict[str, bool]`** on `ResponseMaskController` maps canonical selector
+  `path` → last revealed/masked choice. Character offsets are intentionally **not** used
+  as keys because indent changes shift every span.
+- **`handle_click`** writes `self._reveal_state[span.path] = span.is_revealed` after each
+  toggle (including re-mask).
+- **`set_masked_spans`** runs `_apply_persisted_reveals()`: for each new span whose `path`
+  is marked revealed in the map, expands document text from `masked_value` to `raw_value`
+  and shifts later span offsets (same delta rules as click toggle).
+- **Security default**: first paint and any non-preserve display start fully masked.
+  A different response or `clear_body()` wipes the map so reveals never leak onto unrelated
+  payloads.
+- **Tab isolation**: each `ResponseTab` owns its own `ResponseView` /
+  `ResponseMaskController`; there is no process-global reveal map.
+- **Regression**: `tests/test_pypost_1392_failing_repro.py` asserts indent persistence and
+  reset-on-new-response.
+- **DEBUG logs** (counts/paths only, never secrets):
+  `response_masking_preserve_reveal_state`, `reveal_state_spans_cleared`,
+  `reveal_state_cleared`, `reveal_state_restored`, and extended
+  `response_masking_spans_updated` with `restored_reveals` / `memory_size`.
 
 #### In-Place Click-to-Reveal Toggle Mechanics and Span Offset Shifting
 - **Click Detection (`eventFilter` & `handle_click`)**:
@@ -332,7 +365,8 @@ display_response(response, hidden_fields)
   - Locates target span `span = self.span_at(char_pos)`.
   - Computes `old_len = span.end_pos - span.start_pos`.
   - Selects replacement text: `new_text = span.raw_value if not span.is_revealed else span.masked_value`.
-  - Toggles `span.is_revealed = not span.is_revealed`.
+  - Toggles `span.is_revealed = not span.is_revealed` and records the choice in
+    `_reveal_state` when `span.path` is non-empty.
   - Uses `QTextCursor` to perform in-place replacement:
     ```python
     cursor = QTextCursor(self.code_view.document())
@@ -389,7 +423,9 @@ display_response(response, hidden_fields)
 - **Immutability of In-Memory `ResponseData`**:
   - All masking and unmasking transformations are presentation-only, operating strictly on the `QTextDocument` in `ResponseView`.
   - `response.body` on the `ResponseData` instance and history records stored via `HistoryManager` remain completely unmodified.
-  - Re-indenting JSON via `set_indent_size()` safely re-applies formatting from `self._last_response` and `self._last_hidden_fields`.
+  - Re-indenting JSON via `set_indent_size()` safely re-applies formatting from `self._last_response` and `self._last_hidden_fields` with
+    `preserve_reveal_state=True` so prior reveal choices survive the reformat
+    ([PYPOST-1392](https://pypost.atlassian.net/browse/PYPOST-1392)).
 - **Telemetry Counter**:
   - When masking spans are initialized in `display_response`, the system tracks telemetry via:
     - Metric: `hidden_value_masks_applied_total`
@@ -397,7 +433,10 @@ display_response(response, hidden_fields)
     - Invocation: `self._metrics.track_hidden_value_mask_applied("gui_response")`
 - **Structured Logging (Zero Leakage)**:
   - `response_masking_initialized span_count=<count> selectors_count=<count>` (DEBUG)
-  - `response_masking_spans_updated span_count=<count>` (DEBUG)
+  - `response_masking_spans_updated span_count=<count> restored_reveals=<count> memory_size=<count>` (DEBUG)
+  - `response_masking_preserve_reveal_state` (DEBUG)
+  - `reveal_state_spans_cleared memory_size=<count>` / `reveal_state_cleared memory_size=<count>` (DEBUG)
+  - `reveal_state_restored restored_count=<count> memory_size=<count>` (DEBUG)
   - `click_to_reveal_toggle path=<path> revealed=<bool>` (DEBUG)
   - `response_masking_large_doc_fallback payload_size=<size> threshold=<threshold>` (DEBUG)
   - All logs record paths and counts, never exposing secret values.

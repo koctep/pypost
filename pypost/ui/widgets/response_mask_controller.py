@@ -154,6 +154,7 @@ class ResponseMaskController(QObject):
         self.code_view = code_view
         self.response_view = response_view
         self._spans: list[MaskedTokenSpan] = []
+        self._reveal_state: dict[str, bool] = {}
         self._force_viewport_clicks: bool = False
 
         self.code_view.viewport().installEventFilter(self)
@@ -162,18 +163,75 @@ class ResponseMaskController(QObject):
             self.code_view.set_mask_controller(self)
 
     def clear(self) -> None:
-        """Clears all tracked spans and visual highlights."""
+        """Clears tracked spans, reveal memory, and visual highlights."""
+        memory_size = len(self._reveal_state)
+        self._spans.clear()
+        self._reveal_state.clear()
+        self.update_visual_formats()
+        if self.code_view and self.code_view.viewport():
+            self.code_view.viewport().setCursor(Qt.CursorShape.IBeamCursor)
+        QToolTip.hideText()
+        logger.debug("reveal_state_cleared memory_size=%d", memory_size)
+
+    def clear_spans(self) -> None:
+        """Clears tracked spans and visuals but keeps path-keyed reveal memory."""
         self._spans.clear()
         self.update_visual_formats()
         if self.code_view and self.code_view.viewport():
             self.code_view.viewport().setCursor(Qt.CursorShape.IBeamCursor)
         QToolTip.hideText()
+        logger.debug(
+            "reveal_state_spans_cleared memory_size=%d",
+            len(self._reveal_state),
+        )
 
     def set_masked_spans(self, spans: list[MaskedTokenSpan]) -> None:
-        """Stores token spans and applies initial ExtraSelection highlights."""
+        """Stores token spans, restores persisted reveals, and applies highlights."""
         self._spans = list(spans)
+        restored = self._apply_persisted_reveals()
         self.update_visual_formats()
-        logger.debug("response_masking_spans_updated span_count=%d", len(self._spans))
+        logger.debug(
+            "response_masking_spans_updated span_count=%d restored_reveals=%d memory_size=%d",
+            len(self._spans),
+            restored,
+            len(self._reveal_state),
+        )
+
+    def _apply_persisted_reveals(self) -> int:
+        """Expand document text for spans whose path was previously revealed.
+
+        Returns:
+            Number of spans restored to the revealed presentation state.
+        """
+        if not self._reveal_state or not self._spans:
+            return 0
+        restored = 0
+        for span in self._spans:
+            if not span.path or span.is_revealed:
+                continue
+            if not self._reveal_state.get(span.path, False):
+                continue
+            old_len = span.end_pos - span.start_pos
+            new_text = span.raw_value
+            span.is_revealed = True
+            cursor = QTextCursor(self.code_view.document())
+            cursor.setPosition(span.start_pos)
+            cursor.setPosition(span.end_pos, QTextCursor.MoveMode.KeepAnchor)
+            cursor.insertText(new_text)
+            delta = len(new_text) - old_len
+            span.end_pos = span.start_pos + len(new_text)
+            for other in self._spans:
+                if other.start_pos > span.start_pos:
+                    other.start_pos += delta
+                    other.end_pos += delta
+            restored += 1
+        if restored:
+            logger.debug(
+                "reveal_state_restored restored_count=%d memory_size=%d",
+                restored,
+                len(self._reveal_state),
+            )
+        return restored
 
     def spans(self) -> list[MaskedTokenSpan]:
         """Returns the list of tracked token spans."""
@@ -206,6 +264,8 @@ class ResponseMaskController(QObject):
         old_len = span.end_pos - span.start_pos
         new_text = span.raw_value if not span.is_revealed else span.masked_value
         span.is_revealed = not span.is_revealed
+        if span.path:
+            self._reveal_state[span.path] = span.is_revealed
 
         cursor = QTextCursor(self.code_view.document())
         cursor.setPosition(span.start_pos)

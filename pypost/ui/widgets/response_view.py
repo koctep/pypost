@@ -312,7 +312,11 @@ class ResponseView(QWidget):
     def set_indent_size(self, size: int):
         self.indent_size = size
         if self._last_response is not None:
-            self.display_response(self._last_response, hidden_fields=self._last_hidden_fields)
+            self.display_response(
+                self._last_response,
+                hidden_fields=self._last_hidden_fields,
+                preserve_reveal_state=True,
+            )
             return
         # Refresh current view if it contains JSON
         text = self.body_view.toPlainText()
@@ -360,6 +364,8 @@ class ResponseView(QWidget):
         self,
         response: ResponseData,
         hidden_fields: Sequence[str] | None = None,
+        *,
+        preserve_reveal_state: bool = False,
     ):
         self._cancel_mask_worker()
         self._search_timer.stop()
@@ -371,7 +377,11 @@ class ResponseView(QWidget):
 
         self._last_response = response
         self._last_hidden_fields = list(hidden_fields) if hidden_fields is not None else None
-        self.mask_controller.clear()
+        if preserve_reveal_state:
+            self.mask_controller.clear_spans()
+            logger.debug("response_masking_preserve_reveal_state")
+        else:
+            self.mask_controller.clear()
 
         body_str = (
             response.body
