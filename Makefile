@@ -86,7 +86,8 @@ check-lock: ## Verify requirements.txt matches requirements.in (needs uv on PATH
 	rm -f requirements.txt.check requirements.txt.body requirements.txt.check.body
 
 lock-dev: ## Regenerate requirements-dev.txt transitive lock from requirements-dev.in
-	$(UV) pip compile requirements-dev.in -o requirements-dev.txt --python-version $(LOCK_PYTHON_VERSION)
+	$(UV) pip compile requirements-dev.in -o requirements-dev.txt \
+		--python-version $(LOCK_PYTHON_VERSION) --upgrade
 
 check-lock-dev: ## Verify requirements-dev.txt matches requirements-dev.in (needs uv on PATH)
 	@attempt=1; max_attempts=3; delay=1; \

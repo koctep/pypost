@@ -101,11 +101,18 @@ stale (then touches `.venv/.venv-test-<pyver>`); CI main job installs
 `pip install -e ".[dev,otel]"`. Local and CI share the same optional extras
 declared in `pyproject.toml`.
 
-**Regenerate the dev lock** after editing `requirements-dev.in`:
+**Regenerate the dev lock** after editing `requirements-dev.in`, or when
+`make check-lock-dev` reports the committed lock is stale:
 
 ```bash
 make lock-dev
 ```
+
+`make lock-dev` passes `uv pip compile --upgrade` so regeneration matches the
+fresh resolve used by `check-lock-dev` (which compiles into a new `.check` file
+and therefore does not inherit existing pins). Without `--upgrade`, rewriting
+onto an existing `requirements-dev.txt` would keep prior transitive pins and the
+documented remediation would not clear drift (PYPOST-1397).
 
 Verify the committed dev lock matches the source file:
 
@@ -117,7 +124,7 @@ CI runs the same check in the `check-lock-dev` job (`.github/workflows/test.yml`
 push and pull request (PYPOST-804). The workflow pins the `uv` toolchain version
 (currently `0.11.31`, configured via the `version:` parameter of `astral-sh/setup-uv`)
 to guarantee reproducible resolutions and prevent compiler version drift (PYPOST-995,
-PYPOST-1359).
+PYPOST-1359, PYPOST-1397).
 
 For local verification, install or pin the matching `uv` version (`0.11.31`) in your
 environment and run:
