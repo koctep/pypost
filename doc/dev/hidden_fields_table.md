@@ -121,6 +121,20 @@ A written `..` on the stripped path is rejected before wildcard normalization
 `users..email` is not ok. `users[*].email` stays ok. The existing unsupported
 message is reused.
 
+When the stripped draft matches exactly one shape, the warning names that shape
+([PYPOST-1540](https://pypost.atlassian.net/browse/PYPOST-1540)):
+
+- Dollar, `$.token`: "This field selector uses a JSONPath dollar. A dollar
+  sign is not a supported field name."
+- Index, `users[0].email`: "This field selector uses a numeric index. A
+  number in brackets is not a supported field name."
+- Filter, `users[?(@.active)].email`: "This field selector uses a filter. A
+  condition in brackets is not a supported field name."
+
+Zero matches or more than one (for example `$.users[0].name`) keep the
+generic warning. `token` stays ok with an empty message. Accept and reject
+do not change.
+
 Invalid results carry a plain-language `message` plus short `suggestions`
 listing the four supported families.
 
