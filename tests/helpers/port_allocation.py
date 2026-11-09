@@ -44,8 +44,15 @@ def _can_bind(host: str, port: int) -> bool:
     return True
 
 
-def allocate_tcp_port(host: str = "127.0.0.1") -> int:
-    """Return a localhost TCP port unlikely to collide under parallel test workers."""
+def allocate_bound_tcp_socket(host: str = "127.0.0.1") -> socket.socket:
+    """Bind and return an open TCP socket; caller owns close (PYPOST-1541).
+
+    Keeps the port reserved until the caller closes the socket or hands it to a
+    server (e.g. uvicorn ``serve(sockets=[sock])``), eliminating the
+    allocate-then-release TOCTOU of :func:`allocate_tcp_port`.
+    """
+    family = detect_address_family(host)
+    clean_host = host.strip("[]")
     _LOCK_PATH.parent.mkdir(parents=True, exist_ok=True)
     with open(_LOCK_PATH, "a+", encoding="utf-8") as lock_file:
         fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)
@@ -54,20 +61,36 @@ def allocate_tcp_port(host: str = "127.0.0.1") -> int:
             for _ in range(_MAX_ATTEMPTS):
                 counter += 1
                 port = _PORT_BASE + (counter % _PORT_SPAN)
-                if _can_bind(host, port):
-                    _write_counter(counter)
-                    return port
-
-            family = detect_address_family(host)
-            clean_host = host.strip("[]")
-            with socket.socket(family, socket.SOCK_STREAM) as sock:
+                sock = socket.socket(family, socket.SOCK_STREAM)
                 sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-                sock.bind((clean_host, 0))
-                port = int(sock.getsockname()[1])
+                try:
+                    sock.bind((clean_host, port))
+                except OSError:
+                    sock.close()
+                    continue
+                _write_counter(counter)
+                return sock
+
+            sock = socket.socket(family, socket.SOCK_STREAM)
+            sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            sock.bind((clean_host, 0))
             _write_counter(counter + 1)
-            return port
+            return sock
         finally:
             fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
+
+
+def allocate_tcp_port(host: str = "127.0.0.1") -> int:
+    """Return a localhost TCP port unlikely to collide under parallel test workers.
+
+    Prefer :func:`allocate_bound_tcp_socket` when the next step is a server bind;
+    this helper still closes the probe socket before return (compat TOCTOU).
+    """
+    sock = allocate_bound_tcp_socket(host)
+    try:
+        return int(sock.getsockname()[1])
+    finally:
+        sock.close()
 
 
 class EphemeralPortReserve:

@@ -173,12 +173,19 @@ settle helpers
 (`wait_for_widget` / `enabled` / `text` / `snapshot`) live in
 [ui_wait.md](ui_wait.md). For TCP listen readiness, use
 `wait_for_port` from `tests/helpers/mcp_live_server.py`.
-Ephemeral ports for live MCP / manager tests come from `free_port()`, which
-delegates to `allocate_tcp_port` in `tests/helpers/port_allocation.py`
-(PYPOST-1178): cross-process `fcntl.flock` + counter file under
-`PYPOST_TEST_PORT_LOCK` (default `/tmp/pypost-test-port.lock`), base 35000,
-span 25000, bind probe, fallback to port 0. Prefer `free_port()` /
-`allocate_tcp_port` over ad-hoc `bind(..., 0)` when workers may run in parallel.
+Ephemeral ports for live MCP / manager tests come from
+`tests/helpers/port_allocation.py` (PYPOST-1178 / PYPOST-1541): cross-process
+`fcntl.flock` + counter file under `PYPOST_TEST_PORT_LOCK` (default
+`/tmp/pypost-test-port.lock`), base 35000, span 25000, `SO_REUSEADDR` bind,
+fallback to port 0. Prefer `allocate_bound_tcp_socket()` when the next step is a
+server listen — it returns an **open bound socket** so the port stays reserved
+until the caller closes it or hands it to uvicorn (`serve(sockets=[sock])`).
+`LiveMCPServer` uses that held-socket path plus a bounded bind retry loop.
+`free_port()` / `allocate_tcp_port()` remain for call sites that only need an
+integer; they close the probe socket before return (allocate-then-release
+TOCTOU). Prefer them over ad-hoc `bind(..., 0)` under parallel workers, and
+prefer the bound-socket helper over the integer helpers when starting a real
+listener.
 
 To drive pytest **yield fixtures** outside a request (e.g. mocked packaging caplog proofs),
 use `tests/helpers/fixture_drive.py` (`unwrap_yield_fixture`, `run_yield_fixture`,
