@@ -252,7 +252,7 @@ display_response(response, hidden_fields)
         → JsonHighlighter highlights "***" as valid string literal
           → Viewport Mouse Hover: PointingHandCursor & Tooltips
           → Viewport Left-Click: In-place QTextCursor toggle ("***" <-> raw_value)
-            → Downstream span offset delta shifting
+            → One Fenwick length delta; later spans are not visited
             → Search match counter & code folding synchronization
 ```
 
@@ -283,9 +283,10 @@ display_response(response, hidden_fields)
 #### ResponseMaskController Lifecycle & Visual Styling
 `ResponseMaskController` (`QObject`) manages span tracking and user interactions for `FoldableCodeView`:
 - **Hit-testing (`span_at`) — O(log N) bisect** ([PYPOST-1390](https://pypost.atlassian.net/browse/PYPOST-1390)):
-  - `_spans` stay non-overlapping and ordered by ascending `start_pos` for the lifetime of a
-    span set (formatter emission order; `handle_click` shifts later intervals in place without
-    reordering the list).
+  - `_spans` stay non-overlapping and ordered by ascending display `start_pos`.
+    Formatter emission order is stable. A toggle does not reorder the list.
+    Live `start_pos` and `end_pos` are the formatted base plus the Fenwick
+    prefix. Later spans are not visited.
   - Lookup uses stdlib `bisect_right(self._spans, char_pos, key=attrgetter("start_pos"))`, then
     takes candidate `idx - 1` (rightmost span with `start_pos <= char_pos`) and returns it iff
     `char_pos <= candidate.end_pos`. Empty list, index `0`, or failed end check → `None`.
@@ -296,9 +297,10 @@ display_response(response, hidden_fields)
     cannot diverge.
   - Regression: `tests/test_pypost_1390_failing_repro.py` locks oracle parity (including
     post-toggle) and asserts high-N query work stays logarithmic vs a full `_spans` scan.
-  - Later-span offset shifting on toggle remains a linear walk (separate debt
-    [PYPOST-1547](https://pypost.atlassian.net/browse/PYPOST-1547)); optional MouseMove
-    throttling is [PYPOST-1548](https://pypost.atlassian.net/browse/PYPOST-1548).
+  - One toggle records one Fenwick length delta. Later spans are not visited
+    ([PYPOST-1547](https://pypost.atlassian.net/browse/PYPOST-1547)).
+    Optional MouseMove throttling is
+    [PYPOST-1548](https://pypost.atlassian.net/browse/PYPOST-1548).
 - **Viewport Event Filtering**:
   - Installs an event filter on `FoldableCodeView.viewport()` and enables `setMouseTracking(True)`.
   - On `QEvent.Type.MouseMove`:
@@ -341,8 +343,8 @@ opt into `preserve_reveal_state=True`) must not discard the user’s click-to-re
 - **`handle_click`** writes `self._reveal_state[span.path] = span.is_revealed` after each
   toggle (including re-mask).
 - **`set_masked_spans`** runs `_apply_persisted_reveals()`: for each new span whose `path`
-  is marked revealed in the map, expands document text from `masked_value` to `raw_value`
-  and shifts later span offsets (same delta rules as click toggle).
+  is marked revealed, writes `raw_value` through the same Fenwick index as a click.
+  One length delta is recorded per restored span. Later spans are not visited.
 - **Security default**: first paint and any non-preserve display start fully masked.
   A different response or `clear_body()` wipes the map so reveals never leak onto unrelated
   payloads.
@@ -355,7 +357,8 @@ opt into `preserve_reveal_state=True`) must not discard the user’s click-to-re
   `reveal_state_cleared`, `reveal_state_restored`, and extended
   `response_masking_spans_updated` with `restored_reveals` / `memory_size`.
 
-#### In-Place Click-to-Reveal Toggle Mechanics and Span Offset Shifting
+#### In-Place Click-to-Reveal Toggle and Fenwick Length Deltas
+
 - **Click Detection (`eventFilter` & `handle_click`)**:
   - On `QEvent.Type.MouseButtonRelease` with `Qt.MouseButton.LeftButton`:
     - Checks `not self.code_view.textCursor().hasSelection()` to ensure text drag-selection is not mistaken for a click.
@@ -363,30 +366,37 @@ opt into `preserve_reveal_state=True`) must not discard the user’s click-to-re
     - Calls `handle_click(char_pos)`.
 - **In-Place QTextCursor Replacement**:
   - Locates target span `span = self.span_at(char_pos)`.
-  - Computes `old_len = span.end_pos - span.start_pos`.
-  - Selects replacement text: `new_text = span.raw_value if not span.is_revealed else span.masked_value`.
+  - Reveal writes `raw_value`. Hide writes `masked_value`.
   - Toggles `span.is_revealed = not span.is_revealed` and records the choice in
     `_reveal_state` when `span.path` is non-empty.
-  - Uses `QTextCursor` to perform in-place replacement:
+  - `_replace_span_text` selects the live range, then inserts that text:
     ```python
     cursor = QTextCursor(self.code_view.document())
     cursor.setPosition(span.start_pos)
     cursor.setPosition(span.end_pos, QTextCursor.MoveMode.KeepAnchor)
     cursor.insertText(new_text)
     ```
-    *(Note: In Qt `QPlainTextEdit`, programmatic cursor edits succeed even when `isReadOnly() == True`, preventing user typing while allowing scriptable modifications).*
-- **Downstream Span Offset Delta Shifting**:
-  - Calculates length delta: `delta = len(new_text) - old_len`.
-  - Updates target span boundary: `span.end_pos = span.start_pos + len(new_text)`.
-  - Shifts all subsequent spans (`other.start_pos > span.start_pos`) in the tracked list:
-    ```python
-    for other in self._spans:
-        if other.start_pos > span.start_pos:
-            other.start_pos += delta
-            other.end_pos += delta
-    ```
-  - Spans preceding the toggled position remain unaffected. This preserves exact coordinate integrity across any sequence of reveals and re-masks.
-  - Updates visual formats via `update_visual_formats()`.
+    The length delta is recorded after `insertText`. Recording it first would
+    move this span's end before the cursor selection is taken.
+    *(Note: In Qt `QPlainTextEdit`, programmatic cursor edits succeed even when
+    `isReadOnly() == True`, preventing user typing while allowing scriptable
+    modifications).*
+- **Fenwick prefix of length deltas**
+  ([PYPOST-1547](https://pypost.atlassian.net/browse/PYPOST-1547)):
+  - `_SpanDeltaIndex` in `pypost/ui/widgets/response_mask_controller.py` stores
+    one length delta per span. `prefix(count)` sums indexes `[0, count)`.
+  - `set_masked_spans` binds each span to its stable index. Formatter
+    coordinates stay the base. Live `start_pos` is that base plus
+    `prefix(index)`. Live `end_pos` is the base end plus `prefix(index + 1)`.
+  - One mask toggle calls `add` once for that index. Later spans are not
+    visited. Display positions pick up the prefix when read.
+  - `span_at` is still `bisect_right` on those display starts.
+  - Persisted-reveal restore uses the same index. Each restored span records
+    one delta through `_replace_span_text`.
+  - The paint pass (`update_visual_formats`) still walks every span once to
+    build `ExtraSelection`s. That walk does not add a delta.
+  - Spans before the toggled index stay put, so reveals and re-masks keep
+    document order and non-overlapping intervals.
 
 #### Subsystem Coexistence
 - **Syntax Highlighting (`JsonHighlighter`)**:

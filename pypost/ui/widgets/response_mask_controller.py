@@ -11,7 +11,6 @@ from __future__ import annotations
 import json
 import logging
 from bisect import bisect_right
-from dataclasses import dataclass
 from operator import attrgetter
 from typing import TYPE_CHECKING, Any, Sequence
 
@@ -27,16 +26,111 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-@dataclass
-class MaskedTokenSpan:
-    """Tracks coordinates and state of a masked token in the text document."""
+class _SpanDeltaIndex:
+    """Point-update prefix sums of per-span length deltas.
 
-    start_pos: int
-    end_pos: int
-    raw_value: str
-    masked_value: str = '"***"'
-    is_revealed: bool = False
-    path: str = ""
+    ``prefix(count)`` is the sum of deltas at indexes ``[0, count)``.
+    The array is 1-based internally; public indexes are 0-based.
+    ``prefix(0)`` is 0. ``add`` on an empty index does nothing.
+    """
+
+    def __init__(self, count: int) -> None:
+        if count < 0:
+            raise ValueError("count must be non-negative")
+        self._count = count
+        self._tree = [0] * (count + 1)
+
+    def add(self, index: int, delta: int) -> None:
+        if self._count == 0:
+            return
+        if index < 0 or index >= self._count:
+            raise IndexError(index)
+        cursor = index + 1
+        while cursor <= self._count:
+            self._tree[cursor] += delta
+            cursor += cursor & -cursor
+
+    def prefix(self, count: int) -> int:
+        if count < 0 or count > self._count:
+            raise IndexError(count)
+        total = 0
+        cursor = count
+        while cursor > 0:
+            total += self._tree[cursor]
+            cursor -= cursor & -cursor
+        return total
+
+
+class MaskedTokenSpan:
+    """Base coordinates at construction; live coordinates after bind.
+
+    Display start is the base start plus the prefix strictly before this
+    span. Display end is the base end plus the prefix through this span.
+    An unbound span reports the base. The binding is excluded from
+    equality and ``repr``.
+    """
+
+    def __init__(
+        self,
+        start_pos: int,
+        end_pos: int,
+        raw_value: str,
+        masked_value: str = '"***"',
+        is_revealed: bool = False,
+        path: str = "",
+    ) -> None:
+        self._base_start = start_pos
+        self._base_end = end_pos
+        self.raw_value = raw_value
+        self.masked_value = masked_value
+        self.is_revealed = is_revealed
+        self.path = path
+        self._index: int | None = None
+        self._deltas: _SpanDeltaIndex | None = None
+
+    def _bind(self, index: int, deltas: _SpanDeltaIndex) -> None:
+        self._index = index
+        self._deltas = deltas
+
+    def _unbind(self) -> None:
+        self._index = None
+        self._deltas = None
+
+    @property
+    def start_pos(self) -> int:
+        deltas = self._deltas
+        index = self._index
+        if deltas is None or index is None:
+            return self._base_start
+        return self._base_start + deltas.prefix(index)
+
+    @property
+    def end_pos(self) -> int:
+        deltas = self._deltas
+        index = self._index
+        if deltas is None or index is None:
+            return self._base_end
+        return self._base_end + deltas.prefix(index + 1)
+
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, MaskedTokenSpan):
+            return NotImplemented
+        return (
+            self.start_pos == other.start_pos
+            and self.end_pos == other.end_pos
+            and self.raw_value == other.raw_value
+            and self.masked_value == other.masked_value
+            and self.is_revealed == other.is_revealed
+            and self.path == other.path
+        )
+
+    def __repr__(self) -> str:
+        return (
+            "MaskedTokenSpan("
+            f"start_pos={self.start_pos}, end_pos={self.end_pos}, "
+            f"raw_value={self.raw_value!r}, masked_value={self.masked_value!r}, "
+            f"is_revealed={self.is_revealed!r}, path={self.path!r})"
+        )
 
 
 class JsonMaskFormatter:
@@ -156,6 +250,7 @@ class ResponseMaskController(QObject):
         self.code_view = code_view
         self.response_view = response_view
         self._spans: list[MaskedTokenSpan] = []
+        self._deltas: _SpanDeltaIndex = _SpanDeltaIndex(0)
         self._reveal_state: dict[str, bool] = {}
         self._force_viewport_clicks: bool = False
 
@@ -167,6 +262,7 @@ class ResponseMaskController(QObject):
     def clear(self) -> None:
         """Clears tracked spans, reveal memory, and visual highlights."""
         memory_size = len(self._reveal_state)
+        self._release_span_bindings()
         self._spans.clear()
         self._reveal_state.clear()
         self.update_visual_formats()
@@ -177,6 +273,7 @@ class ResponseMaskController(QObject):
 
     def clear_spans(self) -> None:
         """Clears tracked spans and visuals but keeps path-keyed reveal memory."""
+        self._release_span_bindings()
         self._spans.clear()
         self.update_visual_formats()
         if self.code_view and self.code_view.viewport():
@@ -189,7 +286,11 @@ class ResponseMaskController(QObject):
 
     def set_masked_spans(self, spans: list[MaskedTokenSpan]) -> None:
         """Stores token spans, restores persisted reveals, and applies highlights."""
+        self._release_span_bindings()
         self._spans = list(spans)
+        self._deltas = _SpanDeltaIndex(len(self._spans))
+        for index, span in enumerate(self._spans):
+            span._bind(index, self._deltas)
         restored = self._apply_persisted_reveals()
         self.update_visual_formats()
         logger.debug(
@@ -198,6 +299,28 @@ class ResponseMaskController(QObject):
             restored,
             len(self._reveal_state),
         )
+
+    def _release_span_bindings(self) -> None:
+        """Drop the delta index so released spans fall back to their base."""
+        for span in self._spans:
+            span._unbind()
+        self._deltas = _SpanDeltaIndex(0)
+
+    def _replace_span_text(self, span: MaskedTokenSpan, new_text: str) -> None:
+        """Replace the live range, then record that span's length delta.
+
+        The delta is recorded after ``insertText``. Recording it first would
+        move this span's end before the cursor selection is taken.
+        """
+        old_len = span.end_pos - span.start_pos
+        cursor = QTextCursor(self.code_view.document())
+        cursor.setPosition(span.start_pos)
+        cursor.setPosition(span.end_pos, QTextCursor.MoveMode.KeepAnchor)
+        cursor.insertText(new_text)
+        index = span._index
+        if index is None:
+            raise RuntimeError("masked span is not bound to a delta index")
+        self._deltas.add(index, len(new_text) - old_len)
 
     def _apply_persisted_reveals(self) -> int:
         """Expand document text for spans whose path was previously revealed.
@@ -213,19 +336,8 @@ class ResponseMaskController(QObject):
                 continue
             if not self._reveal_state.get(span.path, False):
                 continue
-            old_len = span.end_pos - span.start_pos
-            new_text = span.raw_value
             span.is_revealed = True
-            cursor = QTextCursor(self.code_view.document())
-            cursor.setPosition(span.start_pos)
-            cursor.setPosition(span.end_pos, QTextCursor.MoveMode.KeepAnchor)
-            cursor.insertText(new_text)
-            delta = len(new_text) - old_len
-            span.end_pos = span.start_pos + len(new_text)
-            for other in self._spans:
-                if other.start_pos > span.start_pos:
-                    other.start_pos += delta
-                    other.end_pos += delta
+            self._replace_span_text(span, span.raw_value)
             restored += 1
         if restored:
             logger.debug(
@@ -263,24 +375,11 @@ class ResponseMaskController(QObject):
         if span is None:
             return False
 
-        old_len = span.end_pos - span.start_pos
         new_text = span.raw_value if not span.is_revealed else span.masked_value
         span.is_revealed = not span.is_revealed
         if span.path:
             self._reveal_state[span.path] = span.is_revealed
-
-        cursor = QTextCursor(self.code_view.document())
-        cursor.setPosition(span.start_pos)
-        cursor.setPosition(span.end_pos, QTextCursor.MoveMode.KeepAnchor)
-        cursor.insertText(new_text)
-
-        delta = len(new_text) - old_len
-        span.end_pos = span.start_pos + len(new_text)
-
-        for other in self._spans:
-            if other.start_pos > span.start_pos:
-                other.start_pos += delta
-                other.end_pos += delta
+        self._replace_span_text(span, new_text)
 
         self.update_visual_formats()
         self.code_view.fold_controller().ensure_scanned()
