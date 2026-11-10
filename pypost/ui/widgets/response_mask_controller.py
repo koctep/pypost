@@ -14,7 +14,7 @@ from bisect import bisect_right
 from operator import attrgetter
 from typing import TYPE_CHECKING, Any, Sequence
 
-from PySide6.QtCore import QEvent, QObject, Qt
+from PySide6.QtCore import QEvent, QObject, QPoint, Qt, QTimer
 from PySide6.QtGui import QColor, QMouseEvent, QTextCharFormat, QTextCursor
 from PySide6.QtWidgets import QTextEdit, QToolTip
 
@@ -239,12 +239,20 @@ def format_masked_json(
 
 
 class ResponseMaskController(QObject):
-    """Coordinates masked token spans, hover cursors, and click-to-reveal toggling."""
+    """Coordinates masked token spans, hover cursors, and click-to-reveal toggling.
+
+    ``limit_hover_moves`` stays off unless the caller passes it. The
+    default hover path applies cursor and tooltip work inside the move
+    event. When the limit is on, moves in one turn share one later pass
+    for the newest point.
+    """
 
     def __init__(
         self,
         code_view: FoldableCodeView,
         response_view: Any = None,
+        *,
+        limit_hover_moves: bool = False,
     ) -> None:
         super().__init__(code_view)
         self.code_view = code_view
@@ -253,6 +261,15 @@ class ResponseMaskController(QObject):
         self._deltas: _SpanDeltaIndex = _SpanDeltaIndex(0)
         self._reveal_state: dict[str, bool] = {}
         self._force_viewport_clicks: bool = False
+        self._limit_hover_moves = limit_hover_moves
+        if limit_hover_moves:
+            self._hover_move_waiting = False
+            self._hover_move_local: QPoint | None = None
+            self._hover_move_global: QPoint | None = None
+            self._hover_move_timer = QTimer(self)
+            self._hover_move_timer.setSingleShot(True)
+            self._hover_move_timer.setInterval(0)
+            self._hover_move_timer.timeout.connect(self._flush_limited_hover)
 
         self.code_view.viewport().installEventFilter(self)
         self.code_view.viewport().setMouseTracking(True)
@@ -262,6 +279,7 @@ class ResponseMaskController(QObject):
     def clear(self) -> None:
         """Clears tracked spans, reveal memory, and visual highlights."""
         memory_size = len(self._reveal_state)
+        self._cancel_limited_hover()
         self._release_span_bindings()
         self._spans.clear()
         self._reveal_state.clear()
@@ -273,6 +291,7 @@ class ResponseMaskController(QObject):
 
     def clear_spans(self) -> None:
         """Clears tracked spans and visuals but keeps path-keyed reveal memory."""
+        self._cancel_limited_hover()
         self._release_span_bindings()
         self._spans.clear()
         self.update_visual_formats()
@@ -425,24 +444,67 @@ class ResponseMaskController(QObject):
 
         self.code_view.setExtraSelections(selections)
 
+    def _apply_hover_feedback(self, local_pos: QPoint, global_pos: QPoint) -> None:
+        """Set the cursor and tooltip for one pointer sample via ``span_at``."""
+        char_pos = self.code_view.cursorForPosition(local_pos).position()
+        span = self.span_at(char_pos)
+        viewport = self.code_view.viewport()
+        if span is not None:
+            viewport.setCursor(Qt.CursorShape.PointingHandCursor)
+            tooltip_text = "Click to re-mask" if span.is_revealed else "Click to reveal"
+            QToolTip.showText(global_pos, tooltip_text, viewport)
+        else:
+            viewport.setCursor(Qt.CursorShape.IBeamCursor)
+            QToolTip.hideText()
+
+    def _queue_limited_hover(self, local_pos: QPoint, global_pos: QPoint) -> None:
+        """Keep the newest point. Arm the 0 ms timer only while it is idle.
+
+        Restarting that timer on every move would leave hover on an older
+        place until the queue is idle.
+        """
+        self._hover_move_local = QPoint(local_pos)
+        self._hover_move_global = QPoint(global_pos)
+        if self._hover_move_waiting:
+            return
+        self._hover_move_waiting = True
+        self._hover_move_timer.start()
+
+    def _flush_limited_hover(self) -> None:
+        """Apply the stored point once when a move is still waiting.
+
+        The waiting flag drops before the apply. A timeout posted before
+        leave or clear then finds nothing to do, and a move during this
+        pass can arm the next turn.
+        """
+        if not self._hover_move_waiting:
+            return
+        self._hover_move_waiting = False
+        local_pos = self._hover_move_local
+        global_pos = self._hover_move_global
+        if local_pos is None or global_pos is None:
+            return
+        self._apply_hover_feedback(local_pos, global_pos)
+
+    def _cancel_limited_hover(self) -> None:
+        """Drop a pending pass so a posted timeout cannot apply a stale point."""
+        if not self._limit_hover_moves:
+            return
+        self._hover_move_waiting = False
+        self._hover_move_timer.stop()
+        self._hover_move_local = None
+        self._hover_move_global = None
+
     def eventFilter(self, watched: QObject, event: QEvent) -> bool:
         """Filters viewport mouse events for hover cursors, tooltips, and click-to-reveal."""
         if self.code_view and watched is self.code_view.viewport():
             if event.type() == QEvent.Type.MouseMove and isinstance(event, QMouseEvent):
-                pos = event.position().toPoint()
-                char_pos = self.code_view.cursorForPosition(pos).position()
-                span = self.span_at(char_pos)
-                if span is not None:
-                    self.code_view.viewport().setCursor(Qt.CursorShape.PointingHandCursor)
-                    tooltip_text = "Click to re-mask" if span.is_revealed else "Click to reveal"
-                    QToolTip.showText(
-                        event.globalPosition().toPoint(),
-                        tooltip_text,
-                        self.code_view.viewport(),
-                    )
+                local_pos = event.position().toPoint()
+                global_pos = event.globalPosition().toPoint()
+                if self._limit_hover_moves:
+                    self._queue_limited_hover(local_pos, global_pos)
                 else:
-                    self.code_view.viewport().setCursor(Qt.CursorShape.IBeamCursor)
-                    QToolTip.hideText()
+                    self._apply_hover_feedback(local_pos, global_pos)
             elif event.type() == QEvent.Type.MouseButtonRelease and isinstance(event, QMouseEvent):
                 if (
                     event.button() == Qt.MouseButton.LeftButton
@@ -454,6 +516,7 @@ class ResponseMaskController(QObject):
                         if self.handle_click(char_pos):
                             return True
             elif event.type() == QEvent.Type.Leave:
+                self._cancel_limited_hover()
                 self.code_view.viewport().setCursor(Qt.CursorShape.IBeamCursor)
                 QToolTip.hideText()
 

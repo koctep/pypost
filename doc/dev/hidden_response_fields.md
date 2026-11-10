@@ -299,16 +299,28 @@ display_response(response, hidden_fields)
     post-toggle) and asserts high-N query work stays logarithmic vs a full `_spans` scan.
   - One toggle records one Fenwick length delta. Later spans are not visited
     ([PYPOST-1547](https://pypost.atlassian.net/browse/PYPOST-1547)).
-    Optional MouseMove throttling is
-    [PYPOST-1548](https://pypost.atlassian.net/browse/PYPOST-1548).
+  - Optional hover coalesce
+    ([PYPOST-1548](https://pypost.atlassian.net/browse/PYPOST-1548)):
+    `limit_hover_moves` defaults to false. `ResponseView` still applies
+    cursor and tooltip inside the move event. When the flag is true, rapid
+    moves store the latest point and one 0 ms timer applies cursor and
+    tooltip once through `span_at`. A click still uses the release position.
+  - Regression: `tests/test_pypost_1548_failing_repro.py` checks that an
+    enabled limit keeps the latest span after rapid moves.
 - **Viewport Event Filtering**:
   - Installs an event filter on `FoldableCodeView.viewport()` and enables `setMouseTracking(True)`.
   - On `QEvent.Type.MouseMove`:
-    - Maps coordinate to character index via `code_view.cursorForPosition(pos).position()`.
-    - Hit-tests against tracked spans via `span_at(char_pos)` (bisect above).
-    - If hovering over a span: updates cursor to `Qt.CursorShape.PointingHandCursor` and displays a tooltip via `QToolTip.showText` (`"Click to reveal"` or `"Click to re-mask"`).
-    - If hovering outside all spans: restores `Qt.CursorShape.IBeamCursor` and hides tooltips via `QToolTip.hideText()`.
-  - On `QEvent.Type.Leave`: restores `IBeamCursor` and dismisses tooltips.
+    - Default (`limit_hover_moves` false): `cursorForPosition` and
+      `span_at` run inside the move event, then set the cursor and tooltip.
+    - Enabled (`limit_hover_moves` true): store the latest point. One
+      single-shot 0 ms timer applies cursor and tooltip once through
+      `span_at`. Moves while that timer is armed replace the stored point
+      and do not restart it.
+    - Over a span: `PointingHandCursor` and `QToolTip.showText`
+      (`"Click to reveal"` or `"Click to re-mask"`).
+    - Outside every span: `IBeamCursor` and `QToolTip.hideText()`.
+  - On `QEvent.Type.Leave`: drop a pending coalesce, restore `IBeamCursor`,
+    and dismiss tooltips.
 - **ExtraSelection Visual Affordance (`update_visual_formats`)**:
   - Masking affordances are rendered using Qt's `QTextEdit.ExtraSelection` API on `FoldableCodeView`.
   - `ExtraSelection` paints decorations directly in the viewport layer without mutating document text, modifying character offsets, or interfering with `QSyntaxHighlighter`.
