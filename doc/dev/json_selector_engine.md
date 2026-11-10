@@ -48,7 +48,7 @@ The unified engine lives in `pypost/core/json_selector_engine.py`:
 |                                                              |
 |   - matches(path, key) -> bool                               |
 |   - redact_tree(node, placeholder) -> (redacted, count)      |
-|   - mutable breadcrumb (append / pop) during redact_tree     |
+|   - mutable breadcrumb (push / pop) during redact_tree       |
 +------------------------------+-------------------------------+
             |                                      |
             v                                      v
@@ -129,8 +129,10 @@ Evaluates whether a dictionary key at the specified parent path matches any comp
 - If `key` is present in `_bare_keys`, returns `True` immediately in $O(1)$ time.
 - Otherwise, walks `PathSelectorTrie` over `path` then `key` via `matches_path_and_key`
   (no combined candidate list allocation on the hot path).
-- Includes shorthand dot fallback: when the candidate path contains `*`, a second trie walk
-  strips those segments (e.g. matching rule `items.secret` against path `items.*.secret`).
+- Includes shorthand dot fallback after a hierarchical miss. A `MaskBreadcrumb` reports
+  `*` presence with `has_wildcard` (wildcard count above zero) and does not scan the
+  location. A one-shot list or tuple still uses `_sequence_has_wildcard`. When presence is true, a
+  second trie walk strips `*` segments (rule `items.secret` against path `items.*.secret`).
 
 ```python
 # Bare key match at any depth
@@ -148,9 +150,11 @@ lists). Returns a 2-tuple `(redacted_tree, masked_count)` containing the new san
 structure and the total number of redacted leaf values. Non-container inputs are returned
 unmodified.
 
-Internally, `_redact_node` shares one mutable `list[str]` breadcrumb: object keys are
-`append` / `pop`’d on descent/ascent; array elements push `"*"`. Callers still receive an
-immutable redacted copy of the tree (inputs are never mutated).
+Internally, `_redact_node` shares one `MaskBreadcrumb`. Object keys and list stars are
+pushed on descent and popped on ascent. Push of `"*"` increments a wildcard count and
+pop of `"*"` decrements it, so an outer star stays in force after an inner star is
+popped. Callers still receive an immutable redacted copy of the tree (inputs are never
+mutated).
 
 ```python
 payload = {
@@ -221,8 +225,10 @@ sanitized = redact_json_response_fields(raw_body, hidden_fields=["user.apiKey"])
 Located in `pypost.ui.widgets.response_mask_controller`.
 
 `JsonMaskFormatter` uses `JsonSelectorEngine` to detect masked keys during text indentation.
-Like `redact_tree`, format descent shares one mutable path list (`append` / `pop` for object
-keys and `"*"` for array elements) instead of allocating `path + [seg]` per level.
+Like `redact_tree`, format descent shares one `MaskBreadcrumb` (`push` / `pop` for object
+keys and `"*"` for array elements) instead of allocating `path + [seg]` per level. The
+hierarchical miss reads `has_wildcard` from that breadcrumb rather than scanning the
+location.
 
 ```python
 from pypost.ui.widgets.response_mask_controller import JsonMaskFormatter
@@ -247,8 +253,9 @@ formatted_text, spans = formatter.format(response_dict)
    `matches` walks exact/`*` edges bounded by path depth, not by scanning all $R$ hierarchical
    rules. Compile DEBUG reports `trie_size` as the indexed-path count.
 3. **Mutable Path Breadcrumbs (PYPOST-1388)**:
-   `redact_tree` and `JsonMaskFormatter` reuse one `list[str]` across recursion with
-   `append` / `pop`, avoiding per-level `path + [seg]` allocations.
+   `redact_tree` and `JsonMaskFormatter` reuse one `MaskBreadcrumb` across recursion with
+   `push` / `pop`, avoiding per-level `path + [seg]` allocations. A hierarchical miss reads
+   `has_wildcard` instead of scanning the location for `*`.
 4. **Zero-Allocation Non-Matches**:
    If the trie is empty and a key is not in `_bare_keys`, `matches()` returns `False`
    immediately without allocating path lists or string objects.

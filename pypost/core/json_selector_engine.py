@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 import re
-from typing import Any, Iterable, Sequence
+from typing import Any, Iterable, Sequence, SupportsIndex
 
 from pypost.core.header_selector_prefix import header_selector_name
 
@@ -111,6 +111,37 @@ class PathSelectorTrie:
         return any(node.is_terminal for node in nodes)
 
 
+class MaskBreadcrumb(list[str]):
+    """Location stack whose wildcard count tracks pushed ``*`` segments."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self._wildcard_count = 0
+
+    def push(self, segment: str) -> None:
+        super().append(segment)
+        if segment == "*":
+            self._wildcard_count += 1
+
+    def pop(self, index: SupportsIndex = -1) -> str:
+        segment = super().pop(index)
+        if segment == "*":
+            self._wildcard_count -= 1
+        return segment
+
+    @property
+    def has_wildcard(self) -> bool:
+        return self._wildcard_count > 0
+
+    def append(self, segment: str) -> None:
+        self.push(segment)
+
+
+def _sequence_has_wildcard(path: Sequence[str]) -> bool:
+    """Plain sequences have no push history, so presence is read from segments."""
+    return any(str(t) == "*" for t in path)
+
+
 class JsonSelectorEngine:
     """Evaluates JSON selector path rules and performs data redaction."""
 
@@ -158,8 +189,13 @@ class JsonSelectorEngine:
         if self._trie.matches_path_and_key(path, key_str):
             return True
 
-        # Shorthand dot fallback (e.g. items.secret matching items.*.secret path)
-        if any(str(t) == "*" for t in path):
+        # Shorthand dot fallback (e.g. items.secret matching items.*.secret path).
+        # Walks read the breadcrumb flag. One-shot lists and tuples still scan.
+        if isinstance(path, MaskBreadcrumb):
+            wildcard_present = path.has_wildcard
+        else:
+            wildcard_present = _sequence_has_wildcard(path)
+        if wildcard_present:
             if self._trie.matches_shorthand_path_and_key(path, key_str):
                 return True
 
@@ -174,7 +210,7 @@ class JsonSelectorEngine:
         if self.is_empty or not isinstance(node, (dict, list)):
             return node, 0
         masked_count = [0]
-        path: list[str] = []
+        path = MaskBreadcrumb()
         redacted = self._redact_node(node, path, placeholder, masked_count)
         logger.debug(
             "json_selector_engine_redact_tree_completed masked_count=%d",
@@ -185,7 +221,7 @@ class JsonSelectorEngine:
     def _redact_node(
         self,
         node: Any,
-        path: list[str],
+        path: MaskBreadcrumb,
         placeholder: str,
         masked_count: list[int],
     ) -> Any:
@@ -197,7 +233,7 @@ class JsonSelectorEngine:
                     res[key] = placeholder
                     masked_count[0] += 1
                 else:
-                    path.append(key_str)
+                    path.push(key_str)
                     try:
                         res[key] = self._redact_node(
                             val, path, placeholder, masked_count
@@ -208,7 +244,7 @@ class JsonSelectorEngine:
         if isinstance(node, list):
             result: list[Any] = []
             for item in node:
-                path.append("*")
+                path.push("*")
                 try:
                     result.append(
                         self._redact_node(item, path, placeholder, masked_count)
