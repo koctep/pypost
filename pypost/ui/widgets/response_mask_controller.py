@@ -19,7 +19,7 @@ from PySide6.QtCore import QEvent, QObject, Qt
 from PySide6.QtGui import QColor, QMouseEvent, QTextCharFormat, QTextCursor
 from PySide6.QtWidgets import QTextEdit, QToolTip
 
-from pypost.core.json_selector_engine import JsonSelectorEngine
+from pypost.core.json_selector_engine import JsonSelectorEngine, MaskBreadcrumb
 
 if TYPE_CHECKING:
     from pypost.ui.widgets.foldable_code_view import FoldableCodeView
@@ -61,11 +61,11 @@ class JsonMaskFormatter:
         self._chunks = []
         self._spans = []
         self._current_pos = 0
-        path: list[str] = []
+        path = MaskBreadcrumb()
         self._format_value(node, path, 0)
         return "".join(self._chunks), self._spans
 
-    def _format_value(self, node: Any, path: list[str], depth: int) -> None:
+    def _format_value(self, node: Any, path: MaskBreadcrumb, depth: int) -> None:
         if isinstance(node, dict):
             self._format_dict(node, path, depth)
         elif isinstance(node, list):
@@ -73,7 +73,9 @@ class JsonMaskFormatter:
         else:
             self._emit(json.dumps(node, ensure_ascii=False))
 
-    def _format_dict(self, node: dict[str, Any], path: list[str], depth: int) -> None:
+    def _format_dict(
+        self, node: dict[str, Any], path: MaskBreadcrumb, depth: int
+    ) -> None:
         if not node:
             self._emit("{}")
             return
@@ -100,7 +102,7 @@ class JsonMaskFormatter:
                     )
                 )
             else:
-                path.append(key_str)
+                path.push(key_str)
                 try:
                     self._format_value(val, path, depth + 1)
                 finally:
@@ -110,14 +112,14 @@ class JsonMaskFormatter:
             self._emit("\n")
         self._emit(" " * (depth * self.indent) + "}")
 
-    def _format_list(self, node: list[Any], path: list[str], depth: int) -> None:
+    def _format_list(self, node: list[Any], path: MaskBreadcrumb, depth: int) -> None:
         if not node:
             self._emit("[]")
             return
         self._emit("[\n")
         for idx, item in enumerate(node):
             self._emit(" " * ((depth + 1) * self.indent))
-            path.append("*")
+            path.push("*")
             try:
                 self._format_value(item, path, depth + 1)
             finally:

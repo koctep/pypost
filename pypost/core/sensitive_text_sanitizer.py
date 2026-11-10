@@ -8,7 +8,7 @@ import re
 from typing import Any, Iterable, Mapping, Sequence
 
 from pypost.core.header_selector_prefix import header_selector_name
-from pypost.core.json_selector_engine import JsonSelectorEngine
+from pypost.core.json_selector_engine import JsonSelectorEngine, MaskBreadcrumb
 
 logger = logging.getLogger(__name__)
 
@@ -127,7 +127,13 @@ def _redact_node(
 ) -> Any:
     engine = JsonSelectorEngine(selectors)
     mc = masked_count if masked_count is not None else [0]
-    return engine._redact_node(node, path, placeholder, mc)
+    if isinstance(path, MaskBreadcrumb):
+        breadcrumb = path
+    else:
+        breadcrumb = MaskBreadcrumb()
+        for segment in path:
+            breadcrumb.push(str(segment))
+    return engine._redact_node(node, breadcrumb, placeholder, mc)
 
 
 def _redact_hidden_values(
