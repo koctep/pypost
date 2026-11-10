@@ -364,6 +364,12 @@ opt into `preserve_reveal_state=True`) must not discard the user’s click-to-re
   `ResponseMaskController`; there is no process-global reveal map.
 - **Regression**: `tests/test_pypost_1392_failing_repro.py` asserts indent persistence and
   reset-on-new-response.
+- **Characterization** (PYPOST-1549): `tests/test_pypost_1549_clear_and_remask.py`.
+  Clearing the response body forgets a reveal, so the next body starts
+  masked even when the text matches. Revealing a value and masking it
+  again, then changing indent on the same response, leaves that value
+  hidden. A value left revealed stays visible. A value never revealed
+  stays masked.
 - **DEBUG logs** (counts/paths only, never secrets):
   `response_masking_preserve_reveal_state`, `reveal_state_spans_cleared`,
   `reveal_state_cleared`, `reveal_state_restored`, and extended
