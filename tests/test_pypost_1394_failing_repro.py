@@ -215,7 +215,6 @@ def test_json_selector_engine_observability_and_zero_leak(
         "json_selector_engine_compiled" in record.message
         and "raw_count=2" in record.message
         and "bare_keys_count=1" in record.message
-        and "path_selectors_count=1" in record.message
         and "trie_size=1" in record.message
         for record in caplog.records
     )

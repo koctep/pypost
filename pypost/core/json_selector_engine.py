@@ -117,7 +117,6 @@ class JsonSelectorEngine:
     def __init__(self, selectors: Iterable[str] | None = None) -> None:
         self._raw_selectors: set[str] = set()
         self._bare_keys: set[str] = set()
-        self._path_selectors: list[CompiledPathSelector] = []
         self._trie = PathSelectorTrie()
         if selectors:
             self._compile(selectors)
@@ -137,15 +136,12 @@ class JsonSelectorEngine:
             if "." not in cleaned and "[" not in cleaned:
                 self._bare_keys.add(cleaned)
             else:
-                compiled = CompiledPathSelector(cleaned)
-                self._path_selectors.append(compiled)
-                self._trie.insert(compiled.tokens)
+                self._trie.insert(CompiledPathSelector(cleaned).tokens)
         logger.debug(
             "json_selector_engine_compiled raw_count=%d bare_keys_count=%d "
-            "path_selectors_count=%d trie_size=%d",
+            "trie_size=%d",
             len(self._raw_selectors),
             len(self._bare_keys),
-            len(self._path_selectors),
             self._trie.size,
         )
 
