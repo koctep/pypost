@@ -181,6 +181,10 @@ bare key, `full_dot`, `shorthand_dot`, and `wildcard_dot`.
 
 Located in `pypost.core.json_selector_engine`.
 
+The isolated catalog in `tests/test_pypost_1545_failing_repro.py` locks insert
+dedupe and size, an empty index, shorthand-only walks, bare-name rules, and the
+wildcard-heavy yes-or-no, without changing mask results.
+
 #### `insert(tokens: Sequence[str]) -> None`
 Indexes one hierarchical token sequence. Duplicate terminals do not inflate `size`.
 
