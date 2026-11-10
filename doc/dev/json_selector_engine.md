@@ -243,10 +243,9 @@ formatted_text, spans = formatter.format(response_dict)
    responses, >80% of selectors are simple key names (`token`, `password`, `key`). These match in
    $O(1)$ time without string concatenation or tuple allocations.
 2. **Segment Trie Hierarchical Lookup (PYPOST-1388)**:
-   Hierarchical rules are indexed in `PathSelectorTrie` at compile time. Steady-state
+   Hierarchical rules are indexed only in `PathSelectorTrie` at compile time. Steady-state
    `matches` walks exact/`*` edges bounded by path depth, not by scanning all $R$ hierarchical
-   rules. A `_path_selectors` list is still built for DEBUG `path_selectors_count` and the
-   FR-2 regression probe; it is not iterated on the hot path.
+   rules. Compile DEBUG reports `trie_size` as the indexed-path count.
 3. **Mutable Path Breadcrumbs (PYPOST-1388)**:
    `redact_tree` and `JsonMaskFormatter` reuse one `list[str]` across recursion with
    `append` / `pop`, avoiding per-level `path + [seg]` allocations.
@@ -299,4 +298,4 @@ Example in collection JSON persistence:
 - **Large hierarchical catalogs feel slow**:
   Confirm rules are hierarchical (contain `.` or `[`); bare keys already match in $O(1)$.
   PYPOST-1388 trie lookup should keep non-bare misses proportional to nesting depth. Check
-  DEBUG `json_selector_engine_compiled` for `trie_size` vs `path_selectors_count`.
+  DEBUG `json_selector_engine_compiled` for `trie_size`.

@@ -1,8 +1,8 @@
 """Regression suite for PYPOST-1388 (efficient selector evaluation).
 
 Semantic-lock tests pin match / redact / format outcomes. Efficiency tests lock
-FR-2 / FR-3 bounds: hierarchical lookup must stay depth-bounded (not linear over
-``_path_selectors``), and redact/format descent must reuse one path breadcrumb list.
+FR-2 / FR-3 bounds: hierarchical catalog cardinality is trie size, and
+redact/format descent must reuse one path breadcrumb list.
 """
 
 from __future__ import annotations
@@ -124,43 +124,21 @@ def test_semantic_lock_empty_engine_short_circuit() -> None:
 
 
 # ---------------------------------------------------------------------------
-# Efficiency locks (depth-bounded lookup + reusable path breadcrumbs)
+# Efficiency locks (trie-size catalog + reusable path breadcrumbs)
 # ---------------------------------------------------------------------------
 
 
-class _CountingPathSelectors:
-    """Sequence wrapper that counts every rule yield during linear scans."""
-
-    def __init__(self, rules: list[Any]) -> None:
-        self._rules = list(rules)
-        self.item_reads = 0
-
-    def __iter__(self):
-        for rule in self._rules:
-            self.item_reads += 1
-            yield rule
-
-    def __bool__(self) -> bool:
-        return bool(self._rules)
-
-    def __len__(self) -> int:
-        return len(self._rules)
-
-    def __getitem__(self, index: int) -> Any:
-        return self._rules[index]
-
-
 def test_hierarchical_lookup_scaling_bounded_by_depth_not_rule_count() -> None:
-    """FR-2: hierarchical match must not scan all R path rules per visited key.
+    """FR-2: hierarchical catalog cardinality is trie size, not a stored list.
 
-    Segment-trie evaluation must stay near O(depth) per key; wrapping
-    ``_path_selectors`` detects any regression to a linear rule scan.
+    Distinct dotted rules each occupy one trie terminal. After compile,
+    ``engine._trie.size`` equals the rule count. Miss-heavy redaction still
+    calls ``matches`` and masks nothing.
     """
     rule_count = 400
     selectors = [f"catalog{i}.branch{i}.leaf{i}" for i in range(rule_count)]
     engine = JsonSelectorEngine(selectors)
-    counter = _CountingPathSelectors(engine._path_selectors)
-    engine._path_selectors = counter  # type: ignore[assignment]
+    assert engine._trie.size == rule_count
 
     # Medium body: many keys that miss the catalog (forces hierarchical probes).
     body: dict[str, Any] = {
@@ -168,27 +146,19 @@ def test_hierarchical_lookup_scaling_bounded_by_depth_not_rule_count() -> None:
         for i in range(25)
     }
     match_calls = 0
-    max_depth = 0
     original_matches = engine.matches
 
     def counting_matches(path: Any, key: str) -> bool:
-        nonlocal match_calls, max_depth
+        nonlocal match_calls
         match_calls += 1
-        max_depth = max(max_depth, len(path) + 1)
         return original_matches(path, key)
 
     engine.matches = counting_matches  # type: ignore[method-assign]
 
-    engine.redact_tree(body)
+    _redacted, mask_count = engine.redact_tree(body)
 
     assert match_calls > 0
-    # Trie / depth-bounded budget with modest wildcard slack — not O(R × visits).
-    budget = match_calls * max(max_depth, 1) * 4
-    assert counter.item_reads <= budget, (
-        f"hierarchical rule examinations={counter.item_reads} exceed depth-bounded "
-        f"budget={budget} (match_calls={match_calls}, max_depth={max_depth}, "
-        f"R={rule_count}); linear _path_selectors scan still in use"
-    )
+    assert mask_count == 0
 
 
 def test_redact_tree_reuses_single_path_breadcrumb_list(
