@@ -310,6 +310,9 @@ class ResponseMaskController(QObject):
         self._deltas = _SpanDeltaIndex(len(self._spans))
         for index, span in enumerate(self._spans):
             span._bind(index, self._deltas)
+        present_paths = {span.path for span in self._spans if span.path}
+        for path in set(self._reveal_state) - present_paths:
+            del self._reveal_state[path]
         restored = self._apply_persisted_reveals()
         self.update_visual_formats()
         logger.debug(
