@@ -370,6 +370,11 @@ opt into `preserve_reveal_state=True`) must not discard the user’s click-to-re
   again, then changing indent on the same response, leaves that value
   hidden. A value left revealed stays visible. A value never revealed
   stays masked.
+- **Characterization** (PYPOST-1550): `tests/test_pypost_1550_medium_indent_preserve.py`.
+  On a longer response, an indent change that finishes in the
+  background keeps a revealed value visible and a hidden value
+  hidden. A stale background result for an older generation does
+  not replace a newer display.
 - **DEBUG logs** (counts/paths only, never secrets):
   `response_masking_preserve_reveal_state`, `reveal_state_spans_cleared`,
   `reveal_state_cleared`, `reveal_state_restored`, and extended
