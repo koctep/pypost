@@ -375,6 +375,9 @@ opt into `preserve_reveal_state=True`) must not discard the user’s click-to-re
   background keeps a revealed value visible and a hidden value
   hidden. A stale background result for an older generation does
   not replace a newer display.
+- **Characterization** (PYPOST-1551): `tests/test_pypost_1551_forget_absent_reveal.py`.
+  A field that left starts masked if it comes back. A field still
+  present keeps its choice.
 - **DEBUG logs** (counts/paths only, never secrets):
   `response_masking_preserve_reveal_state`, `reveal_state_spans_cleared`,
   `reveal_state_cleared`, `reveal_state_restored`, and extended
